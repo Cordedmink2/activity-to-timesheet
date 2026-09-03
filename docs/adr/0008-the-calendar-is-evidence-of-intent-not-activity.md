@@ -29,9 +29,10 @@ from the AFK watcher exactly as before. No calendar event ever turns a break int
 
 **A calendar event is a block candidate, ranked by corroboration.**
 
-- **Corroborated** — a meeting window from the activity source falls inside the event's span. The
-  event is drafted as a block covering the event, extended to the end of any meeting-window evidence
-  that runs past it. This is the second sanctioned exception to "outer block edges are the script's
+- **Corroborated** — a meeting window from the activity source intersects the event's span (it may
+  begin before the event, when the user joined early; a window that ended as the event began saw
+  nothing of it). The event is drafted as a block covering the event, extended to the end of any
+  meeting-window evidence that runs past it. This is the second sanctioned exception to "outer block edges are the script's
   spans, transcribed verbatim", beside shrunk thin blocks, and the break it covers is declared under
   the table. Confidence `HIGH`.
 - **Uncorroborated** — no meeting window inside the span, whether the event sits inside the skeleton

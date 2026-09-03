@@ -34,7 +34,7 @@ Windows ending in `… - <ProfileName> - <UserDisplayName> - Microsoft Edge` (or
 
 ### 3. Teams chat / call titles (HIGH confidence for Teams events)
 
-Teams windows follow this pattern: `Chat | <Name>[, <Name>…] | <TenantName> | <user-email> | Microsoft Teams`.
+Teams windows follow this pattern: `Chat | <Name>[, <Name>…] | <TenantName> | <user-email> | Microsoft Teams`. A meeting or a call is titled `Meeting | <name> | …` or `Call with <name> | …` instead — the meeting-title pattern `SKILL.md` Step 3 uses as a soft boundary, and the one `scripts/calendar_day.py` uses to decide whether a calendar event was attended; a `Chat | …` window is never that evidence.
 
 - Title contains an **internal-colleague** name (see `.context.md` "Internal colleagues") → *probably* internal, but **don't auto-classify a meeting as internal just because the participants are all colleagues**. Internal teammates regularly hop on calls to discuss client work. Before billing to the internal-admin project, peek at a screenshot during the meeting to check the shared screen / agenda — if it shows a client environment, architecture diagram, work item, or repo, bill the meeting to *that* client's project instead. Only fall back to internal-admin when the screenshot shows internal artefacts (internal wiki, the consultancy's own CRM, AI training material, timesheet work) or is genuinely unrevealing.
 - Title contains a **known external contact** (see `.context.md` "Known external contacts") → use the mapped client. The `(External unfamiliar)` Teams flag is often stale; treat it as a soft warning, not a hard rule.

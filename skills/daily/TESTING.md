@@ -1836,6 +1836,70 @@ the wrong trade.
 **Not measured.** Anything against a real calendar. The adapter is #51, and its live check is
 the `setup` step's Verify (#56), the same arrangement the screenshot task has.
 
+### The corroboration verdict — #52
+**Rung 3.** 2026-09-03. The second tracer bullet of #49: every event the wrapper prints now
+carries `corroborated`, and the corroborated ones an `evidence` span and a proposed `block`
+span. Arithmetic over the day's window events, pinned at the function against days built with
+the `Day` DSL and at process level against a served fake ActivityWatch. The decisions the ticket
+left open, and what was chosen:
+
+**The meeting-title pattern is `Meeting |` or `Call with`, on the title alone.** SKILL.md Step 3
+already named both as the soft boundary a Teams meeting starts at, so the wrapper's `MEETING_TITLE`
+is that rule's first copy in code rather than a new rule; the row in `self-development.md` says
+so. `Chat |` is excluded by not being matched, which is the AC's "a Teams chat window does not
+corroborate". The app name is not consulted — Teams has been `Teams.exe`, `ms-teams.exe` and a
+browser tab — and nothing but Teams titles a window that way.
+
+**Meeting windows are read as the timeline reads them.** Heartbeats collapsed, sub-five-second
+events dropped, fragments of the same title under a minute apart joined. The two constants moved
+from `activity_timeline.py` into `aw_client.py` so both readers import one copy, and the wrapper
+takes the same two flags — a flash of the Teams window that is noise to the timeline has to be
+noise to the verdict too, and the review of this ticket caught that one copy of the *constant* is
+not enough when one reader lets the user move it and the other does not. Merging is by *title*, and
+with the last span of that title rather than the last span seen, so two meetings back to back are
+two spans, the second cannot lend its end to the first, and two windows flicked between do not
+shred each other's runs. A fragment minutes after the scheduled end — reopening the meeting to
+read its chat — is a separate span that does not intersect the event and does not extend the
+block; the evidence has to run *through* the end to count as an overrun. The fetch-and-refuse that
+goes with the constants moved too: `aw_client.window_day()` is now the one copy of "unreachable"
+and "no window bucket" for the timeline and the wrapper both, which the review also asked for.
+
+**An event with no span intersects nothing, and a reversed one is refused.** A zero-length
+appointment is a reminder; a window open at that instant would otherwise corroborate it and hand
+the rules a block the length of the whole meeting window. An event ending before it starts is an
+adapter bug and is named as one, like a missing field.
+
+**Intersection is strict; the evidence is reported as seen; the block moves at one end.** A
+window that ended as the event began saw nothing of it. Evidence may start before the event when
+the user joined early, and is printed that way — it is what the machine saw. The block is the
+event's span with only its end extended, per the spec's words: the minutes before a scheduled
+start are ordinary active time the surrounding block covers, and re-timing the calendar's start
+would be the wrapper making a judgement the rules own.
+
+**The activity source is read before the adapter, and its absence is refused.** Without window
+events there is no verdict, and printing every event uncorroborated would turn each meeting into
+a question with nothing said about why — a quiet wrong answer, which is the failure mode the
+whole skill is built to avoid. So an unreachable ActivityWatch and a missing window bucket are
+refused in the two reading scripts' words, and before the adapter is spawned, because the
+adapter is Outlook and Outlook can take a while to start. The process-level tests therefore serve
+an activity day as well as a fake adapter; the tests about an adapter failing still assert on the
+adapter's reason, so the order is pinned by the one that asserts the adapter never ran.
+
+**Both spans render in the skeleton's notation.** Through `local_clock`, so the second-pass marker
+lands on a block that starts in the repeated hour and a block span can be handed to `--cover`
+unchanged. Pinned on the 2026-04-05 fall-back.
+
+**Known and left.** Evidence is read over the day's own bounds, so an event that runs over local
+midnight has its overrun judged only up to midnight, and its block end renders as a clock earlier
+than its start — the same dateless-clock shape every other script here prints for an overnight
+span. Reading further would mean fetching the adapter first to know how far, which puts Outlook's
+start-up ahead of the "is ActivityWatch even up" check for a case that is a meeting at midnight.
+Noted in `day_window_events()`'s docstring; revisit if it is ever seen.
+
+**Not measured.** What a rule does with the verdict — drafting a corroborated event over a break
+(#53), listing an uncorroborated one as a question (#54). Those are prose changes to Steps 3 and
+6, and the SKILL.md inventory entry says so until they land.
+
 ## Rejected
 
 ### Byte size as a "static screen" signal — narrowed, 2026-08-28

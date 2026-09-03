@@ -1,12 +1,15 @@
 """Shared ActivityWatch REST helpers for the billables `daily` skill.
 
-`afk_blocks.py` reads the day skeleton and `activity_timeline.py` reads its
-content, but both talk to the same local AW server the same way: discover a
-hostname-suffixed bucket, pull a day of events, collapse the heartbeats. Each
-used to carry its own copy of that code, so a fix to one left the other wrong.
+`afk_blocks.py` reads the day skeleton, `activity_timeline.py` reads its content, and
+`calendar_day.py` reads the window events again to decide whether a calendar event was
+attended. All three talk to the same local AW server the same way: discover a
+hostname-suffixed bucket, pull a day of events, collapse the heartbeats. The first two used
+to carry their own copy of that code, so a fix to one left the other wrong; `window_day()`
+below is the fetch-and-refuse the two window readers share, and `NOISE_FLOOR` / `GAP_FOLD`
+are the one copy of what they both treat as noise.
 
 It also owns the one fact about *where* a day is read — the server's address — because
-both scripts need it and neither should answer it its own way. It resolves through
+every reader needs it and none should answer it its own way. It resolves through
 `skill_config`, so it arrives from wherever the user configured it and nothing here knows
 about the harness.
 
@@ -26,11 +29,63 @@ import skill_config
 
 DEFAULT_ACTIVITY_URL = "http://localhost:5600"
 
+# What counts as noise when window events are read as spans. Here rather than in the
+# timeline because the calendar wrapper reads the same events for its verdict, and a meeting
+# window flashed through for two seconds has to be noise to both or the two disagree about
+# whether a meeting was attended. The timeline exposes each as a flag; the defaults are what
+# a person works like, and belong in their `context.md` § Preferences rather than only here.
+NOISE_FLOOR = 5    # drop sub-5s events (tab-switch noise), per SKILL.md
+GAP_FOLD = 60      # inter-event gaps shorter than this don't break a span (seconds)
+
+# The bucket the window watcher reports into. Prefixes deliberately carry no trailing `_`:
+# `pick_bucket` prefers a hostname-suffixed bucket over an unsuffixed one, and a prefix ending
+# in `_` made every unsuffixed bucket invisible.
+WINDOW_BUCKET = "aw-watcher-window"
+
 
 class UsageError(ValueError):
     """A flag value a day-reading script cannot act on — a `--window` or `--cover` that
     does not parse. Carries the message `main()` prints after `ERR `; the exit code stays
     `main()`'s to decide, and the function that raised it has printed nothing."""
+
+
+class SourceError(Exception):
+    """The activity source could not be read — one line, printed after `ERR`, exit 1.
+
+    Distinct from `UsageError` (exit 2) so a caller can tell "AW is down" from "you typed
+    the range backwards" and choose its fallback for the right reason."""
+
+
+def unreachable(exc) -> str:
+    """The one wording of "AW is down", so every reader refuses in the same words."""
+    return f"ActivityWatch unreachable at {resolve_base()} ({exc})"
+
+
+def window_day(start_utc, end_utc, consequence: str) -> tuple[dict, str, list[dict]]:
+    """The bucket listing, the window bucket's id and its events over the range — or the
+    reason there are none.
+
+    Two refusals, both `SourceError`. Unreachable is the obvious one. A *missing* window
+    bucket is the one that used to slip through: without it a crashed or renamed window
+    watcher yields a well-formed, totally empty result and exit 0, which reads as "the user
+    did nothing" rather than "the instrument is broken". Silence is the more dangerous
+    answer for every reader, and `consequence` is what the silence would have meant to this
+    one — "this day has no timeline", "nothing can corroborate a calendar event".
+
+    The listing is returned so a caller wanting other buckets too pays for one call.
+    """
+    try:
+        buckets = get("/buckets/")
+        bucket = pick_bucket(buckets, WINDOW_BUCKET)
+        events = fetch_events(bucket, start_utc, end_utc)
+    except Exception as exc:
+        raise SourceError(unreachable(exc)) from None
+    if not bucket:
+        raise SourceError(
+            f"no {WINDOW_BUCKET} bucket found — the window watcher is not reporting, so "
+            f"{consequence} (that is not the same as an empty day). Buckets seen: "
+            f"{sorted(buckets) or '(none)'}")
+    return buckets, bucket, events
 
 
 def resolve_base() -> str:

@@ -39,15 +39,9 @@ import json
 import re
 import sys
 
-from aw_client import (UsageError, dedupe_heartbeats, fetch_events, get, parse_ts,
-                       pick_bucket, resolve_base)
+from aw_client import (GAP_FOLD, NOISE_FLOOR, SourceError, UsageError, dedupe_heartbeats,
+                       fetch_events, get, parse_ts, pick_bucket, unreachable, window_day)
 from timezone import local_clock, parse_range, resolve_zone, utc_bounds, zone_label
-
-# Defaults for the two noise constants, each exposed as a flag in main(): what counts as
-# noise depends on how a person works, so they belong in the user's `context.md`
-# § Preferences rather than only here.
-NOISE_FLOOR = 5    # drop sub-5s events (tab-switch noise), per SKILL.md
-GAP_FOLD = 60      # inter-event gaps shorter than this don't break a span (seconds)
 
 WEB_WATCHERS = ("aw-watcher-web-firefox", "aw-watcher-web-chrome")
 
@@ -231,9 +225,11 @@ def main():
 
     start_utc, end_utc = utc_bounds(local_date, zone)
     try:
-        buckets = get("/buckets/")
-        win_bucket = pick_bucket(buckets, "aw-watcher-window")
-        win_events = fetch_events(win_bucket, start_utc, end_utc)
+        # The fetch and both refusals — unreachable, and the missing window bucket that
+        # would otherwise read as a day of no work — are the client's, shared with the
+        # calendar wrapper. afk_blocks.py refuses the same way on a missing AFK bucket.
+        buckets, win_bucket, win_events = window_day(start_utc, end_utc,
+                                                    "this day has no timeline")
         # The web watchers are only read in zoom mode, and only the browsers that report:
         # a missing bucket is answered with nothing by `fetch_events`. A fetch that fails
         # is reported here like the window watcher's, rather than leaving the zoom's tab
@@ -243,17 +239,11 @@ def main():
             for pref in WEB_WATCHERS:
                 web_events += dedupe_heartbeats(
                     fetch_events(pick_bucket(buckets, pref), start_utc, end_utc))
-    except Exception as e:
-        print(f"ERR ActivityWatch unreachable at {resolve_base()} ({e})", file=sys.stderr)
+    except SourceError as e:
+        print(f"ERR {e}", file=sys.stderr)
         return 1
-    if not win_bucket:
-        # Without this, a crashed or renamed window watcher yields a well-formed, totally
-        # empty timeline and exit 0 — which reads as "the user did no work" rather than
-        # "the instrument is broken". afk_blocks.py already refuses on a missing AFK
-        # bucket; silence is the more dangerous answer for both.
-        print("ERR no aw-watcher-window bucket found — the window watcher is not "
-              "reporting, so this day has no timeline (that is not the same as an empty "
-              f"day). Buckets seen: {sorted(buckets) or '(none)'}", file=sys.stderr)
+    except Exception as e:
+        print(f"ERR {unreachable(e)}", file=sys.stderr)
         return 1
     classes = load_classes()
 

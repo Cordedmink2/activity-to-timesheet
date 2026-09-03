@@ -113,8 +113,10 @@ def test_fetch_events_asks_the_bucket_for_the_requested_range(monkeypatch):
 # The request, dedupe and timestamp helpers the two day-reading scripts each used to carry
 # a copy of, which is the drift this module exists to prevent. `parse_range` was on this
 # list until #36 and is now on `test_timezone.py`'s, with the rest of the zone arithmetic.
+# `resolve_base` was on it until #52, when the one wording of "AW is down" that reads it
+# became the client's `unreachable()` and the scripts stopped needing the address themselves.
 SHARED = ["get", "pick_bucket", "fetch_events", "dedupe_heartbeats", "parse_ts",
-          "resolve_base"]
+          "unreachable"]
 
 
 @pytest.mark.parametrize("module", [ab, tl], ids=["afk_blocks", "activity_timeline"])

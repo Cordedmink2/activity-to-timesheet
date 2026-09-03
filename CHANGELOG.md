@@ -36,7 +36,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skeleton's notation. Off, it exits non-zero saying so; an adapter that cannot read the calendar
   is a non-zero exit carrying its reason, never a quiet empty day. **Nothing reads it yet**, and
   the Outlook adapter it names does not ship yet — turning the toggle on today gets an error
-  naming the missing adapter. The corroboration verdict, the adapter and the skill steps follow.
+  naming the missing adapter. The adapter and the skill steps follow.
+- **The corroboration verdict** (#52, the second piece of #49). Every event the calendar wrapper
+  prints now says whether the activity source backs it: `corroborated` is true when a meeting
+  window — a `Meeting | …` or `Call with …` title, the same pattern the daily skill already
+  treats as a meeting's start — intersects the event's span. A corroborated event carries the
+  `evidence` span seen and a proposed `block` span: the event, extended to the end of the
+  evidence when the meeting ran over, and never past it on the AFK watcher's word alone. An
+  uncorroborated event carries neither, whether the user was at the machine doing something else
+  or on a client site before it opened. Meeting windows are read as the timeline reads them —
+  heartbeats collapsed, sub-five-second flashes dropped, fragments under a minute apart joined —
+  and the two noise constants now live in the shared activity client so both readers hold one
+  copy. The wrapper reads the day's window events from ActivityWatch before it runs the adapter
+  and refuses, in the two day-reading scripts' words, when it cannot: a day with nothing to
+  corroborate against is not a day on which no meeting was attended. The verdict is computed
+  once, here; the steps that read it are still to come.
 
 ### Fixed
 - **A patch could move an entry's times across a daylight-saving change and bill it short,

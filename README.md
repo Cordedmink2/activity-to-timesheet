@@ -501,7 +501,7 @@ activity-to-timesheet/
 │   └── scripts/              # Harvest + ActivityWatch + screenshot helpers (stdlib Python)
 │       ├── activity_timeline.py  # categorized window timeline from AW category rules
 │       ├── afk_blocks.py         # AFK-anchored day skeleton (work_start/end, breaks)
-│       ├── aw_client.py          # shared ActivityWatch REST helpers for the two above
+│       ├── aw_client.py          # shared ActivityWatch REST helpers for every script that reads a day
 │       ├── harvest_lookup.py     # project_id/task_id lookup by code, name or client
 │       ├── skill_config.py       # the one seam every script reads a setting through
 │       ├── timezone.py           # the zone a day is read in + its clock arithmetic

@@ -44,7 +44,7 @@ import sys
 from typing import NamedTuple
 
 from aw_client import (UsageError, dedupe_heartbeats, fetch_events, get, parse_ts,
-                       pick_bucket, resolve_base)
+                       pick_bucket, unreachable)
 from timezone import local_clock, parse_range, resolve_zone, utc_bounds, zone_label
 
 DEFAULT_THRESHOLD = 1050  # 17.5 min — the skill's "real break" boundary
@@ -476,7 +476,7 @@ def main():
         # reported like any other, rather than a tail quietly missing from the report.
         win_events = dedupe_heartbeats(fetch_events(win_bucket, start_utc, end_utc))
     except Exception as e:
-        print(f"ERR ActivityWatch unreachable at {resolve_base()} ({e})", file=sys.stderr)
+        print(f"ERR {unreachable(e)}", file=sys.stderr)
         return 1
 
     tunables = Tunables(args.afk_threshold, args.solid, args.blip_gap, args.min_uncovered,
