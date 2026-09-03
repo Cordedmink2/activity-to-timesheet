@@ -1,6 +1,7 @@
 """The one place the bundled scripts read their configuration.
 
   setting(key, flag=..., default=...) -> str | None   — a single setting
+  enabled(key, flag=...) -> bool                      — a single on/off setting
   has_value(candidate) -> bool                        — whether a candidate counts at all
   find_workspace() -> Path | None                     — the directory holding `.mcp/`
   fail_missing(message) -> NoReturn                   — the error contract for a
@@ -135,6 +136,26 @@ def setting(key: str, *, flag: str | None = None, default: str | None = None) ->
         if has_value(candidate):
             return candidate
     return default
+
+
+def enabled(key: str, *, flag: str | None = None) -> bool:
+    """Resolve one on/off setting: on when it reads `true`, in any case; off otherwise.
+
+    The same ladder as `setting()`, so a toggle means the same thing on the plugin route
+    and on the export route: a `.env` line saying `false` beats an environment saying
+    `true`, and a blank at any layer falls through to the next. Blank, unset, or anything
+    but `true` is off — absent configuration means today's behaviour exactly (ADR-0008).
+
+    One spelling of on, deliberately. `yes`, `1` and `on` are not accepted, because a
+    toggle with three spellings of on has three spellings of a typo that silently reads as
+    *off*, and nothing in a run says so — a user finds out at the `setup` skill's verify
+    step, or not at all. The
+    harness injects a declared boolean option as the strings `true` / `false` — its hook
+    runner does `String(value)` — so the one spelling here is the one the configure dialog
+    produces, and a hand-edited `.env` has one word to get right.
+    """
+    value = setting(key, flag=flag)
+    return value is not None and value.strip().lower() == "true"
 
 
 def fail_missing(message: str) -> NoReturn:

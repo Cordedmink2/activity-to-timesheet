@@ -81,6 +81,7 @@ Everything the skill needs to know about *this machine and account* is declared 
 | `TIMESHEET_ACTIVITY_URL` | no | `http://localhost:5600` |
 | `TIMESHEET_SCREENSHOTS_DIR` | no | `~/Pictures/WorkScreenshots` |
 | `TIMESHEET_WORKSPACE` | no | the directory Claude Code is run from, if it looks like a workspace |
+| `TIMESHEET_OUTLOOK_CALENDAR` | no | the calendar is not read. `true` — the one spelling of on — reads the default calendar in classic Outlook, Windows only |
 
 The user sets them with **`/plugin configure billables`**. The two Harvest fields are declared *sensitive*, so Claude Code stores them in its own credential store — not in any file in the plugin, and not in `settings.json`. A plugin update cannot carry them off and there is nothing for this skill to git-ignore.
 

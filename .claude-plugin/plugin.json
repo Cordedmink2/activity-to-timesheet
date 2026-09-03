@@ -51,6 +51,11 @@
       "type": "directory",
       "title": "Workspace directory",
       "description": "The folder holding your Timesheets/ and .mcp/ catalogs. Leave blank to use the folder you run Claude Code from."
+    },
+    "TIMESHEET_OUTLOOK_CALENDAR": {
+      "type": "boolean",
+      "title": "Read my Outlook calendar",
+      "description": "Reads your default calendar in classic Outlook (Windows only) as a fourth source: a calendar event your activity corroborates is drafted as a block, and one it does not is put to you as a question. Off means today's behaviour exactly. Not sure? Leave it off and run /billables:setup."
     }
   },
   "hooks": {

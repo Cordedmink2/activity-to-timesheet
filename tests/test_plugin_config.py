@@ -50,7 +50,19 @@ REQUIRED = {"HARVEST_ACCOUNT_ID", "HARVEST_API_KEY", "TIMESHEET_TIMEZONE"}
 # What the harness must keep out of `settings.json` and out of the plugin folder.
 SENSITIVE = {"HARVEST_ACCOUNT_ID", "HARVEST_API_KEY"}
 # What a user can leave blank and still complete a run.
-OPTIONAL = {"TIMESHEET_ACTIVITY_URL", "TIMESHEET_SCREENSHOTS_DIR", "TIMESHEET_WORKSPACE"}
+OPTIONAL = {"TIMESHEET_ACTIVITY_URL", "TIMESHEET_SCREENSHOTS_DIR", "TIMESHEET_WORKSPACE",
+            "TIMESHEET_OUTLOOK_CALENDAR"}
+
+# The export has no manifest to be asked from, so the same keys go in a `.env` copied from
+# this template. The two are the same declaration made twice, which is why a test holds them
+# together below.
+ENV_TEMPLATE = REPO / "skills" / "daily" / ".env.example"
+
+# Keys the template carries that the manifest deliberately does not: the work-item source's.
+# They belong to one org rather than to every install, so the configure dialog never asks
+# for them (README § "Coming from a hand-installed copy"), and drawing that boundary
+# properly is #37's. Named here so that *any other* difference between the two fails.
+WORK_ITEM_SOURCE_KEYS = {"DATAVERSE_URL", "PAC_AUTH_PROFILE"}
 
 
 def user_config() -> dict:
@@ -159,6 +171,37 @@ def test_every_option_says_what_it_is_and_where_to_get_it(key):
     opt = user_config()[key]
     assert opt.get("title"), f"{key} has no title"
     assert len(opt.get("description", "")) > 30, f"{key}'s description does not say enough"
+
+
+def test_the_calendar_toggle_is_a_boolean_with_nothing_to_type():
+    """One on/off switch, no magic word (#49, story 19). A string option would have the
+    dialog ask for text and the user guess at `true`, `yes`, `on` — of which the seam
+    accepts exactly one, so two of the three would be a calendar silently left off."""
+    assert user_config()["TIMESHEET_OUTLOOK_CALENDAR"]["type"] == "boolean"
+
+
+def template_lines() -> dict[str, str]:
+    """`KEY` -> value for every assignment line in the export's env template."""
+    text = ENV_TEMPLATE.read_text(encoding="utf-8")
+    return {m.group(1): m.group(2)
+            for m in re.finditer(r"^([A-Z][A-Z0-9_]*)=(.*)$", text, re.M)}
+
+
+def test_the_env_template_names_exactly_the_keys_the_manifest_declares():
+    """Two install routes, one configuration. A key declared in the manifest and missing
+    from the template is a setting the exported install has no line for — its user reads
+    the plugin's setup instructions, finds no such key in the file they were told to fill
+    in, and the feature stays off with nothing saying why. The other direction is a key the
+    template offers that nothing resolves."""
+    assert set(template_lines()) == set(user_config()) | WORK_ITEM_SOURCE_KEYS, (
+        "the export's .env.example and the manifest's userConfig name different keys")
+
+
+def test_every_template_key_is_present_and_blank():
+    """The template is copied to `.env` and filled in. A value already in it is a default
+    by another name, and `test_no_option_carries_a_default` says why there are none."""
+    filled = {k: v for k, v in template_lines().items() if v.strip()}
+    assert not filled, f"the env template pre-fills: {filled}"
 
 
 def test_the_two_directories_are_declared_as_directories():

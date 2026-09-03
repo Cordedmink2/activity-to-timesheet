@@ -1769,6 +1769,73 @@ is no such module in the standard library (`datetime.timezone` is an attribute a
 `zoneinfo` is the package), and the scripts have no third-party dependencies at all, so the
 exposure is a future dependency named exactly `timezone` — checked by hand, not by a test.
 
+### The calendar toggle and the wrapper behind it — #50
+**Rung 3.** 2026-09-03. New capability, the first tracer bullet of #49, and nothing observed
+yet: no adapter exists to observe. What is recorded here is the handful of decisions the ticket
+left to the implementation, and the one it decided that this reads differently.
+
+**A tentatively accepted meeting counts.** The spec's filter says "accepted or organised", and
+its story 13 says "tentative meetings are included". In Outlook those conflict: tentatively
+accepting an invite sets *both* the response and the show-as to tentative, so a filter that
+took the spec's response list literally would drop exactly the half-committed meeting story 13
+keeps, and "Tentative is kept" — the AC's own words — would hold only for the organiser who
+marked their own meeting tentative. The response filter is therefore organiser, accepted or
+tentative; declined, never answered, and `none` are out. `none` is worth a word: it is what
+Outlook reports for an appointment the user wrote themselves, which is the site-visit case
+story 4 exists for. That is the adapter's to report as `organizer` — the user authored it —
+and the wrapper's docstring says so, because the wrapper cannot tell a self-authored
+appointment from an invite nobody answered and should not try.
+
+**An event is on the day it starts.** The spec says an event counts when it "falls on the
+target calendar day", which a meeting running 23:00–01:00 does twice. It is placed by its
+start, as a calendar displays it, for a reason the output shape forces: clocks are rendered
+without dates, so on the second day that event would read `23:00:00`–`01:00:00` — a span that
+appears to run backwards, or a twenty-two-hour one, depending on who reads it. Pinned by
+`test_an_event_is_placed_by_where_it_starts`.
+
+**`--adapter` takes a path, not a command line.** The spec says the adapter command is
+injectable. A command *line* has to be tokenised, and there is no stdlib tokeniser that
+survives a Windows path: `shlex` in POSIX mode eats the backslashes, in non-POSIX mode keeps
+the quotes, and `subprocess.list2cmdline` has no inverse. A path needs no tokenising, and the
+suffix says how to run it — `.ps1` under `powershell` (5.1, which is what holds the Outlook
+adapter to parsing there), `.py` under the interpreter running the wrapper, anything else as
+it is. The date is the one argument, last. The Outlook adapter is a path beside the script
+rather than a setting, so there is no spelling for a user to get wrong.
+
+**The toggle gates even when `--adapter` is given.** The flag chooses *which* adapter; the
+toggle says whether the calendar is read at all. A fake handed to a machine with the calendar
+off is refused like the real one would be, which keeps "off means today's behaviour exactly"
+true of every invocation rather than of the ones without a flag.
+
+**The off message carries `note_for_an_unreached_shell()`.** A required setting that never
+reaches a PowerShell-tool command fails loudly and the note explains why. A *toggle* that never
+reaches one reads as off — a legitimate state — so the skill would quietly run without the
+calendar on a machine where it was turned on, and nothing would say so. The off message is
+where that user can be told, under the same three conditions as the other messages.
+
+**The harness injects a boolean as `true`/`false`.** Not documented; read out of the installed
+CLI, whose hook runner does `String(value)` when building `CLAUDE_PLUGIN_OPTION_<KEY>`. So the
+seam's one spelling of on is the one the configure dialog produces, and an off toggle arrives
+as the word `false`, which the publisher forwards (it drops blanks, not words) and the seam
+reads as off. Worth re-checking if a future CLI stops stringifying that way; the `setup`
+step's Verify (#56) is where it would show.
+
+**The parity test admits two keys the manifest does not declare.** `.env.example` carries
+`DATAVERSE_URL` and `PAC_AUTH_PROFILE`, which the configure dialog deliberately never asks for
+— they belong to one org, not every install — and whose proper boundary is #37's. The test
+names those two and demands equality otherwise, so any *other* drift between the two
+declarations fails in either direction.
+
+**Process level means the adapter, not the wrapper.** The fake adapter is a real script the
+wrapper spawns, so the argv contract, the exit-code judgement and the UTF-8 read are exercised
+for real; the fake asserts its own argv. The wrapper itself runs in-process through `run_cli`,
+as every script here does — a subprocess would read the real `.env` for the toggle and the
+zone, and `README.md` § "Never invoke a script with `subprocess`" already says why that is
+the wrong trade.
+
+**Not measured.** Anything against a real calendar. The adapter is #51, and its live check is
+the `setup` step's Verify (#56), the same arrangement the screenshot task has.
+
 ## Rejected
 
 ### Byte size as a "static screen" signal — narrowed, 2026-08-28

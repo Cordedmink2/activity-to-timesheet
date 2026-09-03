@@ -24,6 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reachable Harvest and an entry id that exists, where before it needed none of them. A mistyped id
   answers `ERR 404` instead of printing `WOULD PATCH`.
 
+### Added
+- **A calendar toggle and the wrapper behind it** (#50, the first piece of #49). A new optional
+  setting, **Read my Outlook calendar** (`TIMESHEET_OUTLOOK_CALENDAR`), off by default and mirrored
+  as a blank line in the export's `.env.example`; a test now holds the template and the manifest
+  to the same keys. The configuration seam learns its first boolean: `true` in any case is on,
+  and blank or anything else is off. `scripts/calendar_day.py` is the wrapper the `daily` skill
+  will read the calendar through — one day's events from whichever adapter is configured,
+  filtered to what counts (accepted, organised or tentatively accepted; busy or tentative; timed;
+  not cancelled; starting on the day in the configured zone), as JSON with clocks in the
+  skeleton's notation. Off, it exits non-zero saying so; an adapter that cannot read the calendar
+  is a non-zero exit carrying its reason, never a quiet empty day. **Nothing reads it yet**, and
+  the Outlook adapter it names does not ship yet — turning the toggle on today gets an error
+  naming the missing adapter. The corroboration verdict, the adapter and the skill steps follow.
+
 ### Fixed
 - **A patch could move an entry's times across a daylight-saving change and bill it short,
   silently** (#32). Harvest recomputes the duration from the two clock times on a `PATCH` exactly

@@ -41,6 +41,7 @@ for your own details, once:
 | **ActivityWatch address** | Optional. Leave blank unless AW runs somewhere other than `http://localhost:5600`. |
 | **Screenshot directory** | Optional. Blank means `~/Pictures/WorkScreenshots`. |
 | **Workspace directory** | Optional. Blank means the folder you run Claude Code from, if it already looks like a workspace (`.mcp/` or `Timesheets/`) — which is the normal case. Set it if you start sessions elsewhere: a plugin is never installed *inside* a workspace, so there is no second place to fall back to. Answer it after step 6, with `/plugin configure billables`. |
+| **Read my Outlook calendar** | Optional, off by default. On, the `daily` skill reads your default calendar in classic Outlook (Windows only) as a fourth source — a calendar event your activity corroborates is drafted, one it does not is put to you as a question. Off is exactly today's behaviour. |
 
 To change any of them later: `/plugin configure billables`.
 

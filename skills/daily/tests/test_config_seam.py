@@ -104,6 +104,58 @@ def test_a_blank_env_file_value_does_not_win(isolated, monkeypatch):
 
 
 # --------------------------------------------------------------------------------------
+# A toggle: the one boolean the seam resolves
+# --------------------------------------------------------------------------------------
+#
+# Every setting before the calendar was a string a script used as it stood. The calendar
+# toggle is a yes-or-no, and the seam is where the spelling of "yes" is decided — once —
+# rather than in whichever script happens to read it first.
+
+TOGGLE = "TIMESHEET_OUTLOOK_CALENDAR"
+
+
+@pytest.mark.parametrize("spelling", ["true", "TRUE", "True", "  true  "])
+def test_a_toggle_is_on_when_it_reads_true_in_any_case(isolated, monkeypatch, spelling):
+    """The configure dialog writes one spelling and a hand-edited `.env` another. Case and
+    surrounding whitespace are not what a user means by the word."""
+    monkeypatch.setenv(TOGGLE, spelling)
+    assert skill_config.enabled(TOGGLE) is True
+
+
+@pytest.mark.parametrize("spelling", ["", "   ", "false", "yes", "1", "on", "enabled", "tru"])
+def test_anything_but_true_is_off(isolated, monkeypatch, spelling):
+    """Blank or anything but `true` is off. `yes` and `1` are deliberately not accepted:
+    a toggle that reads three spellings of on has three spellings of a typo that is
+    silently *off*, and no run says so — a user finds out at the setup skill's Verify,
+    or not at all."""
+    monkeypatch.setenv(TOGGLE, spelling)
+    assert skill_config.enabled(TOGGLE) is False
+
+
+def test_an_unset_toggle_is_off(isolated):
+    """Absent configuration means today's behaviour exactly — ADR-0008."""
+    assert skill_config.enabled(TOGGLE) is False
+
+
+def test_a_toggle_resolves_through_the_same_precedence_as_every_other_key(isolated,
+                                                                         monkeypatch):
+    """`.env` beats the process environment, and a blank `.env` line falls through to it —
+    the two rungs of the ladder a toggle can plausibly sit on at once, on an exported
+    install whose user also has the variable set."""
+    isolated.write_text(f"{TOGGLE}=false\n", encoding="utf-8")
+    monkeypatch.setenv(TOGGLE, "true")
+    assert skill_config.enabled(TOGGLE) is False, ".env did not beat the environment"
+    isolated.write_text(f"{TOGGLE}=\n", encoding="utf-8")
+    assert skill_config.enabled(TOGGLE) is True, "a blank .env line did not fall through"
+
+
+def test_a_toggle_takes_a_flag_like_every_other_key(isolated, monkeypatch):
+    monkeypatch.setenv(TOGGLE, "true")
+    assert skill_config.enabled(TOGGLE, flag="false") is False
+    assert skill_config.enabled(TOGGLE, flag="  ") is True, "a blank flag must not win"
+
+
+# --------------------------------------------------------------------------------------
 # find_workspace(): the one derived setting, resolved the same way for reader and writer
 # --------------------------------------------------------------------------------------
 

@@ -60,6 +60,7 @@ def bundled_script_names() -> list[str]:
 SETTING_KEYS = (
     "HARVEST_ACCOUNT_ID", "HARVEST_API_KEY", "TIMESHEET_TIMEZONE",
     "TIMESHEET_ACTIVITY_URL", "TIMESHEET_WORKSPACE", "TIMESHEET_SCREENSHOTS_DIR",
+    "TIMESHEET_OUTLOOK_CALENDAR",
     "DATAVERSE_URL", "PAC_AUTH_PROFILE",
 )
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer

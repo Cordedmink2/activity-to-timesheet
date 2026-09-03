@@ -173,10 +173,12 @@ def test_scripts_import_under_a_stdout_that_cannot_be_reconfigured(name, monkeyp
 
 # Every script whose `main()` has to make the console UTF-8 before it prints, and how.
 # The four that shell out need `PYTHONIOENCODING` for the child as well, so they call the
-# shared `harvest_client.use_utf8()`; the two that spawn nothing reconfigure their own
-# streams rather than importing the Harvest client into a script that never bills.
+# shared `harvest_client.use_utf8()`; the three below reconfigure their own streams rather
+# than importing the Harvest client into a script that never bills. Two of them spawn
+# nothing; `calendar_day` spawns an adapter, but reads it as UTF-8 by contract rather than
+# by setting the child's encoding, so it has no use for the helper either.
 UTF8_VIA_HELPER = ["harvest_post", "harvest_patch", "harvest_list", "refresh_catalogs"]
-UTF8_INLINE = ["activity_timeline", "harvest_lookup"]
+UTF8_INLINE = ["activity_timeline", "harvest_lookup", "calendar_day"]
 
 
 @pytest.mark.parametrize("name", UTF8_VIA_HELPER)
