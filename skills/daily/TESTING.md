@@ -1900,6 +1900,95 @@ Noted in `day_window_events()`'s docstring; revisit if it is ever seen.
 (#53), listing an uncorroborated one as a question (#54). Those are prose changes to Steps 3 and
 6, and the SKILL.md inventory entry says so until they land.
 
+### The Outlook adapter — #51
+**Rung 2.** 2026-09-04. The third tracer bullet of #49, and the first read of a real calendar.
+`scripts/outlook_calendar.ps1` is the producer of the contract #50 fixed; what it owns is the
+translation from Outlook's object model to the nine fields, pinned by the repo-level
+`tests/test_outlook_adapter.py`, which dot-sources the script under Windows PowerShell 5.1 and
+hands its functions `PSCustomObject`s with an `AppointmentItem`'s member names — the same code
+path the real object takes, no Outlook started. The live read is by hand, below.
+
+**Measured on the object model first, then written.** Every enumeration value was read out of
+`Microsoft.Office.Interop.Outlook` 15.0 rather than remembered: `OlBusyStatus` free 0, tentative 1,
+busy 2, out-of-office 3, working-elsewhere 4; `OlResponseStatus` none 0, organized 1, tentative 2,
+accepted 3, declined 4, not-responded 5; `OlMeetingStatus` non-meeting 0, meeting 1, received 3,
+cancelled 5, received-and-cancelled 7. The test module spells the tables a second time on purpose,
+so a slip in the script's copy fails rather than mirrors. A value outside them is refused by name:
+mapped to a guess, it would fall out of the wrapper's filter without a word.
+
+**A self-authored appointment reports `olResponseOrganized`, not `olResponseNone`.** The ticket
+said `none`; the calendar read here says 1 for every appointment the user wrote. Both are covered:
+the adapter keys on `olNonMeeting` and reports `organizer` whatever the response field says,
+because neither value is an answer to an invitation and the wrapper drops `none`.
+
+**Instances of a series share the master's `EntryID`.** Observed, and documented: every occurrence
+of a recurring meeting reports the series master's id, so the two standups on one day would
+collide. An instance's id carries the occurrence's UTC start after a slash; a one-off keeps the
+bare id, which `Namespace.GetItemFromID` reopens directly for the drill-down (#55).
+
+**Instants are UTC, and the window is a day wide either side.** `Start` and `StartUTC` both come
+back with `DateTimeKind.Unspecified`; the UTC pair is stamped as such and printed with `Z`, which
+the wrapper reads. A local clock with the machine's offset would have been the other choice, and
+it is wrong twice a year: an ambiguous local time in the repeated hour gets whichever offset .NET
+picks. The `Restrict` window is the requested day plus a day before and after — the adapter's day
+is the machine's, the wrapper's is the configured zone's, and they need not be the same day; the
+wrapper keeps what starts on its day and drops the rest. Three days cost nothing measurable.
+
+**`Sort`, then `IncludeRecurrences`, then a bounded `Restrict`** — the order the object model
+documents, and the filter bounds both `[Start]` and `[End]` because an unbounded enumeration of a
+recurring series never ends. Dates go into the filter in the current culture's short form
+(`ToString("g")`), which is what the Jet filter parses; measured working under `en-NZ`, where the
+day/month order is the one most likely to be misread.
+
+**stdout is written as UTF-8 bytes, not through `Write-Output`.** Windows PowerShell writes a
+redirected stdout in the console code page. A macron in a subject — te reo is written on the
+calendars this skill is used against — would reach the wrapper as a replacement character. The
+document is encoded once and written to the raw stream; `test_a_subject_and_attendee_outside_ascii_survive_the_trip`
+holds it.
+
+**Two defects the review caught before the commit, both invisible to the tests as first
+written.** An empty day printed `{"events": [null]}`: PowerShell returns an empty array from a
+function as `$null`, and `@($null)` is an array of one null, so a quiet day would have had the
+wrapper refuse the adapter as broken — the test passed an array *literal* and never crossed the
+function boundary. It now does. And `Fail` wrote through `[Console]::Error`, which is the console
+code page, so a refusal quoting a subject with a macron reached the wrapper mangled — the exact
+hazard stdout had been written around. Both streams are now UTF-8 bytes. The lesson: test the
+composition the script actually runs, not the pieces in the shape that is convenient to hand them.
+
+**Outlook is started and never closed.** `New-Object -ComObject Outlook.Application` attaches to a
+running Outlook or starts one in the background. `Quit()` on the way out would close the user's
+own Outlook when it was already open, so nothing is quit; a background instance started by the
+adapter stays until the user opens or ends it, which is the same behaviour every COM client of
+Outlook has.
+
+**Verified by hand, 2026-09-04, against the maintainer's real calendar.** The adapter alone printed
+12 events across the three-day window: recurring standups as their day's instances, two cancelled
+meetings flagged `cancelled` with show-as `free`, the user's own calendar events as `organizer`, one
+recurring appointment with no recipients as an empty `attendees`. Through the wrapper for the day
+with `--utc-offset 12`: exit 0, two events kept, both self-authored, both uncorroborated, clocks
+in the skeleton's notation. Total time including Outlook already running: under three seconds.
+
+**Observed and worth knowing for #53/#54/#56.** Every meeting *received* on that calendar reported
+`not_responded`: the user never clicks Accept, and Outlook shows an unanswered invitation as
+tentative on the calendar without setting the response to tentative. The wrapper's filter then
+keeps none of them, and the day's real meetings are absent from the calendar day. The filter is
+right by the spec — an unanswered invitation was not committed to — but a user with this habit
+gets a calendar that only ever shows what they wrote themselves. The `setup` step's Verify (#56)
+is where to tell them; nothing here changes.
+
+**Known and left.** The user's own name is in `attendees` — Outlook lists the organiser among a
+meeting's recipients, and a self-authored appointment's one recipient is its author. The contract
+says attendee names and the rules read them as an attribution signal, so the user's own name is
+noise there rather than harm; dropping it means reading `Namespace.CurrentUser` and threading it
+into the conversion, which is a small change if a rule ever trips on it. A room invited as a
+required attendee rather than as a resource is kept, because Outlook recorded it as a person.
+
+**Not measured.** The not-Windows guard (`$IsWindows` under pwsh) — the wrapper refuses before
+spawning on any other platform, so the guard is belt to that brace. A machine with new Outlook
+alone or none: the class-not-registered path is tested by shadowing `New-Object`, not by removing
+Outlook. Shared and delegate calendars: `GetDefaultFolder(olFolderCalendar)` is the default
+calendar by definition and nothing else is opened, so there is no code path to a second one.
+
 ## Rejected
 
 ### Byte size as a "static screen" signal — narrowed, 2026-08-28

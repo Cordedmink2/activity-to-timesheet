@@ -34,9 +34,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filtered to what counts (accepted, organised or tentatively accepted; busy or tentative; timed;
   not cancelled; starting on the day in the configured zone), as JSON with clocks in the
   skeleton's notation. Off, it exits non-zero saying so; an adapter that cannot read the calendar
-  is a non-zero exit carrying its reason, never a quiet empty day. **Nothing reads it yet**, and
-  the Outlook adapter it names does not ship yet — turning the toggle on today gets an error
-  naming the missing adapter. The adapter and the skill steps follow.
+  is a non-zero exit carrying its reason, never a quiet empty day. **Nothing reads it yet**; the
+  skill steps follow.
+- **The Outlook adapter** (#51, the third piece of #49). `scripts/outlook_calendar.ps1` is the
+  adapter the toggle names: on a Windows machine with classic Outlook, it reads the **default
+  calendar only** through Outlook's COM object model — shared and delegate calendars are never
+  looked at — expands recurring meetings into the day's instances, and prints the raw day in
+  the wrapper's contract with basic fields only: subject, start, end, show-as, response, all-day,
+  cancelled and attendee names, meeting rooms dropped. An appointment the user wrote themselves
+  is reported as `organizer`, so the site visit with no invitation still counts. Outlook is
+  started in the background if it is not running and is never closed. Instants are printed in
+  UTC and the day is read a day wide either side, so the machine's zone and the configured
+  `TIMESHEET_TIMEZONE` need never agree. No classic Outlook — new Outlook alone, or none — is a
+  non-zero exit with one line naming the cause, which the wrapper carries to the user; so is
+  anything Outlook reports outside the enumerations the contract spells, rather than a guess.
+  Parses under Windows PowerShell 5.1 and is held to it by the same test as the other scripts.
 - **The corroboration verdict** (#52, the second piece of #49). Every event the calendar wrapper
   prints now says whether the activity source backs it: `corroborated` is true when a meeting
   window — a `Meeting | …` or `Call with …` title, the same pattern the daily skill already
