@@ -63,6 +63,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and refuses, in the two day-reading scripts' words, when it cannot: a day with nothing to
   corroborate against is not a day on which no meeting was attended. The verdict is computed
   once, here; the steps that read it are still to come.
+- **The `daily` skill reads the calendar, and drafts the meeting the AFK watcher lost** (#53, the
+  fourth piece of #49). Step 2 now runs `scripts/calendar_day.py` beside the skeleton and the
+  timeline. On the great majority of installs it exits saying the calendar is off, and that is a
+  state rather than a failure — the day is read from the three sources exactly as before; any
+  other non-zero exit stops the run and is reported as it stands, because a calendar the user
+  turned *on* and did not get is a missing source. Step 3 then drafts a **corroborated** event as
+  one block over the wrapper's `block` span, **even where the skeleton recorded a break inside
+  it**: the forty-five minute meeting spent listening, camera off, keyboard untouched, is one
+  billed block instead of twenty-five minutes of break. Nothing about the skeleton moves — the
+  break is still a break and the AFK watcher still settles active and idle, the calendar no more
+  than a screenshot does — so the break the block swallowed is declared under the table beside
+  the known exclusions, naming the event that covers it. The Step 6 guards gain exactly one named
+  exception between them: verbatim outer edges now has two (the shrunk thin block, and this), and
+  the `work_end` ceiling defers to it where the meeting's own `block` span runs later. A block that
+  starts before `work_start`, or ends past `work_end` with the evidence stopping earlier, is
+  flagged for the user rather than billed or trimmed — there the calendar and the skeleton
+  genuinely disagree. An
+  **uncorroborated** event is never drafted and never billed — a meeting skipped and a meeting
+  taken from the car look identical from here. Putting those to the user as questions is the next
+  piece.
 
 ### Fixed
 - **A patch could move an entry's times across a daylight-saving change and bill it short,

@@ -71,6 +71,22 @@ def shipped_text(skill: Path) -> str:
 # Frontmatter
 # --------------------------------------------------------------------------------------
 
+def section(text: str, heading: str) -> str:
+    """One `## ` section of a markdown document, heading excluded, or "" if there is none.
+
+    Keyed on the heading text, like `table_cells` below, so a document can be re-ordered
+    without silently emptying whatever check reads it. Ends at the next `## ` of the same
+    level, so `### ` subsections belong to the section they sit under.
+
+    Here rather than in the module that first wanted it: this is the third reader of a
+    markdown section in `tests/`, and a helper that stops finding what it looks for
+    returns nothing rather than raising — which is exactly the silent-pass this file's
+    docstring exists to prevent. Callers assert on the emptiness themselves.
+    """
+    found = re.search(rf"^## {re.escape(heading)}\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
+    return found.group(1) if found else ""
+
+
 def frontmatter(text: str) -> dict[str, str]:
     """The top-level `key: value` pairs of a document's YAML frontmatter, or {} if there
     is none.

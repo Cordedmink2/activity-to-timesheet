@@ -1989,6 +1989,90 @@ alone or none: the class-not-registered path is tested by shadowing `New-Object`
 Outlook. Shared and delegate calendars: `GetDefaultFolder(olFolderCalendar)` is the default
 calendar by definition and nothing else is opened, so there is no code path to a second one.
 
+### The corroborated meeting reaches the table — #53
+**Rung 2.** 2026-09-07. The fourth tracer bullet of #49, and the first one that is prose: Step 2
+runs the wrapper, Step 3 drafts a corroborated event over its `block` span, and the Step 6 guards
+name the exception that lets it cross a break. No script changed.
+
+**Walked by hand before the wording was fixed, on a built fixture day.** `Day` DSL: work
+08:30–17:00, a Teams meeting window 09:03–09:20 inside a scheduled 09:00–09:45 sprint review, AFK
+09:20–09:45 (25 min, over the 17.5 min threshold, so a real break), lunch 12:30–13:30, plus an
+uncorroborated 07:30–08:30 site visit before the laptop opened. `afk_blocks.py` gave the break;
+`calendar_day.py` through a fake adapter gave `corroborated: true`, evidence 09:03–09:20, block
+09:00–09:45 for the review and `null`/`null` for the site visit. The blocks that fall out of Step 3
+as written — 08:30–09:00, **09:00–09:45**, 09:45–12:30, 13:30–17:00 — pass `--cover` clean at 425 of
+425 active minutes, and the listening-only 25 minutes are billed instead of lost. That is the case
+#49 was raised for, end to end, with nothing re-inferred about idle.
+
+**The walk turned up a double-billing the guards cannot see, and it is why Step 3 has a fourth
+bullet.** A corroborated block starting mid-span leaves the span either side of it, and the obvious
+draft is the whole first active span *plus* the meeting: 08:30–09:20 and 09:00–09:45, which bills
+09:00–09:20 twice. `--cover` reports that pair as "all active spans covered", identically to the
+correct four — measured, not reasoned: `--cover` unions the ranges it is handed and then sums the
+active minutes they touch, so two blocks touching the same minute are indistinguishable from one.
+So the rule that a calendar block "replaces what it covers rather than doubling it" carries the
+whole weight there, and guard 3 is not a backstop for it. Whether any *other* gate would catch it
+is not measured — the Step 8 checklist item now says the same thing in one clause, which is a second
+reader and not an instrument.
+
+**One named exception across the guards, not one each.** #49 story 35 asks for that so they stay
+auditable. Guard 1 owns it — verbatim outer edges now names two sanctioned exceptions, the shrunk
+thin block and this — and guard 2 defers to the same one rather than adding its own: a corroborated
+block ends where its `block` span does, which can be past `work_end` when the meeting is the last
+thing in the day and the AFK watcher stopped seeing input inside it. Left unwritten, guard 2 would
+have shrunk exactly the minutes #52's arithmetic exists to bill, and the skill would have
+contradicted itself between two steps. Step 3's `work_end` bullet — the owner copy of the ceiling,
+per `self-development.md` — and the Step 8 checklist both moved with it. If a third guard ever
+looks like it needs one, that is the signal to re-read all three rather than to write it.
+
+**An uncorroborated event is stated as never-a-block now, three tickets before it is put to the
+user.** Loading the calendar at Step 2 and saying nothing about the uncorroborated half would leave
+a run holding events with no rule over them, which is how a meeting gets billed on the calendar's
+word. The refusal is cheap to write and the questions (#54) do not depend on it.
+
+**Five defects the review caught before the commit, and the worst of them read as correct.** Guard
+2's first draft said a corroborated block "ends where its `evidence` does". The block span already
+*is* the evidence extension — `max(event end, evidence end)` — so on the fixture day above, where
+the evidence stops at 09:20 and the block runs to 09:45, the guard as written instructed a run to
+shrink away the twenty-five listening minutes the whole ticket exists to bill. It quoted a real
+field, it read as careful, and it inverted the change. The other four: "judge it by its exit code"
+was false (every refusal exits 1 — the `ERR` text is the discriminator, and the code says nothing);
+the benign `the calendar is off:` sits one word away from the fatal `the calendar stays off:`, so a
+run matching the prefix loosely would treat a genuinely missing source as an install that never
+opted in; the AW-unreachable refusal contradicted the `compact.jsonl` fallback four lines below it
+in the same step; and the wrapper's own module docstring still said "the skill does not run this
+unless the toggle is on", which stopped being true the moment Step 2 started running it
+unconditionally and reading the off message. **A prose change gets a diff review for the same
+reason code does** — none of these five was reachable by any test in this repo, and three of them
+name a real field or a real message.
+
+**One hole the review found that the spec does not cover, and it is put to the user.** The wrapper
+never moves an event's start, so a meeting scheduled from 08:00 whose window evidence begins at
+08:40 proposes a block from 08:00 — before `work_start`, before the machine saw anything. Step 3
+now flags that 🔸 rather than billing it or trimming it, and the same for a block whose end passes
+`work_end` with the evidence stopping earlier. Both are cases where the calendar and the skeleton
+genuinely disagree and only the user knows which is right; the alternative — an arithmetic rule
+here — would be the wrapper's judgement wearing the rules' clothes.
+
+**The instrument.** `tests/test_daily_skill.py`, repo-level because the check needs `CONTEXT.md`
+in front of it as well as the skill: the `## Workflow` section must invoke
+`scripts/calendar_day.py`, name the toggle (read off the wrapper's own `TOGGLE`, so renaming the
+key fails here), and speak the glossary's calendar terms and the verdict words `corroborated` /
+`uncorroborated` — which are held against the wrapper's source too, so the prose and the field
+cannot drift apart in either direction. Scoped to the workflow, because everything it asks for was
+already true of "Files in this skill" through the whole period the calendar shipped unread: a
+whole-file scan would have been green before this change and is therefore not a measurement of it.
+All three tests were watched failing against `git show HEAD:…/SKILL.md`, on the invocation, the
+toggle and both verdict words; `Calendar` and `calendar event` were already there, from Step 3's
+soft-boundary line. **The words are matched on boundaries, not with `in`** — the review caught that
+"corroborated" is a substring of "uncorroborated", so the first draft's positive case passed on a
+document that only ever said the negative, which is the half of the rule that bills nothing.
+
+**Not measured.** A fresh agent walking a day with the new Step 3, which is the method this file
+asks for on a guidance change; the hand-walk above is the arithmetic, not an agent's reading of the
+wording. The declaration line under the table has no fixture — its shape is Step 6's prose and the
+first real day with a listening-only meeting is what will show whether it reads.
+
 ## Rejected
 
 ### Byte size as a "static screen" signal — narrowed, 2026-08-28

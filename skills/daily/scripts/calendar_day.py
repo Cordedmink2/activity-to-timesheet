@@ -7,7 +7,10 @@ the boundary between the skill and whatever read that calendar. It owns three th
   1. **Whether the calendar is on.** `TIMESHEET_OUTLOOK_CALENDAR` is a boolean setting,
      resolved through `skill_config.enabled()`: blank or anything but `true` is off, and
      off means this script exits non-zero saying so. Absent configuration is today's
-     behaviour exactly; the skill does not run this unless the toggle is on.
+     behaviour exactly: the skill runs this at its load step whatever the toggle says —
+     nothing it can read in its own shell answers that reliably — and reads the off
+     message as the ordinary state it is, so a machine that never opted in draws a day
+     exactly as it did before this script existed.
   2. **Which adapter runs.** An adapter is any command that prints the raw calendar day
      for a date. The toggle names the first one — `outlook_calendar.ps1` beside this file,
      which reads classic Outlook's default calendar through its object model and is
