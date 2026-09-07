@@ -50,6 +50,40 @@ def workflow() -> str:
     return found
 
 
+def steps() -> list[str]:
+    """Every `### Step N — …` subsection of the workflow, body included.
+
+    Enumerated out of the document rather than listed here, so a step added or renumbered
+    is one the checks below read from that moment.
+    """
+    return re.findall(r"^### Step \d+ —.*?(?=^### |\Z)", workflow(), re.M | re.S)
+
+
+def presentation_step() -> str:
+    """The step that shows the user the proposal — keyed on its title, like
+    `shipped.section` is keyed on its heading, so renumbering the steps does not silently
+    empty the checks that read it."""
+    found = [s for s in steps() if s.splitlines()[0].endswith("Present the proposed timesheet")]
+    assert len(found) == 1, (
+        "no single `### Step N — Present the proposed timesheet` in the daily skill's "
+        "workflow, so these checks have nothing to read. If the step was retitled, retitle "
+        f"it here too. Step titles found: {[s.splitlines()[0] for s in steps()]}")
+    return found[0]
+
+
+def review_question() -> str:
+    """The blockquote the presentation step asks the user, lines joined.
+
+    The quoted question is the part the step puts to the user in so many words, so a fact
+    stated in the prose around it and left out of the quote is one they may never be told.
+    """
+    quoted = [ln for ln in presentation_step().splitlines() if ln.startswith(">")]
+    assert quoted, (
+        "the presentation step asks the user nothing — no `> ` blockquote in it. The "
+        "review question is what the counts below are counted for.")
+    return " ".join(quoted)
+
+
 def wrapper_source() -> str:
     return WRAPPER.read_text(encoding="utf-8")
 
@@ -110,6 +144,58 @@ def test_the_wrapper_still_uses_the_verdict_word_the_rules_are_written_in(word):
     assert says(wrapper_source(), word), (
         f"{WRAPPER.name} no longer says {word!r}. The workflow's calendar rules are written "
         f"in that word; move them with it.")
+
+
+def test_the_presentation_step_puts_the_uncorroborated_events_to_the_user():
+    """An event nobody is asked about is an event the run read and dropped.
+
+    Step 3 refuses to draft one — the calendar's word alone does not bill — and that
+    refusal is the whole rule until the presentation step asks. ADR-0008: an uncorroborated
+    event is a question, and becomes a block only when the user says so.
+    """
+    assert says(presentation_step(), "uncorroborated"), (
+        "the daily skill's presentation step says nothing about uncorroborated calendar "
+        "events. Step 3 leaves them out of the table by design, so a step that does not "
+        "list them as questions loses the client site visit and the call from the car "
+        "silently — the half of ADR-0008 the user is the only witness to.")
+
+
+def test_the_step_that_offers_batch_accept_is_a_step_that_knows_about_them():
+    """Weaker than it looks, and deliberately kept: what this holds is that **wherever**
+    batch-accept is offered, that step speaks of uncorroborated events at all.
+
+    It does not hold the exclusion itself. Deleting the sentence that says batch-accept
+    excludes them leaves this green, as long as the step still mentions them somewhere —
+    measured, not assumed. The exclusion is prose with no instrument, and the decision log
+    records it as such; what this catches is the offer moving to a step where the questions
+    are not in view, which is the arrangement ADR-0008 rejected outright.
+    """
+    offering = [s for s in steps() if "batch-accept" in s]
+    assert offering, (
+        "no step of the workflow offers batch-accept — this check has nothing to read. If "
+        "the offer was reworded, reword it here too.")
+    for step in offering:
+        assert says(step, "uncorroborated"), (
+            f"`{step.splitlines()[0].strip()}` offers batch-accept and says nothing about "
+            "uncorroborated calendar events. A yes meant for the drafted blocks would bill "
+            "a meeting the machine saw nothing of, and the step does not have them in view "
+            "to exclude.")
+
+
+def test_the_review_question_states_how_many_calendar_questions_are_pending():
+    """The counts in the quoted question are what send the user under the table.
+
+    #49 story 36. The block counts are in it because the user cannot see what to look at
+    otherwise; a question listed under the table and absent from the count is one they
+    have no reason to scroll to.
+    """
+    # Singular or plural: the count is a variable, so the question is written for whichever
+    # number the day has.
+    assert re.search(r"\bcalendar questions?\b", review_question(), re.I), (
+        "the daily skill's review question counts blocks and 🔸 flags but not the pending "
+        "calendar questions. They sit under the table, unbilled until answered, so a "
+        "question nothing counts is a meeting the run reads, lists and never gets an "
+        "answer to.")
 
 
 def test_the_workflow_uses_the_glossarys_calendar_vocabulary():

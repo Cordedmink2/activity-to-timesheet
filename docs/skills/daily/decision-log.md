@@ -2118,6 +2118,141 @@ asks for on a guidance change; the hand-walk above is the arithmetic, not an age
 wording. The declaration line under the table has no fixture — its shape is Step 6's prose and the
 first real day with a listening-only meeting is what will show whether it reads.
 
+### The uncorroborated events reach the user — #54
+**Rung 2.** 2026-09-07. The fifth tracer bullet of #49, and prose again: Step 6 lists every
+uncorroborated event under the table as a **calendar question** — subject, time, attendees, one
+line each, with a literal example of the line, because every other thing the step shows the user
+has one — excludes them from batch-accept in the quoted question itself, counts them there, and
+turns a yes into a block over the event's span. No script changed. #53 had already written the refusal (an
+uncorroborated event is never drafted); this is the other half, the question the refusal implies.
+
+**The same fixture day, extended by one event, and the arithmetic measured rather than reasoned.**
+The #53 day (work 08:30–17:00, a Teams window 09:03–09:20 inside a scheduled 09:00–09:45 sprint
+review, a real 09:20–09:45 break, lunch 12:30–13:30) plus the 07:30–08:30 Northwind site visit
+before the laptop opened, plus a third event the walk added: a 15:00–15:30 "Call with Ben about
+BET2020S" in the middle of the afternoon's drafted block. The wrapper's verdicts: the review
+corroborated (evidence 09:03–09:20, block 09:00–09:45), **both others uncorroborated with
+`block: null`** — the phone call included, though the machine was busy right through it, because
+what corroborates is a meeting *window* and a phone call has none. Those two are the day's
+calendar questions.
+
+**An accepted block can only add coverage — measured, not assumed.** `--cover` over the four
+drafted blocks reports 425.0 of 425.0 active min. Adding the accepted site visit `07:30-08:30` —
+which lies outside every active span, before `work_start` — reports 425.0 of 425.0, unchanged and
+still clean; so does a range over the 09:20–09:45 break, and one at 17:30–18:30 after `work_end`.
+`uncovered_segments()` only ever subtracts the proposed ranges from the active spans, and
+`active_seconds()` clamps to the `not-afk` spans, so a range touching no active minute removes
+nothing and adds nothing. A block the user dictates therefore cannot turn a clean report dirty.
+What `--cover` *cannot* see is the reverse: the accepted `15:00-15:30` call fed in alongside the
+drafted `13:30-17:00` reports 425.0 of 425.0 too, identical to the correct split, because it unions
+its ranges first. Same blind spot #53 measured, now on the accepted question — so "replaces what it
+covers rather than doubling it" carries that case alone, and the afternoon has to be split into
+13:30–15:00, the call, and 15:30–17:00. **That sentence stays out of `SKILL.md`**: written beside
+the split rule it reads as reassurance that the check will catch a failure to split, which is the
+one thing it will not do.
+
+**No third guard exception — but the timing argument was wrong, and a reviewer caught it.** An
+accepted event's edges are the calendar's, not a script span's, and it may sit outside the active
+spans, across a break or past `work_end` — which reads like a third exception to guards 1 and 2,
+where #49 story 35 asks for exactly one across them. The first draft resolved it on timing: the
+guards are mandatory *before presenting*, the answer arrives after, so they never meet. **False.**
+Step 8 ends "Edits loop back to Step 6", so any edit after the ask re-runs all three over a table
+that now holds the accepted block — where guard 2 shrinks it inside `work_end` and guard 1 reads
+its edges as "a transcription bug, not a judgment call" and deletes it. The user's own answer,
+undone by the guard two steps later, on the second pass only. The fix is a scope sentence in guard
+1 rather than an exception: **the guards read the blocks *you* drafted**, and a block the user
+dictated — an accepted calendar question, a window they told you to bill — is their instruction and
+not your transcription, so none of the three touches it, on a loop back as much as on the first
+pass. Guard 2 defers to that as it already defers to the corroborated exception. The count of
+sanctioned exceptions stays at two, and the same sentence now covers the older case the file never
+addressed: a window the user asked for that no script span supports.
+
+**A second review round found the same defect four more places, all outside the guards.** The scope
+sentence fixed guards 1 to 3 and nothing else, and "every block" appears in rules the guards do not
+own: Step 3's `active_ratio` bands would have refused an accepted site visit outright (a meeting the
+machine never saw scores 0.0, which is the `<0.4` "do not propose billing" band) or shrunk one to
+its active minutes in the thin band; Step 3's 0.25 hr fold-in would have folded away a ten-minute
+accepted call; the calendar-questions heading said "every uncorroborated event", which on a loop
+back re-lists the one already answered, since corroboration is the wrapper's arithmetic and an
+accepted event is still an uncorroborated event; and ADR-0008 §Consequences still carried the
+refuted timing argument, which is licence for the next reviewer to delete the scope sentence as
+redundant. All four are now written: the ratio rule validates "every block **you derived from the
+skeleton**" and names the user-dictated case as the live form of the `.context.md` phone-standup
+convention — which is what ADR-0008 §Consequences already called it, the user *pre*-answering this
+question; the 0.25 hr floor is restated in the Step 6 bullet as still holding; the heading says
+"still unanswered"; and the ADR bullet is amended in place, dated to this ticket, rather than left
+to read as the current argument. **The lesson is the shape of the fix, not the fix:** a scope
+sentence in one guard reads as though it settles the file, and the rules that undo it are the ones
+that never mention the guards at all.
+
+**Two exclusivity claims in Step 3 had to go with it.** "One block may end after it … **nothing
+else may**" and "**one thing** may cross a break" were true of the corroborated block alone and
+false the moment an accepted question could do either. Both now name the calendar block and both
+kinds. That is the failure mode `CONTRIBUTING.md` § "Rules with more than one copy" warns about
+from the other direction: the claim was written correct, stayed put, and the world moved — and it
+was Step 8 and `output-format.md`, the two restatements, that had already been updated to permit
+what Step 3 still forbade.
+
+**A question is not a 🔸.** A 🔸 is a drafted block whose attribution is uncertain; an
+uncorroborated event is not drafted at all, so it is in no block count, in nothing passed to guard
+3, and in nothing Step 9 posts. The distinction is worth the sentence it costs: both are things
+under the table awaiting the user, and collapsing them would put a calendar question into
+"batch-accept and edit after" — which is the one outcome ADR-0008 rejected outright.
+
+**The instrument, and what it does not hold.** Three more assertions in
+`tests/test_daily_skill.py`, all watched failing against the pre-change `SKILL.md`: the
+presentation step speaks of uncorroborated events; any step offering batch-accept speaks of them
+too; the quoted review question counts them. The step is found by its **title**, like
+`shipped.section` finds a heading, so renumbering the steps does not silently empty the check — and
+the quote is read out of the step separately, because it is what the step puts to the user in
+words, so a fact stated in the prose around it and left out of the quote may never be said. The
+count assertion allows the plural (`questions?`): the first draft matched `calendar question` on
+word boundaries and failed against a line that says "Q calendar question(s)", which is the wording
+a variable count wants.
+
+**The batch-accept assertion is weaker than its first docstring claimed, and is kept anyway.**
+A reviewer deleted the whole bullet that excludes calendar questions from batch-accept and the
+suite stayed green: the assertion only asks that the *step* say "uncorroborated" somewhere, and the
+listing paragraph eleven lines up satisfies it. So it holds the offer beside the questions, not the
+exclusion — the docstring, this entry and `CONTRIBUTING.md` § "The instrument" now all say that,
+rather than the stronger thing. A sentence-scoped version was rejected: the step says
+"batch-accept" twice, once in a bullet and once inside the quoted question, and the quote names the
+questions for a different reason (the count), so any regex tight enough to hold the exclusion is
+tight enough to break on a rewording that keeps it.
+
+**One thing the vocabulary check does hold now.** **Calendar question** is coined as a term, so it
+went into `CONTEXT.md`'s **Calendar** glossary entry in the same change. The workflow's vocabulary
+test reads that entry's bolded terms at run time, so renaming the term — to "calendar ask", say —
+fails in `tests/test_daily_skill.py` and names the prose that has to move with it. Bolded in
+`SKILL.md` and left out of the glossary, it would have been a term with nothing holding it but one
+hardcoded regex.
+
+**An accepted block is the one entry with no activity evidence at all**, which Step 10 now records:
+the event and the user's answer — noes as well as yeses — go into
+`Timesheets/<date>_harvest_responses.json` beside the entry ids. Recording the noes is a decision,
+not bookkeeping: it makes a declined event a ruling that binds, so a later run over that date does
+not put the question again, and the CHANGELOG says so rather than promising it is re-offered
+forever. Without that, a later verification run over the same date (Step 1's already-covered branch)
+finds a billable 07:30–08:30 entry outside every active span, with no screenshots, no window events
+and no recorded ruling — and `--cover` cannot flag it either way, because it contributes zero
+covered active minutes. The branch's rule that a ruling the user already gave binds is keyed on
+that file, so the answer has to be in it.
+
+**Budget cost.** `SKILL.md` goes from 9,320 words to about 9,950, against the 5,000-word ceiling
+#57 asks for — and roughly a third of the increase is the second review round's four fixes, none of
+which is optional. #57 is where it comes back out; what this entry gives a trim to lean on is which
+sentences are load-bearing and which were dropped as rationale on the way in.
+
+**Not measured.** Everything after the yes: a fresh agent handed a day with two questions and an
+answer to one, which is the arm this file asks for on a guidance change. The accepted block's
+declaration, the split of the afternoon around an accepted call, and the guard-1 scope sentence
+that keeps a loop back from Step 8 off it are prose with no fixture behind them — reasoned rules in
+`SKILL.md`, which is rung 3 territory and is exactly where the review found the two defects above.
+The first real day with an uncorroborated event is what will show whether they read. Also
+considered and not written: a carve-out in Step 5's "never re-infer active/idle … never from the
+calendar" for the accepted case. It stays as it is — what settles an accepted block is the user
+saying where they were, which has always overridden (Step 1), not the calendar re-inferring idle.
+
 ## Rejected
 
 ### Byte size as a "static screen" signal — narrowed, 2026-08-28

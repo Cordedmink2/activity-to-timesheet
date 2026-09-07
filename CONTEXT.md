@@ -49,8 +49,8 @@ named here so the fix has a word to use.
 Evidence of *intent*, not of activity: it says where the user was meant to be, and the activity
 source says what the machine saw. That is why it is not an activity source, and the distinction is
 load-bearing: a **calendar event** the activity source corroborates (a meeting window inside its
-span) outranks one it does not, and an uncorroborated event is put to the user at review rather
-than billed on the calendar's word alone. Outlook today, behind a narrow adapter, so a second
+span) outranks one it does not, and an uncorroborated event is put to the user at review as a
+**calendar question** rather than billed on the calendar's word alone. Outlook today, behind a narrow adapter, so a second
 calendar is an adapter rather than a rewrite.
 
 **Timesheet provider**, or just **provider** — the service that holds billed time and invoices

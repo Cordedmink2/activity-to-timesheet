@@ -61,7 +61,12 @@ cached to the workspace.
 - The `.context.md` convention that a standup joined by phone bills despite a low ratio stays
   meaningful. It is the user pre-answering the question this ADR would otherwise ask.
 - The hard guards in Step 6 gain one named exception and lose nothing: an uncorroborated event never
-  reaches them, because it is not a block until the user makes it one.
+  reaches them, because it is not a block until the user makes it one. Once the user does make it
+  one, the guards leave it alone — not as a second exception, but because their reach is the blocks
+  the run drafted, and that block is the user's instruction. Amended on #54, where the first
+  draft argued the two never meet: Step 8's "edits loop back to Step 6" re-runs the guards over a
+  table that by then holds the accepted block, and guard 2 shrank it. The decision log's #54 entry
+  has the walk.
 - The stdlib-only rule for the plugin's Python survives. The Windows-only part is Windows-only anyway,
   because classic Outlook's object model is.
 - A user on new Outlook alone has no adapter. Setup says so and the calendar stays off; that is a

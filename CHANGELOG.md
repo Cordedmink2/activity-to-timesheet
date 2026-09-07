@@ -89,8 +89,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flagged for the user rather than billed or trimmed — there the calendar and the skeleton
   genuinely disagree. An
   **uncorroborated** event is never drafted and never billed — a meeting skipped and a meeting
-  taken from the car look identical from here. Putting those to the user as questions is the next
-  piece.
+  taken from the car look identical from here — the next entry is what becomes of those.
+- **The meetings the machine cannot see are put to the user as questions** (#54, the fifth piece
+  of #49). Every **uncorroborated** calendar event is now listed under the proposed timesheet as a
+  **calendar question** — subject, time and attendees, one line each — and the review question
+  counts them beside the block counts, so the client site visit before the laptop opened takes one
+  word to bill instead of being remembered. None of them is in the table, in the block counts or
+  in the coverage check until it is answered, and **batch-accept does not cover them**: a yes meant
+  for the drafted blocks can never bill a meeting on the calendar's word alone. A yes makes it a
+  block over the event's span, classified like any other, declared under the table with the answer
+  as its evidence and recorded with the day's entries — it may sit outside the AFK watcher's active
+  time entirely, across a break or after the day's last keystroke, because what settles it is the
+  user rather than the machine, and the three hard guards leave a block the user dictated alone. It
+  replaces what it covers rather than doubling it, so a call accepted inside a stretch already
+  drafted splits that stretch instead of billing over it. A no leaves the event unbilled and is
+  recorded with the day, so that date does not ask twice; an unanswered one is offered again.
 
 ### Fixed
 - **A patch could move an entry's times across a daylight-saving change and bill it short,
