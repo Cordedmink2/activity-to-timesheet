@@ -2,8 +2,9 @@
 
 **Status:** Accepted — 2026-09-03.
 **Context:** the `daily` skill's reading of a day. Related: [`CONTEXT.md`](../../CONTEXT.md) § "The
-services" (**calendar**, **calendar event**), the spec in issue #49, ADR-0007 — two boundaries, the provider written and the
-sources read — which is not written yet (#44) and so is named here rather than linked.
+services" (**calendar**, **calendar event**), the spec in issue #49, and
+[ADR-0007](./0007-two-boundaries-the-provider-writes-the-sources-read.md) — two boundaries, the
+provider written and the sources read.
 
 ## Context
 
@@ -65,8 +66,8 @@ cached to the workspace.
   because classic Outlook's object model is.
 - A user on new Outlook alone has no adapter. Setup says so and the calendar stays off; that is a
   Graph adapter's job, later, behind the same JSON.
-- The read/write line moves from "two read, one written" to "everything but the provider is read".
-  ADR-0007 should say so when it is written.
+- The read/write line moves from "two read, one written" to "everything but the provider is read",
+  and ADR-0007 says so.
 
 ## Alternatives considered
 

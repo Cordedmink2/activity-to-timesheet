@@ -1,16 +1,23 @@
-# Testing & Improvement Record
+# The `daily` skill's decision log
 
-Not part of the operating instructions. `SKILL.md` says what to do; this file holds
-why it says it — test records, settled decisions with their evidence, and the options
-that were considered and rejected. Read this before changing `SKILL.md`; skip it if
-you are just running a timesheet.
+The evidence behind `skills/daily/SKILL.md`: test records, settled decisions with what was
+observed, script defects and how they were closed, options tried and rejected, and the gaps
+still open. Read it before changing that skill's `SKILL.md`, a reference or a script, so a
+rule measured unnecessary is not re-added; skip it on a run. A new finding lands here under
+the heading that fits, graded on the evidence rungs below — the operating documents say what
+to do, this file says why.
 
 Method: `changing-agent-instructions`. The rule that governs this file is **never
 encode a diagnosis you have not watched happen**.
 
-`references/self-development.md` is the process side — where maintenance content goes,
-which gates a doc edit trips, the rules with more than one copy, and how a change gets
-released. Read it alongside this file when changing the skill.
+Every entry is a `###` heading, and pointers elsewhere cite one as `§ "heading"`. To reach
+one without reading the whole file: `rg -n '^### ' docs/skills/daily/decision-log.md` lists
+them, and `rg -n -A 30 '^### <start of the heading>' docs/skills/daily/decision-log.md`
+reads one.
+
+`docs/CONTRIBUTING.md` is the process side — which gates a change trips, the rules with
+more than one copy, and how a change is released. Below this line, `SKILL.md`, `references/`,
+`scripts/` and `tests/` without a prefix mean the `daily` skill's.
 
 ## What the instruments measure
 

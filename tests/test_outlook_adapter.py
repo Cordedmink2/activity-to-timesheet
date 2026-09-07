@@ -10,7 +10,7 @@ No Outlook is started. The script keeps its functions apart from its main body s
 dot-source it and hand `ConvertTo-CalendarEvent` a `PSCustomObject` shaped like an
 `AppointmentItem`: the same member names, so the code under test is the code that runs
 against the real thing. The one read of the real calendar is by hand — recorded in
-`skills/daily/TESTING.md` — because a test that starts the user's Outlook is a side effect
+`docs/skills/daily/decision-log.md` — because a test that starts the user's Outlook is a side effect
 the suite has no business having.
 """
 

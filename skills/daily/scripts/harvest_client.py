@@ -111,7 +111,7 @@ def load_creds() -> tuple[str, str]:
             "  and fill in HARVEST_ACCOUNT_ID and HARVEST_API_KEY — get both from\n"
             "  https://id.getharvest.com/developers.\n"
             "  Already configured them? Start a new session: the values are published at\n"
-            "  session start. If a new session still shows this, see references/setup.md\n"
+            "  session start. If a new session still shows this, see references/first-run.md\n"
             "  § 'When the configuration does not arrive'.\n"
             f"  (Exported install instead? Copy {skill_config.SKILL_ROOT / '.env.example'}\n"
             f"   -> {skill_config.ENV_PATH} and put them there.)"

@@ -8,7 +8,7 @@ walk that `config()` already did, `screenshot_capture` layered `argv[0]` on top 
 for the rule to drift.
 
 `skill_config` is now the reader, and its module docstring carries the precedence rule;
-`references/self-development.md` § "Rules with more than one copy" registers where that
+`docs/CONTRIBUTING.md` § "Rules with more than one copy" registers where that
 rule is restated. These tests hold the shape: the precedence itself, the error contract a
 missing required value has to honour, and the structural guards that stop a second reader
 growing back somewhere else in `scripts/`.
@@ -44,7 +44,7 @@ def isolated(env_file, tmp_path, monkeypatch):
 
     A test whose precondition is "nothing resolves" has to neutralise every source the
     resolver reads: the walk up from `SKILL_ROOT` found a real workspace when the suite
-    ran from one checkout and not from another — `TESTING.md` § "A test's result depended on where the checkout sat". Returns the `.env` path for a
+    ran from one checkout and not from another — `docs/skills/daily/decision-log.md` § "A test's result depended on where the checkout sat". Returns the `.env` path for a
     test to write settings into.
     """
     monkeypatch.setattr(skill_config, "SKILL_ROOT", tmp_path / "skills" / "daily")
@@ -190,7 +190,7 @@ def test_find_workspace_does_not_climb_past_the_skills_directory(isolated, tmp_p
                                                                 monkeypatch):
     """Anchored on the install shape, so an unrelated ancestor is not a candidate at all.
 
-    Reasoning and the record: `TESTING.md` § "Workspace resolution is anchored on the
+    Reasoning and the record: `docs/skills/daily/decision-log.md` § "Workspace resolution is anchored on the
     install shape, not on a depth".
     """
     ws = tmp_path / "Admin"
@@ -222,7 +222,7 @@ def test_a_plugin_install_never_resolves_to_a_workspace_around_it(isolated, tmp_
 
     Pinned rather than left to a green suite because the wrong answer is silent and
     delayed — the refresh reports success and the staleness surfaces days later.
-    Reasoning: `TESTING.md` § "Workspace resolution is anchored on the install shape, not
+    Reasoning: `docs/skills/daily/decision-log.md` § "Workspace resolution is anchored on the install shape, not
     on a depth".
     """
     ws = tmp_path / "Admin"
@@ -388,7 +388,7 @@ def test_a_platform_with_one_shell_is_still_told_the_plugin_may_not_be_enabled(
     is right that a wrong shell cannot be the cause there. A plugin enabled for one
     directory and run from another is a cause there in exactly the same way it is on
     Windows — nothing about `installed_plugins.json` is platform-specific — and this
-    branch used to name only the hook, sending the user to `references/setup.md` for a
+    branch used to name only the hook, sending the user to `references/first-run.md` for a
     hook that was never registered to start.
 
     The second assertion is the one that matters if the two branches are ever merged to

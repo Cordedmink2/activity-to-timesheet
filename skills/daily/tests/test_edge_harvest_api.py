@@ -148,7 +148,7 @@ def test_an_entry_across_a_spring_forward_is_left_alone(monkeypatch, live_harves
     """Out of scope for the refusal, and deliberately so: the clock skips rather than
     repeating, so this entry is over-billed rather than short and its two pieces would be
     separated by a gap where the fall-back ones abut. A message written for one and shown
-    for the other sends the reader hunting the wrong hour — `TESTING.md` § Open gaps
+    for the other sends the reader hunting the wrong hour — `docs/skills/daily/decision-log.md` § Open gaps
     carries what is left.
 
     Two independent checks stop it, so this alone cannot say which: on a spring-forward the
@@ -163,7 +163,7 @@ def test_an_entry_across_a_spring_forward_is_left_alone(monkeypatch, live_harves
 def test_the_direction_of_the_change_is_what_decides_it_not_the_arithmetic(monkeypatch):
     """`repeats` is the line between the two kinds of transition day, and it has to be a
     check somebody wrote rather than a side effect of the containment test collapsing —
-    which is the criticism `TESTING.md` § Open gaps already makes of a refusal that emerged
+    which is the criticism `docs/skills/daily/decision-log.md` § Open gaps already makes of a refusal that emerged
     from arithmetic in `parse_range`. Removing it changes no result today, because the
     reading order catches the same days by coincidence, so nothing else here would notice.
 
@@ -491,7 +491,7 @@ def test_a_patch_whose_result_straddles_the_change_is_refused_and_nothing_is_sen
 
 def test_the_refusal_is_the_create_s_message_rather_than_a_second_wording(
         monkeypatch, live_harvest):
-    """One message, one owner — `references/self-development.md` § "Rules with more than
+    """One message, one owner — `docs/CONTRIBUTING.md` § "Rules with more than
     one copy" registers it as `refusal_for_a_straddled_change()`'s. A restatement here
     would be a second thing to keep true, and the arithmetic in it has already been wrong
     in prose once."""
@@ -1011,7 +1011,7 @@ def test_by_day_replaces_the_per_entry_rows_rather_than_adding_to_them(live_harv
 
 def test_the_default_listing_is_unchanged_by_the_flag_existing(live_harvest):
     """The pin on the older contract: `harvest_list.py <date>` is what Step 1 of the
-    `daily` skill and `references/setup.md`'s credential check both run."""
+    `daily` skill and `references/first-run.md`'s credential check both run."""
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am")]]))
     r = run_cli(hlist, ["2026-08-12"])
     assert r.code == 0

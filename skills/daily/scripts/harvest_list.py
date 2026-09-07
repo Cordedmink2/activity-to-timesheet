@@ -140,7 +140,7 @@ def main() -> None:
     if not all_entries:
         # To stderr so stdout stays machine-readable: a day with no entries and a run
         # that silently did nothing look identical otherwise, and the credential check in
-        # `references/setup.md` reads exactly this case.
+        # `references/first-run.md` reads exactly this case.
         print(f"(no time entries from {from_date} to {to_date})", file=sys.stderr)
     if by_day:
         # Sorted deliberately not at all: the rows are grouped by date, so order is

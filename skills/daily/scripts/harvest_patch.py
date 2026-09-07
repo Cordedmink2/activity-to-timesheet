@@ -127,8 +127,8 @@ def refuse_a_result_that_straddles_the_change(entry_id: str, body: dict) -> None
     billed as one, and prints the same message here as it does on a create: Harvest bills
     the difference between the two clock times, so an entry worked through the change is
     short by the span that happened twice, and nothing raises. One message with one owner —
-    `references/self-development.md` § "Rules with more than one copy" registers it as that
-    function's, and its arithmetic has already been wrong in prose once.
+    `docs/CONTRIBUTING.md` (in the repository, not in an installed copy) § "Rules with more
+    than one copy" registers it as that function's, and its arithmetic has already been wrong in prose once.
 
     Three things make this more than that one call, and each is a decision:
 

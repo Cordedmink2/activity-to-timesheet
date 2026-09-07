@@ -8,8 +8,8 @@ script prints the exact body it would have sent and exits 0, so a forgotten flag
 yields a preview rather than an error. The gate, the preview and the `OK` / `ERR`
 contract are `harvest_write.py`'s, shared with `harvest_patch.py`; this script
 declares the body and the guards in front of it. SKILL.md Step 8 is where the
-user's yes is obtained; TESTING.md § "The confirmation gate" is why the gate is
-in the invocation as well as there.
+user's yes is obtained; docs/skills/daily/decision-log.md (in the repository, not in an
+installed copy) § "The confirmation gate" is why the gate is in the invocation as well as there.
 
 Times accept either 24h ("08:15") or 12h ("8:15am") — Harvest accepts both.
 Always sends started_time + ended_time so accounts in start/end-time mode get

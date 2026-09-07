@@ -6,6 +6,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+tests/evals/*-workspace/
 
 # User data — these belong in your own workspace, not in this repo
 Timesheets/

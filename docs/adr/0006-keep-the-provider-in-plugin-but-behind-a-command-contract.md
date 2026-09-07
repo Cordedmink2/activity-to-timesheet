@@ -1,9 +1,9 @@
 # ADR-0006: Keep the provider in-plugin, but behind a command contract
 
 **Status:** Accepted — 2026-09-02. **Supersedes [ADR-0002](./0002-defer-splitting-the-provider-into-its-own-plugin.md).**
-**Context:** whole repo. Related: [`CONTEXT.md`](../../CONTEXT.md), issues #33, #35. Also ADR-0007
-— two boundaries, the provider written and the sources read — which is not written yet and so is
-named here rather than linked; [`../RECOVERY.md`](../RECOVERY.md) § "What still needs writing" has it.
+**Context:** whole repo. Related: [`CONTEXT.md`](../../CONTEXT.md), issues #33, #35, and
+[ADR-0007](./0007-two-boundaries-the-provider-writes-the-sources-read.md) — two boundaries, the
+provider written and the sources read.
 
 ## Context
 
@@ -66,7 +66,7 @@ worth nothing while there is one plugin.
   and the four scripts that need it import it directly, so no provider script imports the
   activity-source client and none imports another script. The refusal message stayed on the
   provider's side of the line, in `harvest_write.py`, because what Harvest does with two clock
-  times is not a fact about the zone — `skills/daily/TESTING.md` § "Two provider scripts were
+  times is not a fact about the zone — `docs/skills/daily/decision-log.md` § "Two provider scripts were
   importing the activity-source client" carries that argument, and
   `skills/daily/tests/test_module_boundaries.py` is what holds the direction from here on.
 - `reconcile` reaches the adapter across a sibling directory by path today. It moves onto the same

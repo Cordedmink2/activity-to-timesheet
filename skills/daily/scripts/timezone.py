@@ -83,7 +83,7 @@ def resolve_zone(flag, offers_offset_flag: bool = True):
             "  Set it once:  /plugin configure billables  -> TIMESHEET_TIMEZONE\n"
             "                (an IANA name, e.g. Europe/London or Pacific/Auckland)\n"
             "  Already set it? Start a new session — the value is published at session\n"
-            "  start. If a new session still shows this, see references/setup.md\n"
+            "  start. If a new session still shows this, see references/first-run.md\n"
             "  § 'When the configuration does not arrive'." +
             ("\n  Or for this run only:  --utc-offset <hours>" if offers_offset_flag else "")
             # Last, after the escape hatch, because it is the cause a user cannot deduce
@@ -278,8 +278,9 @@ def repeated_span(spent, zone) -> tuple[int, int] | None:
     - no transition at all, which is every date but two a year;
     - a spring-forward. The clock skips rather than repeating, so an entry across it is
       over-billed rather than short, and its two pieces would be separated by a gap where
-      these two abut — a different message, and #23 put it out of scope. The `TESTING.md`
-      Open gaps entry for the skipped hour carries it. `repeats` comes from the sign of
+      these two abut — a different message, and #23 put it out of scope. The Open gaps entry
+      for the skipped hour in `docs/skills/daily/decision-log.md` (in the repository, not in
+      an installed copy) carries it. `repeats` comes from the sign of
       the offset shift and not from the order of the two readings, which gets
       `America/Santiago` exactly backwards;
     - a repeated span that crosses midnight, as it does in `America/Santiago`, where the

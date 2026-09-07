@@ -82,7 +82,7 @@ def test_buckets_are_found_on_an_activitywatch_that_does_not_suffix_them(monkeyp
 
     Consequence on an AW instance that does not suffix: `afk_blocks` reports "no
     aw-watcher-afk bucket found" on a machine whose watchers are running fine, and
-    `references/setup.md` tells the reader recovering from a reimage that this case is
+    `references/first-run.md` tells the reader recovering from a reimage that this case is
     already handled.
     """
     d = day().active("09:00", "17:00")

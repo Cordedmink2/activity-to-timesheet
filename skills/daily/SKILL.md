@@ -28,7 +28,7 @@ When the same setting is available from more than one of those, a per-command fl
 **Soft triggers** — confirm first: the user mentions Harvest, ActivityWatch, `daily_exports/`, `Timesheets/` in passing; a new export landed and the user seems unsure what to do with it.
 
 **Do NOT invoke when:**
-- the user is asking about *configuring* the pipeline itself (export script, ActivityWatch setup, screenshot scheduler) — that's maintenance, not daily classification. Standing it up for the first time is the `setup` skill; `references/setup.md` is for a prerequisite that failed mid-run
+- the user is asking about *configuring* the pipeline itself (export script, ActivityWatch setup, screenshot scheduler) — that's maintenance, not daily classification. Standing it up for the first time is the `setup` skill; `references/first-run.md` is for a prerequisite that failed mid-run
 - the user wants *raw* Harvest data beyond a date range ("list my projects", "monthly totals") — point at the Harvest web UI or a one-off script
 
 ## Data sources
@@ -76,13 +76,13 @@ Each capture tick writes **one PNG per monitor** (`HH-MM-SS_m1.png`, `_m2.png`, 
 
 ## Prerequisites — check at start of every run
 
-Run in parallel before classifying anything. If any first-run piece is missing (no workspace, no `.context.md`, unconfigured credentials or timezone, no screenshot task, unknown AW buckets), follow `references/setup.md` — which is also where the `setup` skill hands over when it says this skill scaffolds the workspace.
+Run in parallel before classifying anything. If any first-run piece is missing (no workspace, no `.context.md`, unconfigured credentials or timezone, no screenshot task, unknown AW buckets), follow `references/first-run.md` — which is also where the `setup` skill hands over when it says this skill scaffolds the workspace.
 
 1. **`Timesheets/.context.md` — read it, whole, every run.** If missing, run first-run setup; don't classify without it. **Read the entire file into context; never grep it, never read a slice of it, never skim to the section you think you need.** Its facts are cross-cutting — an exclusion in one section decides a block whose client is named in another — so a partial read produces confident wrong answers rather than an obvious gap. The Step 11 size budget exists precisely so this file always fits in one read; if it has grown past budget, fix the budget (Step 11), don't switch to reading part of it.
 2. **ActivityWatch reachable** — `curl -s <activity-url>/api/0/buckets/` returns JSON, where `<activity-url>` is the configured `TIMESHEET_ACTIVITY_URL` or `http://localhost:5600` if unset. Use the configured one: probing localhost on a machine that reads a remote AW reports the instrument dead when the scripts would have worked. If not, fall back to `daily_exports/<date>/compact.jsonl`; if both missing, the day can only be reconstructed from screenshots + user memory — say so explicitly.
 3. **AW bucket ids resolved** — from `.context.md` if cached, else discover and offer to cache.
 4. **Catalogs fresh** — the assignment catalog (`.mcp/harvest_assignments*.json`) + any work-item catalogs modified within 7 days; else run `scripts/refresh_catalogs.py` (details: `references/catalog-refresh.md`). Surface a >30-day gap to the user before refreshing, unless `.context.md` preferences say refresh silently.
-5. **Harvest credentials work** — `python scripts/harvest_list.py <today> <today>` runs without auth error. "credentials not found" → `references/setup.md`; `401/403` → PAT revoked, user must regenerate.
+5. **Harvest credentials work** — `python scripts/harvest_list.py <today> <today>` runs without auth error. "credentials not found" → `references/first-run.md`; `401/403` → PAT revoked, user must regenerate.
 
 **Tunable defaults** (override via `## Preferences` in `.context.md`): AFK break threshold `1050s` (17.5 min); substantive-activity floor `120s`; end-of-day blip gap `600s`; smallest uncovered stretch worth flagging `900s`; active/thin bands `0.7`/`0.4`; timeline noise floor `5s`, gap fold `60s` and minimum displayed span `3.0 min`; minimum billable block `0.25 hr`; lunch window `11:30–14:30`; work-hours rendering window `06:00–20:00`. **The task names have no default and cannot have one** — the rubric decides a *work kind*, and `.context.md` § "Work kinds" maps each one to the task the user's own provider offers. With no mapping there yet — every install predating that table — the rubric matches the work kind against the project's own `task_assignments[]` rather than guessing a name, and proposes the row at Step 11. A guessed task name is not a task the provider has.
 
@@ -123,7 +123,7 @@ Read in parallel:
   - **One reason is neither** — the activity source being unreachable, when you are already reading the day from `daily_exports/<date>/compact.jsonl` per Prerequisite 2. The verdict is computed against the day's window events, so with nothing to compute it from there is no calendar day to be had: say once that the calendar could not be read for this date either, and blocks come from the dump alone. Don't hand a run of that shape any calendar event — an event with no verdict is not an uncorroborated event, it is an unanswered question.
 - Screenshot index: list `~/Pictures/WorkScreenshots/<date>/` filenames (PowerShell, per above). Don't open PNGs yet.
   - **Compare the last capture's timestamp against `work_end` before moving on.** A short index is ambiguous on its own — it looks the same whether the user stopped working or the capture died mid-day — and `work_end` is what separates the two. If captures stop well before `work_end`, say so *now*, in the Step 6 skeleton line, and treat every block after that point as having no screenshot fallback: those are the blocks that will need the user, so flag them 🔸 on weaker evidence than you otherwise would. Finding this out at Step 5, when a block is already ambiguous, is too late to plan around.
-  - A dead capture task is *maintenance*, not classification — don't fix it mid-timesheet. Note it, finish the day, raise it at Step 11. `references/setup.md` has the health check.
+  - A dead capture task is *maintenance*, not classification — don't fix it mid-timesheet. Note it, finish the day, raise it at Step 11. `references/first-run.md` has the health check.
 
 The two day-reading scripts complement each other: AFK anchors the time boundaries; the timeline shows what happened inside them. The calendar is neither — it records what the user was *meant* to be doing — so what a run may do with an event is settled by the verdict the wrapper already computed, not by re-reading the timeline for a meeting window yourself. Don't derive either by hand from raw events — hand-derivation is where end-of-day and break errors come from. (Sole exception: AW unreachable and working from `compact.jsonl` — apply the manual blocking spec in `references/activitywatch.md`.)
 
@@ -272,7 +272,7 @@ A run frequently reveals a fact the skill or `.context.md` doesn't know (a new s
 
 - *This user's* clients/colleagues/signals/preferences → propose for `.context.md` (most additions).
 - The *workflow itself* (a generic heuristic, data-source change, API quirk) → propose for `SKILL.md`/`references/`.
-- The *skill is wrong* — a script returns a wrong answer, a guard didn't fire, an instruction is wrong for every user → `references/reporting-issues.md` if the user installed this skill, `references/self-development.md` if they maintain it.
+- The *skill is wrong* — a script returns a wrong answer, a guard didn't fire, an instruction is wrong for every user → `references/reporting-issues.md` if the user installed this skill, `docs/CONTRIBUTING.md` (in the repository, not in an installed copy) if they maintain it.
 
 Show the exact diff, one fact per ask. Example: "The XrmToolBox signal isn't in `.context.md`; I guessed Ledger Learning. Add `XrmToolBox connecting to env X → Ledger Learning` under Ledger Learning?"
 
@@ -304,7 +304,7 @@ Show the exact diff, one fact per ask. Example: "The XrmToolBox signal isn't in 
 
 - `SKILL.md` — this file
 - `.env.example` / `.gitignore` — Harvest credential template (copy to `.env`, gitignored)
-- `references/setup.md` — first-run setup: screenshot task, `.context.md` creation, Harvest creds, AW discovery, AW category maintenance
+- `references/first-run.md` — first-run setup: screenshot task, `.context.md` creation, Harvest creds, AW discovery, AW category maintenance
 - `references/context.md.example` — starter template for `Timesheets/.context.md`
 - `references/classification-rules.md` — client/project/**work kind** rubric + interleaved-day switch-point protocol
 - `references/activitywatch.md` — raw AW API reference (endpoints, buckets, heartbeat dedupe, lock-screen quirk)
@@ -312,8 +312,8 @@ Show the exact diff, one fact per ask. Example: "The XrmToolBox signal isn't in 
 - `references/catalog-refresh.md` — refreshing `.mcp/` catalogs
 - `references/new-client-work.md` — billing work that has no project yet (Dataverse case creation)
 - `references/reporting-issues.md` — reporting a defect upstream when the user installed this skill rather than maintaining it: the repo, what to redact first, and the confirmation gate before filing
-- `references/self-development.md` — **for changing this skill, not for running it.** Start here before editing `SKILL.md`, a reference, or a script: where maintenance content goes, which instruments to test against, the rules that have more than one copy, and where the release ritual lives. Ignore it on a normal run.
-- `TESTING.md` — the record behind those decisions: test results, evidence rungs, and options already tried and rejected. Read it so you don't re-add something that was measured unnecessary; new findings go here, not in `SKILL.md`.
+- `docs/CONTRIBUTING.md` — in the repository, not in an installed copy: **for changing this skill, not for running it.** Start there before editing `SKILL.md`, a reference or a script. Ignore it on a normal run.
+- `docs/skills/daily/decision-log.md` — in the repository: the evidence behind the rules, and where a new finding about the skill goes rather than into `SKILL.md`.
 - `scripts/afk_blocks.py` — deterministic day skeleton: work_start/work_end/breaks/active spans/active_ratio; `--window`, `--json`, `--utc-offset`, `--cover "HH:MM-HH:MM,..."` coverage check, plus the `## Preferences` tunables `--afk-threshold`, `--solid`, `--blip-gap`, `--min-uncovered`, `--active-band`, `--thin-band`
 - `scripts/activity_timeline.py` — categorized window timeline + rollup; `--window HH:MM-HH:MM` zoom folds in web watchers; flags `uncategorized`/`!MULTI`; `--utc-offset`, `--json`, `--noise-floor`, `--gap-fold`, plus the two that control how much of the day you get back: `--full` shows every merged span, and `--min-span` sets the shortest span the compact default prints in minutes (`--min-span` is the `## Preferences` tunable `references/context.md.example` maps onto). Hidden spans are still counted in the per-category rollup, so the totals do not move
 - `scripts/aw_client.py` — shared ActivityWatch REST helpers behind `afk_blocks.py`, `activity_timeline.py` and `calendar_day.py`, plus the server address (`TIMESHEET_ACTIVITY_URL`) all of them need, the day's window-event fetch and its two refusals (unreachable, no window bucket) that the timeline and the calendar wrapper share, and the one copy of the noise floor and gap fold both read window events by. *When* a day is read is the next entry's, not this one's
@@ -326,4 +326,4 @@ Show the exact diff, one fact per ask. Example: "The XrmToolBox signal isn't in 
 - `scripts/harvest_client.py` — shared Harvest API helper + the credentials contract
 - `scripts/refresh_catalogs.py` — refresh `.mcp/harvest_assignments*.json` + incident catalog; `--harvest-only` / `--dataverse-only` do one of the two (they are mutually exclusive, and the default is both); `wait_for_project(<code>)` for new synced projects
 - `scripts/screenshot_capture.py` (`--where`) + `scripts/setup_screenshot_pipeline.ps1` — per-monitor capture + one-time scheduled-task setup. `--where` prints the resolved capture directory and captures nothing; it is how you get that path for a PowerShell command, per "Screenshot location" above
-- `tests/` + `pytest.ini` — the script suite. Maintainers only; `references/self-development.md` explains what it does and does not measure.
+- `tests/` + `pytest.ini` — the script suite. Maintainers only; `docs/CONTRIBUTING.md` explains what it does and does not measure.

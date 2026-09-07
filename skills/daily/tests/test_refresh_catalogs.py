@@ -33,7 +33,7 @@ def unresolvable(env_file, tmp_path, monkeypatch):
     """Nothing anywhere resolves a workspace: no `.env`, no cwd, no install directory.
 
     All three sources `find_workspace()` consults have to be neutralised together, or the
-    result depends on where the checkout happens to sit — `TESTING.md` § "A test's result
+    result depends on where the checkout happens to sit — `docs/skills/daily/decision-log.md` § "A test's result
     depended on where the checkout sat" records the run where it did.
     """
     monkeypatch.setattr(skill_config, "SKILL_ROOT", tmp_path / "skills" / "daily")

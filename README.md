@@ -453,7 +453,7 @@ uncertain, and asks before posting anything to Harvest.
 - **`skills/daily/references/classification-rules.md`** — the generic rubric the skill uses
   to turn signals into a `(client, project, task, billable)` decision.
 - **`skills/daily/references/output-format.md`** — the markdown timesheet template.
-- **`skills/daily/references/setup.md`** — first-run setup the skill walks you through.
+- **`skills/daily/references/first-run.md`** — first-run setup the skill walks you through.
 - **`skills/daily/references/activitywatch.md`** — what the skill reads out of ActivityWatch.
 - **`skills/daily/references/new-client-work.md`** — raising a new ticket for unmatched work.
 - Thresholds (AFK break length, what counts as substantive activity, the active/thin bands, the
@@ -488,6 +488,14 @@ activity-to-timesheet/
 ├── .github/ISSUE_TEMPLATE/   # the form behind "New issue"
 ├── CHANGELOG.md              # what changed in each release
 ├── LICENSE                   # MIT
+├── AGENTS.md                 # for agents working on the repo: how to verify, where a thing goes
+├── CONTEXT.md                # the vocabulary the rules are written in
+├── intent/                   # what the product is for and refuses to become
+├── docs/
+│   ├── CONTRIBUTING.md       # how to change the plugin without losing what it knows
+│   ├── adr/                  # the decisions that are hard to reverse, with their reasoning
+│   ├── agents/               # tracker and label conventions the engineering skills read
+│   └── skills/daily/decision-log.md  # the evidence behind the daily skill's rules
 ├── demo/
 │   └── tag-rule-demo.html    # interactive demo of the tag/category-rule failure modes
 ├── .claude-plugin/           # marketplace + plugin manifests, incl. the configuration it asks for
@@ -497,7 +505,7 @@ activity-to-timesheet/
 ├── skills/daily/             # /billables:daily — the timesheet run
 │   ├── SKILL.md              # the skill's instructions
 │   ├── .env.example          # credential + optional-config template
-│   ├── references/           # classification rules, setup, context template, formats
+│   ├── references/           # classification rules, first-run, context template, formats
 │   └── scripts/              # Harvest + ActivityWatch + screenshot helpers (stdlib Python)
 │       ├── activity_timeline.py  # categorized window timeline from AW category rules
 │       ├── afk_blocks.py         # AFK-anchored day skeleton (work_start/end, breaks)
@@ -520,7 +528,7 @@ Two things worth knowing before you do:
 
 - **Not everything is a defect.** If the skill didn't know one of *your* clients, signals or
   machine facts, that belongs in your own `Timesheets/.context.md`. If a window title comes back
-  `uncategorized`, that's an ActivityWatch category rule on your machine — `references/setup.md`
+  `uncategorized`, that's an ActivityWatch category rule on your machine — `references/first-run.md`
   covers it. Neither is fixed by a change here.
 - **Redact before you paste.** This tool reads window titles, screenshots and Harvest entries, so
   its output carries client names, project codes and file paths. Issues are public.

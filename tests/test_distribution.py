@@ -234,8 +234,8 @@ def instruction_docs() -> list[Path]:
 
     An enumeration rather than "the tree minus some exclusions", so read it as the scope
     and not as a claim about the rest of the repo. `CHANGELOG.md`, `docs/RECOVERY.md`,
-    `docs/adr/` and `skills/daily/TESTING.md` are deliberately outside it — they record the
-    past, and naming a retired thing accurately is their job — but so is everything else
+    `docs/adr/` and `docs/skills/daily/decision-log.md` are deliberately outside it — they record
+    the past, and naming a retired thing accurately is their job — but so is everything else
     not listed, including `tests/`, which has to be able to write these names down in order
     to assert on them.
 
@@ -245,7 +245,8 @@ def instruction_docs() -> list[Path]:
     markdown line does.
     """
     docs = [REPO / "README.md", REPO / "AGENTS.md", REPO / "CLAUDE.md",
-            REPO / "CONTEXT.md", REPO / "INTENT.md"]
+            REPO / "CONTEXT.md", REPO / "intent" / "foundational" / "intent.md",
+            REPO / "docs" / "CONTRIBUTING.md"]
     docs += sorted((REPO / ".github").rglob("*.yml"))
     docs += sorted((REPO / "docs" / "agents").glob("*.md"))
     docs += sorted((REPO / "hooks").iterdir()) + sorted((REPO / "install").iterdir())

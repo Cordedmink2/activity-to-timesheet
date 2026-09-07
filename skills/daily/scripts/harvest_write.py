@@ -18,8 +18,8 @@ everything a write has in common happens here, once:
 
 **`--confirm` is the confirmation gate.** It is not a field and not a promise in prose:
 without it nothing is written. `SKILL.md` Step 8 is where the user's yes is obtained;
-`TESTING.md` § "The confirmation gate is in the invocation, not only the prose" is why the
-gate is here as well as there — the frontmatter field that stops a model starting the
+`docs/skills/daily/decision-log.md` (in the repository, not in an installed copy) § "The
+confirmation gate is in the invocation, not only the prose" is why the gate is here as well as there — the frontmatter field that stops a model starting the
 skill unprompted is honoured by some harnesses and dropped by others.
 
 The gate is taken off the argument list before anything reads it positionally, so it may be

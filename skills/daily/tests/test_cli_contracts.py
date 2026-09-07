@@ -188,7 +188,7 @@ def test_the_encoding_fix_is_applied_by_every_cli_that_needs_it(name, monkeypatc
     `run_cli` hands `main()` a `StringIO`, which is not a `TextIOWrapper`, so the body of
     `use_utf8()` correctly does nothing under test — meaning the suite stayed green when
     the call was deleted from a `main()` entirely. The defect that returns is the one in
-    `TESTING.md` § "Three CLIs crashed on import under captured stdout": a Windows console
+    `docs/skills/daily/decision-log.md` § "Three CLIs crashed on import under captured stdout": a Windows console
     on a codepage, a client name with a macron in it, and a `UnicodeEncodeError` partway
     through a report the user is reading.
 

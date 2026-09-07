@@ -1,8 +1,6 @@
 # Intent: Reconstruct work activity into a trustworthy timesheet
 
-Author: Connor  
-Status: draft  
-Created: 2026-08-31
+Status: draft — Connor, created 2026-08-31, refusals section added 2026-09-07 and open under #42.
 
 ## Problem
 
@@ -20,7 +18,10 @@ The agent should use recorded activity together with retained user context to re
 
 The workflow should remain context-efficient as the amount of activity grows. The main agent should work from the evidence and conclusions it needs rather than carrying the whole day's raw activity in one context.
 
-Nothing is billed until the user explicitly approves it.
+Nothing is billed until the user explicitly approves it. A consultant bills several clients from
+one machine and cannot honestly reconstruct Tuesday from memory; this reconstructs the workday from
+local activity data, proposes per-client billable blocks, and posts them once the user confirms. It
+does the remembering; the user does the confirming.
 
 ## Affected users and systems
 
@@ -45,3 +46,26 @@ Today the workflow uses ActivityWatch as the activity source, an agent to interp
 - What learned context should be retained, and how should stale or conflicting context be corrected over time?
 - What decomposition approach best keeps each run context-efficient without losing evidence needed to reconstruct the day accurately?
 - How far should the product extend beyond reconstructing a normal workday?
+
+## What it will not become
+
+These are refusals, not a backlog. A feature request that requires one of them is declined, and
+the refusal is the answer rather than a deferral.
+
+*Draft, reconstructed 2026-09-07 from the surviving head of the original and the "Out of Scope"
+section of spec issue #2. Issue #42 is where Connor finishes it.*
+
+- **A thing that decides whether the user was working.** Idle is settled by the AFK watcher and
+  nothing re-infers it — not a screenshot, not a window title, not a calendar event. A source that
+  disagrees becomes a question to the user, never a block.
+- **A thing that bills on its own.** Every write to the provider carries the confirmation gate in
+  the invocation. No batch mode, no auto-post, no setting that turns the gate off.
+- **A carrier of one user's facts.** Client names, project codes, task names, colleagues, machine
+  specifics live in the user's workspace. A shipped file that names them is a defect.
+- **A second front end to the provider.** Raw provider data beyond a day's entries — project lists,
+  monthly totals, reports — is the provider's own interface's job.
+- **A channel that drops the guard against starting unprompted.** The frontmatter that stops a
+  harness invoking the skill on its own is kept, and any distribution channel that rejects it is
+  declined rather than accommodated.
+- **A product that is conceptually ActivityWatch-to-Harvest.** Both are the current adapters. A rule
+  that could only be true of one of them is written wrongly.

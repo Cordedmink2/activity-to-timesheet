@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reachable Harvest and an entry id that exists, where before it needed none of them. A mistyped id
   answers `ERR 404` instead of printing `WOULD PATCH`.
 
+### Changed
+- **The maintainer's record and guide left the shipped skill.** `skills/daily/TESTING.md` is now
+  `docs/skills/daily/decision-log.md` and `references/self-development.md` is `docs/CONTRIBUTING.md`,
+  so the export carries only what a run reads; `references/setup.md` is `references/first-run.md`,
+  which stops it sharing a name with the `setup` skill; the root `INTENT.md` fragment is retired in
+  favour of `intent/foundational/intent.md`; ADR-0007 exists as a draft; `AGENTS.md` now routes a
+  finding, a change and a decision to the file that holds it.
+
 ### Added
 - **A calendar toggle and the wrapper behind it** (#50, the first piece of #49). A new optional
   setting, **Read my Outlook calendar** (`TIMESHEET_OUTLOOK_CALENDAR`), off by default and mirrored

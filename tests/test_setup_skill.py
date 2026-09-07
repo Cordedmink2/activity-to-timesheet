@@ -218,8 +218,8 @@ def test_a_skill_handing_a_configured_path_to_powershell_resolves_it_in_bash(ski
     script writes by, which is the whole point.
     """
     root = SKILLS / skill
-    # What a *run* reads: SKILL.md and the references beside it. `TESTING.md` and
-    # `self-development.md` are the maintainer's, and both have to stay free to quote the
+    # What a *run* reads: SKILL.md and the references beside it. `docs/skills/daily/decision-log.md` and
+    # `docs/CONTRIBUTING.md` are the maintainer's, and both have to stay free to quote the
     # wrong idiom while explaining why it is wrong — the same allowance the credential
     # guard below makes for naming a key while describing the danger.
     read_on_a_run = [root / "SKILL.md"] + sorted((root / "references").glob("*.md"))

@@ -10,8 +10,9 @@
                                                         when the shell is the reason
 
 This module carries the reasoning for the precedence below; the restatements of it are
-registered in `references/self-development.md` § "Rules with more than one copy", so a
-change here has a list of the other copies to change with it.
+registered in `docs/CONTRIBUTING.md` § "Rules with more than one copy" (in the repository,
+not in an installed copy — as is the decision log cited below), so a change here has a list
+of the other copies to change with it.
 
 Precedence, highest first:
 
@@ -36,7 +37,7 @@ through to the next one — see `has_value()`. `DATAVERSE_URL=` left behind in a
 an omitted argument must not thereby discard the configured value. This is a deliberate
 widening: the `.env` layer already discarded blanks, because `_parse_env_file` strips,
 while a whitespace-only *environment variable* used to be handed to the caller verbatim.
-`TESTING.md` § "Settled decisions" records why that inconsistency was not preserved.
+`docs/skills/daily/decision-log.md` § "Settled decisions" records why that inconsistency was not preserved.
 
 Nothing here is provider-specific: the keys belong to their callers, and the credentials
 contract in particular stays in `harvest_client.load_creds()`. This module owns only the
@@ -66,7 +67,7 @@ ENV_PATH = SKILL_ROOT / ".env"
 # question, and was wrong — `MSYSTEM` is inherited from whatever launched Claude Code, so
 # on a machine where the session was started from a Git Bash terminal the PowerShell tool
 # carries it too and the check was silenced for exactly the user it was written for.
-# `TESTING.md` § "Two ways the configuration does not arrive" holds the record.
+# `docs/skills/daily/decision-log.md` § "Two ways the configuration does not arrive" holds the record.
 #
 # The hook cannot import this module — it is run by path, from a directory with no
 # relationship to the skill — so the spelling exists twice. `tests/test_plugin_config.py`
@@ -179,7 +180,7 @@ def note_for_an_unreached_shell(platform: str | None = None, environ=None) -> st
     through PowerShell reports the timezone or the credentials missing on a machine that
     is configured perfectly well, and the two lines above this note send the user off to
     start a new session or install Git Bash. Neither is the fix, and following either
-    costs them the run. `TESTING.md` § "Two ways the configuration does not arrive"
+    costs them the run. `docs/skills/daily/decision-log.md` § "Two ways the configuration does not arrive"
     carries the evidence and the mechanisms rejected before settling on saying so.
 
     **What is checked is the fact itself, not a proxy for it.** The marker rides in the
@@ -225,7 +226,7 @@ def note_for_an_unreached_shell(platform: str | None = None, environ=None) -> st
             "    from. An install made at local scope is bound to the one directory it\n"
             "    was installed from, and no hook runs anywhere else. Run\n"
             "    `claude plugin list` to see whether it is enabled here.\n"
-            "  - or the hook could not start — see references/setup.md § 'When the\n"
+            "  - or the hook could not start — see references/first-run.md § 'When the\n"
             "    configuration does not arrive'.")
     return (
         "\n  The configuration was not published to this command, so starting a new\n"
@@ -240,7 +241,7 @@ def note_for_an_unreached_shell(platform: str | None = None, environ=None) -> st
         "    nothing is published to any shell. Run `claude plugin list` to see whether it\n"
         "    is enabled here.\n"
         "  - or the publishing hook could not start, which on Windows means Git Bash is\n"
-        "    not installed. references/setup.md § 'When the configuration does not\n"
+        "    not installed. references/first-run.md § 'When the configuration does not\n"
         "    arrive' has that one.")
 
 
@@ -284,7 +285,7 @@ def _install_workspace() -> Path | None:
     install nested one level further than expected resolved to whatever real workspace
     happened to be above it — a public checkout inside `~/Admin` resolved to `~/Admin`.
     Nothing fails at that point: the refresh reports success, and the stale catalogs
-    surface days later. `TESTING.md` § "Workspace resolution is anchored on the install
+    surface days later. `docs/skills/daily/decision-log.md` § "Workspace resolution is anchored on the install
     shape, not on a depth" owns the record.
 
     A plugin install is the third shape, and the reason this is a rule rather than one

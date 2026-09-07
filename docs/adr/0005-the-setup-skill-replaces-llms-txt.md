@@ -46,7 +46,7 @@ print the version it exports, so nothing needed a replacement. `tests/test_distr
 manifest against the changelog heading, and that pair is the whole release.
 
 **Nothing describes the three-copy ritual.** The publish script is gone, and so are the instructions
-that named it — `references/self-development.md` §Releasing and the `Files in this skill` entry for
+that named it — `docs/CONTRIBUTING.md` §Releasing and the `Files in this skill` entry for
 `VERSION`.
 
 **The README keeps its prose walkthrough.** Deleting it too would leave someone who has not
@@ -69,7 +69,7 @@ are the ones a person performs by hand either way.
 - The version has one home. Bumping it is one edit, and `tests/test_distribution.py` fails if the
   changelog disagrees.
 - One step had no other agent-readable home and moved rather than went: scaffolding the workspace.
-  The `setup` skill defers it to the `daily` skill's first run, and `references/setup.md` covered
+  The `setup` skill defers it to the `daily` skill's first run, and `references/first-run.md` covered
   `.context.md` but never the three directories around it — the runbook was the only place that did.
   It is now §"First-run: the workspace" there.
 - An exported install carries no version marker at all. The issue form asks for the plugin's version
@@ -79,7 +79,7 @@ are the ones a person performs by hand either way.
   and `scripts/` file in every skill, the hooks, the installers, the issue form — may name
   `llms.txt`, `publish.ps1`, the release skill, or call any of it a runbook. The set is an
   enumeration and not "the tree minus exclusions", so it is the guard's scope rather than a claim
-  about the rest of the repo: `CHANGELOG.md`, `docs/RECOVERY.md`, `docs/adr/` and `TESTING.md` are
+  about the rest of the repo: `CHANGELOG.md`, `docs/RECOVERY.md`, `docs/adr/` and `docs/skills/daily/decision-log.md` are
   outside it because they record what happened, and `tests/` because a test has to write these
   names down in order to assert on them.
 

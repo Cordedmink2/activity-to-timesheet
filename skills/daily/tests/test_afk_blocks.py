@@ -181,7 +181,7 @@ def test_parse_range_takes_the_first_pass_over_a_repeated_hour():
     convention rather than a fact. It is the first — the pre-change one, at UTC+13.
 
     Pinned because three documents state it (`to_utc`'s docstring, `activitywatch.md`
-    §"Time zones", `TESTING.md`) and nothing else measures it: the transition scenario
+    §"Time zones", `docs/skills/daily/decision-log.md`) and nothing else measures it: the transition scenario
     deliberately avoids this hour, so a change to `fold` semantics would flip the answer
     with the whole suite still green.
     """

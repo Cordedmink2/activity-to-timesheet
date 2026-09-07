@@ -48,7 +48,7 @@ def test_every_skill_relative_command_names_a_shipped_script():
 # `[--confirm]` in a list of a script's optional flags is documentation; a bare `--confirm`
 # on a command line is a template someone will copy.
 OPTIONAL = re.compile(r"\[[^\]]*\]")
-# The interpreter is whatever the machine resolved it to — see TESTING.md § "Interpreter is
+# The interpreter is whatever the machine resolved it to — see docs/skills/daily/decision-log.md § "Interpreter is
 # resolved, not literal", where `python` was the Windows Store stub and the answer was `py`
 # in that user's `.context.md`. Matching the literal word would let the same ready-typed
 # command through under any other spelling, so the interpreter is a token here, not a name.
@@ -88,7 +88,7 @@ def test_no_documented_command_hands_over_the_confirmation_flag_ready_typed():
 # --------------------------------------------------------------------------------------
 # The "Files in this skill" inventory against the flags the scripts actually parse
 #
-# The inventory is the only place a run is told which flags exist. `TESTING.md` §"The
+# The inventory is the only place a run is told which flags exist. `docs/skills/daily/decision-log.md` §"The
 # 'Files in this skill' list is hand-maintained and had drifted" records it losing whole
 # scripts once; it had since lost flags as well. Hand-maintained lists drift, so the fix is
 # not to correct the entries but to compare them against the source on every run.
@@ -247,7 +247,7 @@ def entry_for(name: str) -> tuple[set[str], set[str]]:
 @pytest.mark.parametrize("name", bundled_script_names())
 def test_every_bundled_script_has_an_inventory_entry(name):
     """Derived from `scripts/` rather than from a list, so a twelfth script is covered the
-    day it lands. This is the drift `TESTING.md` records: three scripts had been added and
+    day it lands. This is the drift `docs/skills/daily/decision-log.md` records: three scripts had been added and
     the inventory named none of them."""
     entry_for(name)
 

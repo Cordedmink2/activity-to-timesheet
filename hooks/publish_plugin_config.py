@@ -17,7 +17,7 @@ about the harness.
 POSIX shell and is applied as a preamble to Bash tool calls; the PowerShell tool is given
 no equivalent and loads no profile, so a script the model happens to run through
 PowerShell sees none of this. That is a documented scope, not a defect here, and it is not
-closed by writing a second fragment: `skills/daily/TESTING.md` § "Two ways the
+closed by writing a second fragment: `docs/skills/daily/decision-log.md` § "Two ways the
 configuration does not arrive" records the two mechanisms that would close it and why
 neither was taken. What closes it instead is the skills directing every read of a
 configured value through Bash, and `skill_config.note_for_an_unreached_shell()` naming the

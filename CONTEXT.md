@@ -26,9 +26,9 @@ term below and a synonym both read fine, the term below wins; the synonyms are w
 like.
 
 Decisions that shaped this vocabulary are in [`docs/adr/`](./docs/adr/) — ADR-0006 for why the
-provider stays inside this plugin for now. Why the read and write boundaries are separate is the
-paragraph above and ADR-0006's consequences; the ADR that should hold it on its own, ADR-0007, is on
-[`docs/RECOVERY.md`](./docs/RECOVERY.md)'s list of documents still to write.
+provider stays inside this plugin for now. The two boundaries the paragraph above draws are the
+rule; [ADR-0007](./docs/adr/0007-two-boundaries-the-provider-writes-the-sources-read.md) is the
+write-up of why they are drawn on direction rather than on service.
 
 ## The services
 

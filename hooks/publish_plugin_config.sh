@@ -26,14 +26,14 @@
 # manager and printed fifteen lines of installer output before recovering.
 # `tests/test_plugin_config.py` pins it.
 #
-# KNOWN LIMITATION, accepted with its reasoning in `skills/daily/TESTING.md`: Claude Code
+# KNOWN LIMITATION, accepted with its reasoning in `docs/skills/daily/decision-log.md`: Claude Code
 # runs hook commands through Git Bash on Windows, and through PowerShell when Git Bash is
 # not installed — where `sh` is not a command and this wrapper never starts. There is no
 # single command string valid in both shells that also names a working interpreter, and
 # declaring one hook entry per shell would print a spawn error at every session start on
 # whichever platform is not that one. So the gap is closed by diagnosis instead: the
 # "missing setting" messages the user would hit name a new session first and
-# `references/setup.md` § "When the configuration does not arrive" second, which is where
+# `references/first-run.md` § "When the configuration does not arrive" second, which is where
 # `winget install Git.Git` is.
 #
 # KNOWN LIMITATION, the second one and a different one: this wrapper running is not enough

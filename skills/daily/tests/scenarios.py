@@ -146,7 +146,7 @@ def _no_break_day() -> Day:
 
     The span-level ratio passes 0.7 while hiding three nearly-dead stretches inside it —
     the exact configuration that made two of four test agents over-bill by 1.7 hours
-    before Step 6 guard 1 was scoped (see TESTING.md).
+    before Step 6 guard 1 was scoped (see docs/skills/daily/decision-log.md).
     """
     d = day(dt.date(2026, 8, 5))
     d.classify(*ACME)
