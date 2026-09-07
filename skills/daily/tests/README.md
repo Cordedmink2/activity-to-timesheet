@@ -1,7 +1,8 @@
 # The script test suite
 
 Covers `scripts/`. It does **not** cover `SKILL.md`'s behavioural claims — those need a
-fresh agent and a control arm, and the method for that lives in `docs/skills/daily/decision-log.md`.
+fresh agent and a control arm, and the method for that lives in `docs/skills/daily/decision-log.md`
+(in the repository, not in an installed copy — the same for every `docs/` path cited in this suite).
 
 ```powershell
 python -m pytest                    # everything except benchmarks (~4s)

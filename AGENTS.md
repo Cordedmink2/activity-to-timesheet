@@ -34,6 +34,9 @@ and still reports green.
 
 ## Seen twice
 
+- Run scripts and tests with an interpreter that answers `--version` with a version. A `python`
+  that prints Microsoft Store install help and exits 49 is the Windows app-execution stub, not a
+  broken script; the machine's `.context.md` names the real one.
 - Read a configured value in the Bash tool and hand PowerShell the resolved literal. Published
   configuration reaches Bash alone; a PowerShell read comes back empty and nothing fails.
 

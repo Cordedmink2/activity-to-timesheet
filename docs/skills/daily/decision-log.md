@@ -1035,6 +1035,44 @@ flat, which is what ADR-0004 says makes the prefix necessary in the first place.
 Windows case-only rename upstream is fixed in `prune()` by the same reading and is likewise
 unobserved.
 
+### Maintainer documents moved out of the shipped skill — repo layout
+**Rung 2.** 2026-09-07. Measured: `install/export_agent_skills.py` copies the skill directory
+with only `__pycache__`, `.pytest_cache` and `.env` excluded, so this file (165 KB, 26,794
+words) and `references/self-development.md` (25 KB) travelled with every export. The plugin
+install is the repo root (`marketplace.json` `"source": "./"`), so on Claude Code both ship
+either way; the gain there is that the skill folder an agent enumerates no longer holds them.
+Not measured: no agent was watched reading either file on a run. Both opened by saying "skip
+this on a run", and no run was observed failing to.
+
+What moved. This file → `docs/skills/daily/decision-log.md`, per skill so `reconcile` and
+`setup` can have their own. `references/self-development.md` → `docs/CONTRIBUTING.md`, repo-wide,
+because its gates, pyright section and release ritual were never the `daily` skill's alone and
+GitHub surfaces that path. `references/setup.md` → `references/first-run.md`, because it shared a
+name with the `setup` skill. The root `INTENT.md`, a recovery fragment, retired; intent stays in
+`intent/`, which is the Claude Academy playbook's convention (`intent/<feature>/intent.md`,
+paired with its spec). `AGENTS.md` became the session-start page: verification commands,
+trigger-first routing, the mistakes seen twice, no layout tree.
+
+Rules that came with it. A shipped file citing a `docs/` path says "in the repository, not in
+an installed copy" once. A new ADR needs all three of hard to reverse, surprising without
+context, a real trade-off; ADR-0007 met them and was drafted, nothing else was minted.
+`docs/CONTRIBUTING.md` writes every test path in full, because bare `tests/` had come to mean
+the skill's tree in one document and the repo's in another.
+
+**Rejected: a second `learnings.md`.** This file already is one; a second would split the
+record. **Rejected: merging this file into the guide.** The evergreen process would sink under
+two thousand lines of history. **Rejected: leaving both in place and excluding them from the
+export.** Does nothing for the plugin install, and leaves `references/` holding a maintainer
+document against the folder's own charter (`SKILL.md` "What lives where": generic mechanism for
+any user). **Rejected: a per-skill `contributing.md`.** Two-thirds of it is repo-wide.
+**Rejected: a generated code wiki** — Google's Code Wiki (public repos by submission, private
+repos waitlisted) or the Hermes code-wiki skill's pattern (reference "what/how" for large
+codebases, written outside the repo by default) — for twenty stdlib scripts whose inventory a
+test already pins against their parsers. **Rejected: a layout tree in `AGENTS.md`.** The tree
+is its own source of truth and a copy goes stale. **Deferred, not rejected: trimming
+`SKILL.md`** — 9,342 words against the 5,000-word ceiling the plugin-dev guidance sets — to #57,
+because every `SKILL.md` edit needs a before/after baseline and this change had none.
+
 ## Script defects
 
 Found while building the scenario/contract suite, 2026-08-14. All **rung 1** — each was

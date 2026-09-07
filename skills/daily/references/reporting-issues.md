@@ -6,9 +6,10 @@ everyone — rather than a fact about this user or a setting on their machine. S
 file on a normal run.
 
 **If the user maintains this skill, this is the wrong file.** `docs/CONTRIBUTING.md` in the
-repository (not in an installed copy) owns editing it, and shipping the change is a commit to the repo below — there is no separate
-release ritual. Ask if you don't know; the answer is stable, so it is worth recording under
-`## Preferences` in `.context.md` once rather than re-asking every run.
+repository (not in an installed copy) owns editing it, and shipping the change is a commit to
+the repo below — there is no separate release ritual. Ask if you don't know; the answer is
+stable, so it is worth recording under `## Preferences` in `.context.md` once rather than
+re-asking every run.
 
 ## The repository
 

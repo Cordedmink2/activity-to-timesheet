@@ -79,9 +79,9 @@ are the ones a person performs by hand either way.
   and `scripts/` file in every skill, the hooks, the installers, the issue form — may name
   `llms.txt`, `publish.ps1`, the release skill, or call any of it a runbook. The set is an
   enumeration and not "the tree minus exclusions", so it is the guard's scope rather than a claim
-  about the rest of the repo: `CHANGELOG.md`, `docs/RECOVERY.md`, `docs/adr/` and `docs/skills/daily/decision-log.md` are
-  outside it because they record what happened, and `tests/` because a test has to write these
-  names down in order to assert on them.
+  about the rest of the repo: `CHANGELOG.md`, `docs/RECOVERY.md`, `docs/adr/` and
+  `docs/skills/daily/decision-log.md` are outside it because they record what happened, and
+  `tests/` because a test has to write these names down in order to assert on them.
 
 ## Alternatives considered
 

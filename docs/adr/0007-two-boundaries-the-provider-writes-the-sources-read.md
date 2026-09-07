@@ -2,8 +2,8 @@
 
 **Status:** Proposed — drafted 2026-09-07 under #44, for Connor to accept or amend. The rule it
 records is already enforced; what is proposed is the write-up.
-**Context:** whole repo. Related: [`CONTEXT.md`](../../CONTEXT.md) § "The services", which states the
-rule; [ADR-0006](./0006-keep-the-provider-in-plugin-but-behind-a-command-contract.md), which keeps the
+**Context:** whole repo. Related: [`CONTEXT.md`](../../CONTEXT.md), whose opening paragraphs state
+the rule; [ADR-0006](./0006-keep-the-provider-in-plugin-but-behind-a-command-contract.md), which keeps the
 written side inside this plugin behind a command contract; [ADR-0008](./0008-the-calendar-is-evidence-of-intent-not-activity.md),
 which added a fourth service on the read side; issues #37, #44.
 
