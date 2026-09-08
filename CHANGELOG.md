@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-09-09
 
 ### Upgrading
 - **Changing an entry's times or its date now needs `TIMESHEET_TIMEZONE` too**, where
@@ -23,14 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be applied must not be offered — so previewing a time or date change now needs credentials, a
   reachable Harvest and an entry id that exists, where before it needed none of them. A mistyped id
   answers `ERR 404` instead of printing `WOULD PATCH`.
-
-### Changed
-- **The maintainer's record and guide left the shipped skill.** `skills/daily/TESTING.md` is now
-  `docs/skills/daily/decision-log.md` and `references/self-development.md` is `docs/CONTRIBUTING.md`,
-  so the export carries only what a run reads; `references/setup.md` is `references/first-run.md`,
-  which stops it sharing a name with the `setup` skill; the root `INTENT.md` fragment is retired in
-  favour of `intent/foundational/intent.md`; ADR-0007 exists as a draft; `AGENTS.md` now routes a
-  finding, a change and a decision to the file that holds it.
 
 ### Added
 - **A calendar toggle and the wrapper behind it** (#50, the first piece of #49). A new optional
@@ -126,6 +118,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hidden copy of your projects and tasks. It used to say ".mcp/ catalogs" to a reader who has seen
   neither.
 
+### Changed
+- **The maintainer's record and guide left the shipped skill.** `skills/daily/TESTING.md` is now
+  `docs/skills/daily/decision-log.md` and `references/self-development.md` is `docs/CONTRIBUTING.md`,
+  so the export carries only what a run reads; `references/setup.md` is `references/first-run.md`,
+  which stops it sharing a name with the `setup` skill; the root `INTENT.md` fragment is retired in
+  favour of `intent/foundational/intent.md`; ADR-0007 exists as a draft; `AGENTS.md` now routes a
+  finding, a change and a decision to the file that holds it.
+- The zone a day is read in, and every clock conversion that follows from it, now live in
+  `scripts/timezone.py` (#36). Both halves of the skill need that arithmetic and neither owns it:
+  the two write scripts had been importing the ActivityWatch client to reach it, and one of them
+  had been importing the other for the daylight-saving refusal. Nothing about a command line, an
+  output shape or a message changes — the functions moved as they stood. What is different is that
+  no script that posts to Harvest imports anything of the activity source's, which is the edge
+  ADR-0006 said had to be gone before the provider moves behind a command contract.
+- The confirmation gate, the preview and the `OK` / `ERR` contract are one implementation,
+  `scripts/harvest_write.py`, which `harvest_post.py` and `harvest_patch.py` both declare their
+  body to. No command line changes. One message does: a patch with `--start` after `--end` now
+  explains why it is refused, the way the create already did, instead of stating only that it is.
+
 ### Fixed
 - **A patch could move an entry's times across a daylight-saving change and bill it short,
   silently** (#32). Harvest recomputes the duration from the two clock times on a `PATCH` exactly
@@ -151,19 +162,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release, one PowerShell start — and a write that is refused (a task registered from an elevated
   shell) is remembered and not retried until the next release. A hand-installed or exported copy's
   task is not touched — that, and the refused case, are still `/billables:setup`'s read-back check.
-
-### Changed
-- The zone a day is read in, and every clock conversion that follows from it, now live in
-  `scripts/timezone.py` (#36). Both halves of the skill need that arithmetic and neither owns it:
-  the two write scripts had been importing the ActivityWatch client to reach it, and one of them
-  had been importing the other for the daylight-saving refusal. Nothing about a command line, an
-  output shape or a message changes — the functions moved as they stood. What is different is that
-  no script that posts to Harvest imports anything of the activity source's, which is the edge
-  ADR-0006 said had to be gone before the provider moves behind a command contract.
-- The confirmation gate, the preview and the `OK` / `ERR` contract are one implementation,
-  `scripts/harvest_write.py`, which `harvest_post.py` and `harvest_patch.py` both declare their
-  body to. No command line changes. One message does: a patch with `--start` after `--end` now
-  explains why it is refused, the way the create already did, instead of stating only that it is.
 
 ## [0.6.0] - 2026-09-03
 
