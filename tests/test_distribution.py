@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from shipped import (REPO, SKILLS, frontmatter, frontmatter_name, released_version,
-                     skill_dirs, skill_md_text)
+                     shipped_text, skill_dirs, skill_md_text)
 
 MANIFEST_DIR = REPO / ".claude-plugin"
 PLUGIN_MANIFEST = MANIFEST_DIR / "plugin.json"
@@ -293,6 +293,31 @@ def test_no_instruction_names_the_retired_install_path(doc):
     assert not offenders, (
         f"{doc.relative_to(REPO).as_posix()} still sends a reader to the retired install "
         "path:\n  " + "\n  ".join(offenders))
+
+
+# `sh --version` fails on a machine whose Bash tool works perfectly (Git for Windows puts
+# only `Git\cmd` on `PATH`; `sh.exe` lives in `Git\bin`, which Claude Code never consults) —
+# so it wrongly diagnoses a working install as needing Git Bash installed. The full
+# reasoning lives in `references/first-run.md` §"When the configuration does not arrive"
+# cause 3, which is also the one paragraph allowed to keep saying so.
+SH_VERSION_DIAGNOSTIC = re.compile(r"sh --version")
+
+# A paragraph carrying one of these cues is that explanation, not a fresh recommendation —
+# scoped to the paragraph rather than the line because the explanation's own sentences
+# re-mention the phrase without repeating the cue each time.
+EXPLANATION_CUES = re.compile(r"do not use|until it was measured", re.I)
+
+
+@pytest.mark.parametrize("skill", skill_dirs(), ids=lambda p: p.name)
+def test_no_shipped_skill_recommends_sh_version_as_a_diagnostic(skill):
+    """`sh --version` measures whether the *current* shell has Git Bash's `sh` on `PATH` —
+    not whether the tool Claude Code will actually run the fix through can start one. The
+    two disagree on exactly the machine this diagnostic exists to help."""
+    offenders = [para.strip() for para in shipped_text(skill).split("\n\n")
+                 if SH_VERSION_DIAGNOSTIC.search(para) and not EXPLANATION_CUES.search(para)]
+    assert not offenders, (
+        f"{skill.name} recommends `sh --version` as a configuration diagnostic:\n  "
+        + "\n  ".join(offenders))
 
 
 # --------------------------------------------------------------------------------------

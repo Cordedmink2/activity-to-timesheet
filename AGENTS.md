@@ -18,6 +18,15 @@ Healthy is a single `passed` line and `0 errors`. The root matters: `skills/dail
 collects the skill's own suite alone, so a run started in that folder skips every repo-level guard
 and still reports green.
 
+## Releasing
+
+A version bump is the only thing that reaches an installed user — the plugin cache is keyed on
+the manifest version, and `/plugin update` has nothing to move to while it is unchanged. Bump
+`version` in `.claude-plugin/plugin.json` and add the matching `## [x.y.z]` heading to
+`CHANGELOG.md` in the same change; `tests/test_distribution.py::test_every_version_marker_agrees`
+holds the pair. Then tag the release commit. See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)
+§ Releasing for the full steps.
+
 ## Where a thing goes
 
 - **Changing a skill, a reference or a script** → read
