@@ -2253,7 +2253,80 @@ considered and not written: a carve-out in Step 5's "never re-infer active/idle 
 calendar" for the accepted case. It stays as it is — what settles an accepted block is the user
 saying where they were, which has always overridden (Step 1), not the calendar re-inferring idle.
 
+### Chrome does not put the profile name in the window title; Edge does — rung 2, measured, #66
+
+**Measured on one machine, 2026-09-09, with the profiles created for the test.** This decides how
+far profile-name-as-tag can go, so it was measured rather than researched.
+
+Two Chrome profiles open at once, `billablestest` and `billablestest2`, each in its own window.
+Both window titles read exactly `New Tab - Google Chrome` — no profile name in either. In the same
+enumeration, Edge carried its profile in the title: `… - Work - Microsoft Edge` and
+`… - Acme - Dana - Microsoft Edge`. Window-to-profile was confirmed by reading each window's own
+profile button through UI Automation (`billablestest`, `billablestest2`, `Work Profile`,
+`Acme - Dana Profile`), so the two identical Chrome titles are definitely two different profiles
+and not one profile in two windows.
+
+The single-profile case was checked first and agrees: Chrome's `Default` profile, display name
+`Your Chrome`, produced `New Tab -`, `Example Domain -` and `YouTube - Google Chrome` across three
+navigations, never naming the profile. The multi-profile case was checked separately because it was
+the plausible exception — Chrome disambiguates profiles on the taskbar with avatars, and it would
+have been reasonable for it to do so in the title too. It does not.
+
+**Consequence for #66:** profile-name-as-tag is an Edge-native mechanism. A Chrome user still needs
+an extension to get any client tag into the title, so "the extension becomes an optional upgrade"
+is true for Edge and false for Chrome. The profile name *is* reachable through UI Automation, but
+that does not rescue it — the activity source reads window titles, and nothing in this pipeline
+reads UIA.
+
+**The measurement trap, which cost three failed attempts before anything was read correctly:**
+Chrome runs **one** browser process for every profile sharing a user-data-dir, and opens each
+profile as another window of it. So `Get-Process chrome | ... MainWindowHandle` returns a single
+window and hides the rest, and a launch that succeeded looks like a launch that failed — the new
+window exists, the process count does not move, and a wait loop counting processes never fires.
+Enumerate top-level windows (`EnumWindows`, class `Chrome_WidgetWin_1`) instead. Edge behaves the
+same way. Any future check that counts browser windows must not go through `MainWindowHandle`.
+
 ## Rejected
+
+### Setting the per-profile title format by policy — rung 1, observed, 2026-09-09
+
+**Rejected on the extension's own manifest, not on a failed attempt.**
+
+Raised while scoping "the setup skill owns setup end to end". Steps 1, 2, 4 and 5 all have a
+non-interactive route — winget, `ExtensionInstallForcelist`, the `classes` POST (#47), and the
+scheduled task, which already ships one. Step 3, the per-profile URL-in-Title format that appends
+the client code, was the one step with no obvious route, so it decides whether "end to end" is
+reachable at all.
+
+The route that would have worked is Chrome/Edge managed storage: a `3rdparty\extensions\<id>\policy`
+key that the extension reads through `chrome.storage.managed`. **URL in Title cannot use it.** Its
+shipped manifest (4.0.0, read on this machine at
+`…\Edge\User Data\Default\Extensions\ignpacbgnbnkaiooknalneoeladjnfgb\4.0.0_0\manifest.json`)
+declares `"permissions": ["storage"]` and no `storage.managed_schema`. Without that key the platform
+exposes no managed namespace to the extension, so a policy written for it is not read — the write
+would appear to succeed and change nothing, which is this skill's worst failure shape.
+
+What is left for step 3 is writing the profile's own `Sync Extension Settings\<id>` LevelDB
+directly. Rejected as a shipped step: it needs a non-stdlib LevelDB writer, the browser closed to
+take the lock, knowledge of an undocumented key layout that the extension may change at any version,
+and it fights Edge's own sync. Confirmed the store is the sync one and not the local one — all six
+profiles on this machine have `Sync Extension Settings\<id>` populated (57 b to 1,143 b) and no
+`Local Extension Settings\<id>` at all.
+
+**Not tested:** no policy key was written and observed being ignored. This is the manifest plus the
+documented platform rule, not a measured failure. If someone wants rung 2, the cheap experiment is
+one HKCU `3rdparty` write and a read of `chrome.storage.managed` from the options page.
+
+**What this leaves, and it is better than the route it replaces:** the Edge *profile name* is
+already in every window title, so a profile named for its client is a client tag that needs no
+extension configuration at all. Observed the same day on this machine — the `/Acme|Acme Reserve|Acme
+Trust/` rule matched 386 of 572 browser titles purely off the profile display name "Acme - Dana",
+with zero bracketed codes present anywhere. The profile directories are literally
+`Profile Acme - Dana`, `Profile Contoso - Sam`, `Profile Beta Industries - Admin`,
+`Profile Northwind - Dana`. If profile-name-as-tag becomes the supported mechanism, step 3 stops
+being a configuration step and becomes a naming convention plus a check — and the extension is still
+wanted, but only for the URL/hostname signal step 2 verifies, which needs no per-profile options.
+That trade is a decision for its own issue, not a consequence of this rejection.
 
 ### Byte size as a "static screen" signal — narrowed, 2026-08-28
 
