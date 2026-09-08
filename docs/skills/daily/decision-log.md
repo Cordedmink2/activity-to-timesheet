@@ -2253,6 +2253,33 @@ considered and not written: a carve-out in Step 5's "never re-infer active/idle 
 calendar" for the accepted case. It stays as it is — what settles an accepted block is the user
 saying where they were, which has always overridden (Step 1), not the calendar re-inferring idle.
 
+### The `setup` skill's **Do** splits into a quoted user block and agent reasoning — #65
+
+The constraint, so the next editor does not fold it back: **the block-quoted block in steps 1 to 4 is
+read out to the user; everything around it never is.** Merging them is what #65 undid — the
+instruction and the argument for it were the same paragraph, so every run had to re-extract one from
+the other and each run did it differently.
+
+Two things a review caught in the first cut, both worth naming because the shape recurs. **New
+instructions attract invented claims.** Writing a short instruction tempts you to add the step that
+"obviously" goes with it: a first draft told the user to reload the options page to confirm a save
+(never observed to work), and a second told them to add every category and *then* save, which
+inverts `README.md` and would silently lose all but the last if the UI does not batch. Neither fact
+came from anywhere. **And a justification written next to a check has to match that check** — a line
+claiming step 2's verify was judged against the profile list was wrong in the same file it sat in:
+step 2's verify is aggregate, and the list is step 3's.
+
+The body word count — frontmatter excluded, which is why `wc -w` on the whole file reads about 140
+higher — went 4,734 → 5,051 across the change. Connor accepted the overage on 2026-09-09 rather than
+move the reasoning to a reference, on the ground that #57's 5,000-word ceiling is written against
+the `daily` skill. Worth knowing the file was already at 4,734 before this change: the next thing
+added to it should probably pay the restructure.
+
+The split itself is held by `tests/test_setup_skill.py::test_a_step_s_quoted_instruction_stays_inside_its_do`,
+which asserts the convention is stated and that no quoted block sits outside a **Do**. It deliberately
+does not enumerate which steps are human-facing — steps 5 and 6 drive scripts and have no block to
+read out, and a list would be wrong the moment a step is added.
+
 ### Chrome does not put the profile name in the window title; Edge does — rung 2, measured, #66
 
 **Measured on one machine, 2026-09-09, with the profiles created for the test.** This decides how

@@ -166,6 +166,35 @@ def test_every_step_says_what_to_do_when_the_check_fails(step):
         "comes back bad")
 
 
+def test_a_step_s_quoted_instruction_stays_inside_its_do():
+    """#65: in a step that has one, the block-quoted block is what a run reads out.
+
+    Written down in `SKILL.md` and, until this, held by nothing — which is the shape that
+    rots. Before #65 the instruction and the argument for it were the same paragraph, so
+    every run had to re-extract one from the other and each did it differently; folding
+    them back together reads as tidying rather than as a regression, and nothing would have
+    failed.
+
+    Two assertions, neither of which enumerates which steps are human-facing — steps 5 and 6
+    drive scripts and have no block to read out, and a test that listed "steps 1 to 4" would
+    be wrong the moment a step is added or reordered. Instead: the convention has to be
+    stated somewhere a run meets it, and wherever a quoted block does appear it has to be in
+    the **Do**. A quoted block that drifts into a verify or a failure branch is the same
+    collapse by another route, because both of those are written for the agent.
+    """
+    text = skill_text()
+    assert re.search(r"block-quot", text, re.I), (
+        "SKILL.md never says what a block-quoted instruction in a step is for, so nothing "
+        "tells a run the block is the part to give the user")
+    for heading, body in steps():
+        outside = len(re.findall(r"^\s*>", body, re.M)) - len(
+            re.findall(r"^\s*>", body.split("**Verify**", 1)[0], re.M))
+        assert outside == 0, (
+            f"step '{heading.strip()}' has a quoted block outside its **Do** — a quoted "
+            "block is what is read out to the user, and a verify or a failure branch is "
+            "written for the agent")
+
+
 # The two strings a user has to hand their security team. Both are defined in the
 # screenshot setup script, not here, so renaming either there is what this catches — the
 # skill would go on naming a task that no longer exists, in a request nobody can action.

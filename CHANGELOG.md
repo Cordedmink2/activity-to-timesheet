@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-09-09
+
+### Changed
+- **The `setup` skill hands the user an instruction instead of a paragraph** (#65). Steps 1 to 4
+  each carry a block-quoted block that is what to read out, with the command or URL on its own
+  line — including where the URL-in-title options page actually is, which the skill asked for and
+  never said, and the extension ID a managed browser needs, which until now only the reference
+  carried. In those four steps the surrounding prose is the reasoning and is not read out; nothing
+  about steps 5 and 6 changes, and step 6 still puts its own sentence to the user. No verify and no
+  failure branch changed: what the user is asked for is now stated rather than inferred from the
+  argument for it.
+
 ## [0.7.0] - 2026-09-09
 
 ### Upgrading

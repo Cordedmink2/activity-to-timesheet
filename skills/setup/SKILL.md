@@ -11,6 +11,8 @@ The other skills in this plugin fail loudly — a script exits non-zero and says
 
 So this skill is not a list of instructions. It is a list of instructions **with a check after each one**, and it does not move on until the check comes back. Run it top to bottom.
 
+Where a step's **Do** carries a block-quoted instruction — steps 1 to 4 — that block is what to give the user, near enough verbatim, and short because they are about to go and do it. The prose around it in those four steps is the reasoning behind it, written for you rather than for them. A user handed the reasoning has to work out which sentence was the instruction. This says nothing about the rest of the file: steps 5 and 6 have things to say to the user, and step 6's verify puts a sentence to them in so many words.
+
 ## What this covers, and what it does not
 
 It covers only the residue a person has to do. Everything a machine can do belongs elsewhere and is not repeated here:
@@ -55,7 +57,16 @@ Four things, in parallel, before step 1:
 
 ### 1. The activity source is installed and running
 
-**Do** — ask the user to install ActivityWatch and launch it. On Windows `winget install ActivityWatch.ActivityWatch` is the shortest route; https://activitywatch.net/downloads/ is the fallback and the only route on macOS and Linux.
+**Do** — give the user this:
+
+> **Install ActivityWatch, then launch it.**
+>
+> - Windows: `winget install ActivityWatch.ActivityWatch`
+> - macOS and Linux, or Windows if you would rather run the installer: https://activitywatch.net/downloads/
+>
+> Tell me once it is running.
+
+winget is Windows-only, so the downloads page is the only route on macOS and Linux.
 
 **Verify** — `GET <activity-url>/api/0/buckets/` returns JSON holding a key that starts `aw-watcher-window_` and one that starts `aw-watcher-afk_`. Note the hostname suffix on those keys; the buckets are hostname-scoped and the rest of this run needs the window bucket's full id.
 
@@ -65,15 +76,33 @@ Four things, in parallel, before step 1:
 
 Window titles are the only client signal that survives into the activity stream. Without the extension a browser title is a page name, which says nothing about which client the page belongs to.
 
-**Do** — ask the user to install **URL in Title** (https://chromewebstore.google.com/detail/url-in-title/ignpacbgnbnkaiooknalneoeladjnfgb) in **each browser profile they work in**. Extensions are per-profile; installing it once does not cover the others.
+**Do** — give the user this:
+
+> **Install the "URL in title" extension in every browser profile you work in.**
+>
+> - https://chromewebstore.google.com/detail/url-in-title/ignpacbgnbnkaiooknalneoeladjnfgb
+> - Install it again in each of your other work profiles — extensions are per-profile.
+>
+> Tell me which profiles you installed it in.
+
+The verify below is aggregate, so the profile list is not what it is judged against. Step 3's check is the one that walks the profiles one at a time.
 
 **Verify** — have the user browse for a minute in a work profile, then read recent events: `GET <activity-url>/api/0/buckets/<window-bucket>/events?limit=1000`. Keep the events whose `data.app` is a browser, and check that at least one `data.title` carries a hostname — a `host.tld` pattern such as `example.com`. Do not expect all of them to: a profile without the extension, and any window opened before it was installed, legitimately have none. **Zero across every browser event is the failure**, and it localises to this step rather than to the tagging in step 3.
 
-**If it fails** — the usual cause is the extension living in one profile while the user browsed in another. Ask which profile they just used and check it directly. A managed browser can also refuse the install outright: on Edge or Chrome under policy, the extension has to be allow-listed by ID, which is a precise request — see `references/endpoint-security.md`.
+**If it fails** — the usual cause is the extension living in one profile while the user browsed in another. Ask which profile they just used and check it directly. A managed browser can also refuse the install outright: on Edge or Chrome under policy, the extension has to be allow-listed by ID, and the ID is `ignpacbgnbnkaiooknalneoeladjnfgb` — a precise request, which `references/endpoint-security.md` says how to evidence before making.
 
 ### 3. Each work profile tags its titles with a client code
 
-**Do** — explain the arrangement: one browser profile per client, and in each profile the URL-in-Title format appends that client's short code in brackets, e.g. `{title}-{hostname}{path}{args}{hash} - [ACME]`. Help the user pick codes that are short and collision-resistant; write down which profile carries which code, because step 4 has to agree with it exactly and the end of this run hands the list to the `daily` skill.
+**Do** — settle one short code per client with the user first, then give them this, once per profile with that profile's own code substituted:
+
+> **Tag this profile's titles with its client code.**
+>
+> - In this profile, open `edge://extensions` (or `chrome://extensions`), find **URL in title**, click **Details**, then **Extension options**.
+> - Set the title format to: `{title}-{hostname}{path}{args}{hash} - [ACME]` — with `ACME` replaced by this profile's code.
+> - **Save.**
+> - Repeat in every other work profile, each with its own code.
+
+Help the user pick codes that are short and collision-resistant; write down which profile carries which code, because step 4 has to agree with it exactly and the end of this run hands the list to the `daily` skill.
 
 **Verify** — from the same recent-events read as step 2, check the browser titles for a bracketed code, `\[[A-Za-z0-9-]{2,12}\]`. Go through the codes the user named one at a time: **each has to appear in at least one real title.** A code with zero matches is a profile whose format string was never saved — which is invisible in the options page, because it shows what was typed rather than what was stored.
 
@@ -81,7 +110,17 @@ Window titles are the only client signal that survives into the activity stream.
 
 ### 4. The category rules match the tags
 
-**Do** — walk the user through the activity source's own UI (`<activity-url>` → Settings → Categories): one category per client, with a **Regex** rule matching the bracketed code, e.g. `\[ACME\]`.
+**Do** — give the user this, with the activity source's own address from "Before you start" written out in place of `<activity-url>`, and their own codes substituted:
+
+> **Add one category per client.**
+>
+> - Open `<activity-url>` → **Settings** → **Categories**.
+> - **Add a category** named for the client.
+> - Give it a rule of type **Regex** matching that client's bracketed code: `\[ACME\]`
+> - **Save.**
+> - Repeat for each client.
+
+Save per category rather than once at the end, which is the order `README.md` § "Configure ActivityWatch categories" uses. Keep the category flat and named for the client: the timeline joins a category's name path with `>`, so a grouping parent changes the label every downstream consumer matches on.
 
 **Verify** — do not trust the UI having saved. `GET <activity-url>/api/0/settings` and read `classes[]`. Each entry carries a `name` (a list — the category and its parents) and a `rule`. **Only test the entries whose `rule.type` is `"regex"`**: a grouping category has `{"type": "none"}` and no `regex` at all, and reaching for a field that isn't there turns a healthy configuration into an error. Compile each regex, honouring its `ignore_case`, and run it against the browser titles collected in step 2.
 
