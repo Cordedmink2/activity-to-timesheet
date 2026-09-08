@@ -40,22 +40,22 @@
     "TIMESHEET_ACTIVITY_URL": {
       "type": "string",
       "title": "ActivityWatch address",
-      "description": "Base URL of the ActivityWatch server holding your activity. Leave blank unless it runs somewhere other than http://localhost:5600."
+      "description": "Base URL of the ActivityWatch server holding your activity. Leave blank unless it runs somewhere other than http://localhost:5600. Not sure? Leave it as it is and run /billables:setup."
     },
     "TIMESHEET_SCREENSHOTS_DIR": {
       "type": "directory",
       "title": "Screenshot directory",
-      "description": "Where the capture task writes screenshots. Leave blank for ~/Pictures/WorkScreenshots."
+      "description": "Where the capture task writes screenshots. Leave blank for ~/Pictures/WorkScreenshots. Not sure? Leave it as it is and run /billables:setup."
     },
     "TIMESHEET_WORKSPACE": {
       "type": "directory",
       "title": "Workspace directory",
-      "description": "The folder holding your Timesheets/ and .mcp/ catalogs. Leave blank to use the folder you run Claude Code from."
+      "description": "The folder this plugin keeps your work in: a Timesheets/ folder with one file per day you review, and a hidden copy of your projects and tasks so it need not ask for them on every run. Leave blank to use the folder you run Claude Code from. Not sure? Leave it as it is and run /billables:setup."
     },
     "TIMESHEET_OUTLOOK_CALENDAR": {
       "type": "boolean",
       "title": "Read my Outlook calendar",
-      "description": "Reads your default calendar in classic Outlook (Windows only) as a fourth source: a calendar event your activity corroborates is drafted as a block, and one it does not is put to you as a question. Off means today's behaviour exactly. Not sure? Leave it off and run /billables:setup."
+      "description": "Reads your default calendar in classic Outlook (Windows only) as a fourth source: a calendar event your activity corroborates is drafted as a block, and one it does not is put to you as a question. Off means today's behaviour exactly. Not sure? Leave it as it is and run /billables:setup."
     }
   },
   "hooks": {

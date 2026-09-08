@@ -104,6 +104,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replaces what it covers rather than doubling it, so a call accepted inside a stretch already
   drafted splits that stretch instead of billing over it. A no leaves the event unbilled and is
   recorded with the day, so that date does not ask twice; an unanswered one is offered again.
+- **Setup settles the calendar, and every optional setting says where to learn what it does**
+  (#56, the sixth piece of #49). `/billables:setup` gains a sixth step, entered on every run —
+  *off* is an outcome it states rather than a step it skips. It runs `scripts/calendar_day.py` for
+  today in the Bash tool instead of reading the toggle: a command written to find out whether a
+  setting is set writes its own answer into the transcript, and it answers the wrong question
+  anyway, since on a machine with new Outlook alone the toggle is on and the calendar still cannot
+  be read. Three outcomes, told apart by the `ERR` line because every refusal exits 1 — a day
+  read, reported as its event count and the first subject and nothing else out of it; the calendar
+  off, which is most installs, where the feature is offered in one sentence, routed to the
+  configure dialog or the export's `.env`, and then re-checked — with the two routes read
+  differently, because a `.env` is read by the script and a dialog reaches a session at its start,
+  so on the plugin route the re-check saying *off* is the expected answer and the step finishes in
+  the next session; or a toggle that is on with no classic Outlook behind it, where the user is
+  told why and asked to turn it back off, because the `daily` skill stops on that same line every
+  run until they do. The finish names the calendar among what is now true when it is on. And every
+  **optional** setting now ends its description with the same sentence — *Not sure? Leave it as it
+  is and run /billables:setup.*, and the export's `.env.example` with its own — including the
+  workspace one, rewritten in both places to say what the folder holds in words that mean
+  something before anything has run: a `Timesheets/` folder with one file per day reviewed, and a
+  hidden copy of your projects and tasks. It used to say ".mcp/ catalogs" to a reader who has seen
+  neither.
 
 ### Fixed
 - **A patch could move an entry's times across a daylight-saving change and bill it short,

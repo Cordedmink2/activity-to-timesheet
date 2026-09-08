@@ -1,7 +1,7 @@
 ---
 name: setup
-description: Walk a first-time user through the parts of installing this plugin that only a person can do — installing the activity source, adding the browser extension, tagging each browser profile with a client code, building the category rules, and getting the screenshot task past endpoint security — verifying each one before moving on. User-invoked.
-compatibility: Windows-first. Reads a running ActivityWatch server over HTTP (default http://localhost:5600). Step 5 registers a Windows scheduled task and needs PowerShell plus Python 3.10+; on macOS and Linux there is no screenshot capture to set up and that step is skipped. Needs a harness that can execute local commands and make HTTP requests. Posts nothing to any timesheet provider.
+description: Walk a first-time user through the parts of installing this plugin that only a person can do — installing the activity source, adding the browser extension, tagging each browser profile with a client code, building the category rules, getting the screenshot task past endpoint security, and settling whether the Outlook calendar is read — verifying each one before moving on. User-invoked.
+compatibility: Windows-first. Reads a running ActivityWatch server over HTTP (default http://localhost:5600). Step 5 registers a Windows scheduled task and needs PowerShell plus Python 3.10+; on macOS and Linux there is no screenshot capture to set up and that step is skipped. Step 6 is entered everywhere, and reports the calendar off on any machine without classic Outlook. Needs a harness that can execute local commands and make HTTP requests. Posts nothing to any timesheet provider.
 disable-model-invocation: true
 ---
 
@@ -20,11 +20,11 @@ It covers only the residue a person has to do. Everything a machine can do belon
   **The check is the other way a token reaches the transcript, and it is the way that has actually happened.** A command run to find out whether a value is set writes its own output to the same transcript, so *no command in this skill may expand a credential into its output* — the answer is `set` or `MISSING`, never the value. **Use the probe given below rather than composing one.** The version this replaces paired the two default-substitution forms in one string, on the reading that each supplies a word for its own case; in fact only one of the pair substitutes a word, and the other substitutes the variable itself, so the line printed `set` followed by the user's API key. Nothing failed and nothing looked wrong. If a run has already printed a credential, treat it exactly as a pasted token above: say so at the time, and tell the user to rotate it.
 - **The workspace** — `Timesheets/`, the catalogs, and the `.context.md` describing the user's own clients and conventions — belongs to the `daily` skill's own first run. Point at it at the end; do not build it here.
 
-Five steps, and then a stated finish.
+Six steps, and then a stated finish.
 
 ## Finding the files this skill needs
 
-Step 5 runs a script that ships with the `daily` skill, in a directory beside this one. Resolve **this** skill's folder from where this `SKILL.md` was read, then look for a sibling named `daily` — or, in the shared export, `billables-daily`, because that directory is flat and every skill in it is prefixed. Check which of the two exists rather than guessing; a wrong prefix fails as "file not found", which reads like a broken install rather than a wrong path.
+Steps 5 and 6 run scripts that ship with the `daily` skill, in a directory beside this one. Resolve **this** skill's folder from where this `SKILL.md` was read, then look for a sibling named `daily` — or, in the shared export, `billables-daily`, because that directory is flat and every skill in it is prefixed. Check which of the two exists rather than guessing; a wrong prefix fails as "file not found", which reads like a broken install rather than a wrong path.
 
 ## Before you start
 
@@ -38,7 +38,7 @@ Four things, in parallel, before step 1:
    done
    ```
 
-   Three lines of `set` or `MISSING` and nothing else. Do not collect the values here and do not block on them — steps 1 to 5 need none of them, so carry on and re-check at the finish. Leave the `:-` in `${!k:-}` alone: under `set -euo pipefail`, which some harnesses wrap every command in, the bare form aborts the shell on the first unset key — so the machine that most needs an answer is the one that gets a shell error instead, and a run that gets a shell error writes its own replacement.
+   Three lines of `set` or `MISSING` and nothing else. Do not collect the values here and do not block on them — steps 1 to 5 need none of them, and step 6 needs only the timezone and says so itself when it is missing, so carry on and re-check at the finish. Leave the `:-` in `${!k:-}` alone: under `set -euo pipefail`, which some harnesses wrap every command in, the bare form aborts the shell on the first unset key — so the machine that most needs an answer is the one that gets a shell error instead, and a run that gets a shell error writes its own replacement.
 
    **If there is no Bash tool on this machine, do not translate the probe into PowerShell.** No PowerShell command can answer this question on any machine: the fragment is POSIX and is applied to Bash calls only, so PowerShell reports nothing set whether or not the user has configured anything (issue #28). And a box with no Git Bash is one where the publishing hook could not run either, so nothing was published to either shell. That makes the answer known in advance — treat all three as `MISSING`, skip to the Git Bash question below, and never compose a check to confirm it. Composing one is what leaked a key.
 
@@ -113,15 +113,41 @@ Then run the `daily` skill's `scripts/setup_screenshot_pipeline.ps1`, resolved a
 - **`No module named mss` / `No module named PIL`, or the task's `LastTaskResult` is `0x80070002`** — an interpreter problem, not a security one. The stored path is absolute, so a Python upgrade or reinstall breaks every trigger from that moment on. Re-run the setup script, or pin the interpreter with `-PythonExe <path>`.
 - **The task registers, reports `Ready`, and no image ever appears** — this is the one that is usually endpoint security. Read `references/endpoint-security.md` before saying so to the user: it has to be evidenced before it is escalated.
 
+### 6. The calendar is settled — on and readable, or off on purpose
+
+The only optional step, and it is entered either way: *off* is an outcome to state, not a step to skip. A user who has never heard of the calendar gets one sentence and a choice; a user who turned it on gets the same live check the other five get, before the `daily` skill starts depending on it.
+
+**Do** — run the `daily` skill's `scripts/calendar_day.py` for **today**, resolved as described above, **in the Bash tool** and for the same reason step 5's `--where` is read there: the configuration reaches Bash tool calls alone, so run through PowerShell this reports the calendar off on a machine that has it on.
+
+```bash
+python "<daily>/scripts/calendar_day.py" <today, YYYY-MM-DD>
+```
+
+That one command is the whole check, whatever the toggle says. **Do not read the toggle to find out first** — a command written to see whether a configured value is set writes its own answer into the transcript, which is the rule from "Before you start" and the family the 0.5.0 leak came from. This one answers by doing what the `daily` skill will do, which is the only answer that means anything: on a machine with new Outlook alone the toggle is on and the calendar still cannot be read.
+
+**Verify** — the command's own answer, which is one of three. Every refusal you can get here exits 1 — only a malformed date exits 2 — so judge it by the `ERR` line and never by the exit code:
+
+1. **A JSON day, exit 0** — the calendar is on and working. Report **how many events it holds and the first one's subject**, and nothing else out of it: that is enough to show the adapter reached the right calendar, and the rest of the day's meetings are the user's business rather than the transcript's. An empty `events` list passes too — say which it is, though, because "the calendar was read and today has nothing on it" and "the calendar could not be read" look identical if you don't.
+2. **`ERR the calendar is off: TIMESHEET_OUTLOOK_CALENDAR is not set to true …`** — the ordinary state, and most installs. Offer it in one sentence: *the plugin can read your Outlook calendar, so a meeting you sat through without touching the keyboard is billed rather than lost as a break, and a meeting it cannot corroborate is put to you as a question instead of billed.* If they want it, the route is `/plugin configure billables` → **Read my Outlook calendar** — or, on the exported install, the `TIMESHEET_OUTLOOK_CALENDAR=true` line of the `.env` beside the sibling skill's `SKILL.md`, the same file "Before you start" routes a gap to. **Then run the same command again — and read the answer by the route they took**, because the two routes reach a running session differently. A `.env` is read by the script itself, so the re-check should now print the day, and a second `off` means the line is wrong: `true` is the one spelling of on. **The dialog will still say off, and that is expected rather than a failure** — declared configuration is published to a session when it *starts*, so a value set now reaches the next one. Say that, and say what closes it: start a new session and run this one command again before the first `/billables:daily`. Don't send them back to the dialog, and don't record step 6 as passed on the strength of the dialog having been filled in — a user who is not told this reads their first drafted day, sees no calendar in it, and concludes the feature does not work. If they don't want it, say the calendar stays off and move on: off is exactly today's behaviour and costs them nothing.
+3. **`ERR the calendar stays off: …`, or an adapter failure whose reason names classic Outlook** — the toggle is on and this machine cannot read a calendar. Say so and say why: the shipped adapter drives **classic Outlook**'s object model, which new Outlook (the store app) does not have at all, and which macOS and Linux have no equivalent of. Then **have them turn the toggle back off**, and do not leave this as a note for later — an on-but-unreadable calendar is not a quiet no-op. The `daily` skill stops on a calendar it was told to read and could not, so every run from here would fail on this same line until the toggle goes off.
+
+**If it fails** — the answers that are not about the calendar at all, and are the more likely ones:
+
+- **The re-check still says off in a session that started *after* the dialog was filled in, or straight away on the `.env` route.** That is no longer the expected answer above; it is the same gap as a `MISSING` in "Before you start" — the message names the shell when the configuration cannot have reached the command at all — and `references/first-run.md` in the `daily` skill owns the diagnosis. Check the spelling first: `true`, and nothing else, is on.
+- **An `ERR` naming the activity source.** Step 1 passing does not keep the server running, and the corroboration verdict is computed against the day's window events, so there is no calendar day to be had without it. That is step 1 to re-check, not the calendar.
+- **An `ERROR:` naming `TIMESHEET_TIMEZONE`.** The wrapper needs the zone to know which day it is reading. This is the configuration gap from "Before you start" surfacing here; the calendar is untested until it is filled in, so say that rather than reporting step 6 passed.
+- **`No such file`, or a `ModuleNotFoundError`.** The sibling path, not the calendar: `daily` on a plugin install and `billables-daily` in the shared export, per "Finding the files this skill needs".
+- **`ERR the calendar adapter … is not there: this copy of the skill does not ship it`.** The wrapper is present and the adapter beside it is not, which is a half-copied install rather than anything the user configured. Re-install rather than re-configure — and until it is fixed the toggle has to go off, for the reason in outcome 3.
+
 ## When endpoint security is the answer
 
 `references/endpoint-security.md` holds two things: how to establish that a step was actually blocked rather than merely broken, and the exact allow-list requests to hand over once it has been. Read it at the point a step fails in a way that looks like a block — never earlier, and never instead of the checks above.
 
 ## Done
 
-Setup is finished when steps 1 to 5 have each passed their own check on this machine, and the three required configuration values are present. If any of the three came back `MISSING` at the start, re-run **the same probe from "Before you start"** — not a new one written for the occasion, which is where the value-printing version came from the first time.
+Setup is finished when steps 1 to 6 have each passed their own check on this machine, and the three required configuration values are present. Step 6 passes on a calendar that was read *and* on a calendar deliberately left off; it is unfinished only where the toggle is on and the read failed. If any of the three came back `MISSING` at the start, re-run **the same probe from "Before you start"** — not a new one written for the occasion, which is where the value-printing version came from the first time.
 
-Say so plainly, and say what is now true: the activity source is recording, titles carry client codes, the rules classify them, and screenshots are being captured on a schedule. Then hand over the two things that are not this skill's:
+Say so plainly, and say what is now true: the activity source is recording, titles carry client codes, the rules classify them, and screenshots are being captured on a schedule. **Where step 6 left the calendar on, say that too** — the calendar is read as a fourth source, so a meeting sat through without touching the keyboard is drafted as a block rather than lost as a break, and one the activity source cannot corroborate is put as a question at review rather than billed. It is the one thing here whose result is invisible until a day is drafted, so a user not told about it meets it as a surprise in their first timesheet. Leave the sentence out where the calendar is off. Then hand over the two things that are not this skill's:
 
 - The `daily` skill has its own first run — it scaffolds the workspace and walks the user through the `Timesheets/.context.md` that carries their clients, colleagues and billing conventions. **Hand over the profile-to-code list from step 3 in writing, and say where it goes: `Timesheets/.context.md`, one entry per client alongside that client's other signals.** It is the same information, re-deriving it is waste, and a list that exists only in this conversation is a list that does not survive the session. Tell the user to invoke that skill next, for a day they have already worked.
 - Two things go stale on their own and are worth naming now: a new client needs both a profile tag and a matching category rule, and a screenshot task that stops firing does so silently. `Get-ScheduledTaskInfo -TaskName WorkScreenshots` with a `LastTaskResult` of `0` is the health check.

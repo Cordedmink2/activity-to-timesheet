@@ -48,8 +48,9 @@ To change any of them later: `/plugin configure billables`.
 ### Then run `/billables:setup`
 
 It walks you through the parts only a person can do — installing ActivityWatch, the browser
-extension, the browser-profile title tags, the category rules and the screenshot task — and
-*verifies each one before moving on*, which is the difference that matters: every one of those
+extension, the browser-profile title tags, the category rules, the screenshot task, and whether
+your Outlook calendar is read — and *verifies each one before moving on*, which is the difference
+that matters: every one of those
 steps can look like it worked and have done nothing, and the symptom arrives days later as an
 empty timesheet. It tells you when setup is finished.
 

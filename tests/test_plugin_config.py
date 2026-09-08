@@ -173,6 +173,61 @@ def test_every_option_says_what_it_is_and_where_to_get_it(key):
     assert len(opt.get("description", "")) > 30, f"{key}'s description does not say enough"
 
 
+# The one sentence every optional description ends with (#49, story 21), and two deviations
+# from the spec's literal "Not sure? Leave blank and run /setup.", both forced by what the
+# dialog actually is. `/billables:setup` because that is the command this plugin registers,
+# and a dialog naming a command the harness has no such thing for sends the user nowhere.
+# "Leave it as it is" because one of the four optional settings is a *boolean* — a checkbox
+# with no blank to leave — and one sentence that is true of a text box, a directory picker
+# and a checkbox is worth more than the spec's word for the three of them it fits. The
+# export's `.env.example` says "blank", where the value really is a blank line.
+SETUP_SENTENCE = "Not sure? Leave it as it is and run /billables:setup."
+
+
+@pytest.mark.parametrize("key", sorted(OPTIONAL))
+def test_every_optional_description_says_where_to_learn_what_it_does(key):
+    """An optional setting is one a user can answer wrongly by guessing at it.
+
+    The dialog is the whole of what they have to go on — a title, a description, and no
+    room for the paragraph each of these actually needs. So each one ends by naming the
+    place where the explanation is a walkthrough rather than a sentence: the `setup` skill,
+    which enters every optional setting's step whether it is filled in or not. One sentence,
+    the same sentence, because a user reading four descriptions should recognise the offer
+    on the second one rather than read it as four different offers.
+    """
+    description = user_config()[key]["description"].rstrip()
+    assert description.endswith(SETUP_SENTENCE), (
+        f"{key}'s description does not end with {SETUP_SENTENCE!r}, so a user who does not "
+        f"know what it does has nowhere to be sent:\n{description}")
+
+
+@pytest.mark.parametrize("key", sorted(REQUIRED))
+def test_a_required_setting_is_never_offered_as_one_to_leave_blank(key):
+    """The same sentence on a required key would be advice to skip a value nothing runs
+    without — and the install prompts for these, so there is no blank to leave."""
+    assert SETUP_SENTENCE not in user_config()[key]["description"], (
+        f"{key} is required, so telling the user they may leave it blank is wrong")
+
+
+def test_the_workspace_description_says_what_the_folder_holds_in_plain_words():
+    """The one description written for someone who already knew the answer (#49, story 22).
+
+    It used to name `Timesheets/` and "the `.mcp/` catalogs" — two words for things that do
+    not exist yet at the moment the dialog asks, on a machine where nothing has run. A
+    first-time installer cannot decide whether to leave a folder blank when what would go
+    in it is described by the name of a folder they have never seen. The catalogs are a
+    cache of their projects and tasks, and that is sayable without the word.
+    """
+    description = user_config()["TIMESHEET_WORKSPACE"]["description"]
+    jargon = [word for word in ("catalog", ".mcp") if word in description.lower()]
+    assert not jargon, (
+        f"the workspace description assumes the reader knows what {', '.join(jargon)} "
+        f"means, at the one moment they cannot:\n{description}")
+    assert "Timesheets" in description, (
+        "the workspace description never names the folder the user will actually see in "
+        f"there, which is the whole of what it is for:\n{description}")
+
+
 def test_the_calendar_toggle_is_a_boolean_with_nothing_to_type():
     """One on/off switch, no magic word (#49, story 19). A string option would have the
     dialog ask for text and the user guess at `true`, `yes`, `on` — of which the seam
@@ -195,6 +250,54 @@ def test_the_env_template_names_exactly_the_keys_the_manifest_declares():
     template offers that nothing resolves."""
     assert set(template_lines()) == set(user_config()) | WORK_ITEM_SOURCE_KEYS, (
         "the export's .env.example and the manifest's userConfig name different keys")
+
+
+# The export's copy of the sentence above. "Blank" is the right word here and the wrong one
+# in the dialog: a `.env` line really is left blank, and there is no `/billables:setup`
+# command on a harness that has no plugins — the skill is invoked by whatever that harness
+# calls a skill.
+TEMPLATE_SENTENCE = "Not sure? Leave it blank and run the setup skill."
+
+
+def template_comment(key: str) -> str:
+    """The comment block sitting directly above `KEY=` in the export's env template.
+
+    That block is the export route's whole equivalent of the dialog's description — there
+    is no dialog to read one from — so it is what story 21 has to hold on this route.
+    """
+    lines = ENV_TEMPLATE.read_text(encoding="utf-8").splitlines()
+    at = next((i for i, line in enumerate(lines) if line.startswith(f"{key}=")), None)
+    assert at is not None, f"{key} has no line in the env template"
+    block = []
+    while at and lines[at - 1].startswith("#"):
+        at -= 1
+        block.insert(0, lines[at].lstrip("# ").rstrip())
+    return "\n".join(block)
+
+
+@pytest.mark.parametrize("key", sorted(OPTIONAL))
+def test_the_export_route_offers_the_same_walkthrough_the_dialog_does(key):
+    """Two install routes, one configuration — and one of them has no dialog to be asked
+    from, only this file. A user copying the template reads these comments in place of the
+    descriptions, so an offer made in the manifest and not here is an offer half the
+    installs never get."""
+    block = template_comment(key)
+    assert block.rstrip().endswith(TEMPLATE_SENTENCE), (
+        f"{key}'s comment in the env template does not end with {TEMPLATE_SENTENCE!r}, so "
+        f"the exported install's reader is not told where the explanation is:\n{block}")
+
+
+def test_the_export_route_explains_the_workspace_without_the_catalogs_either():
+    """The same rewrite as the manifest's (#49, story 22), on the copy the export reads.
+
+    This one was the *source* of the jargon — "where the skill keeps its `.mcp/` catalogs"
+    — and rewriting the manifest alone would have left the two descriptions of one setting
+    disagreeing about what the folder is for.
+    """
+    block = template_comment("TIMESHEET_WORKSPACE")
+    jargon = [word for word in ("catalog", ".mcp/ ") if word in block.lower()]
+    assert not jargon, (
+        f"the env template still describes the workspace as {', '.join(jargon)}:\n{block}")
 
 
 def test_every_template_key_is_present_and_blank():
