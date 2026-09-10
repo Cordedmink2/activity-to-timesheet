@@ -12,6 +12,7 @@ because the provider half needs the same arithmetic; `test_timezone.py` covers i
 import datetime as dt
 import os
 import sys
+import urllib.error
 
 import pytest
 
@@ -108,6 +109,42 @@ def test_fetch_events_asks_the_bucket_for_the_requested_range(monkeypatch):
     assert got == ["event"]
     assert seen == ["/buckets/aw-watcher-afk_HOST/events"
                     "?start=2026-05-28T00:00:00Z&end=2026-05-29T00:00:00Z&limit=10000"]
+
+
+# --------------------------------------------------------------------------------------
+# The write. Everything above this line reads; `post_setting` is the one exception, and
+# what it writes is configuration rather than data (ADR-0007 § Amendment).
+# --------------------------------------------------------------------------------------
+
+RULE = {"name": ["Beta Industries"],
+        "rule": {"type": "regex", "regex": r"BET\d{3,}", "ignore_case": True}}
+
+
+def test_a_settings_write_arrives_as_the_keys_whole_value(live_aw):
+    """`POST /settings/classes` carries the entire list, because the endpoint has no
+    partial update — which is why every caller reads first and writes back what it read."""
+    srv = live_aw(day().classify("Acme", r"\[ACME\]"))
+    aw.post_setting("classes", [RULE])
+    (sent,) = srv.sent("POST", "/settings/classes")
+    assert sent["body"] == [RULE]
+
+
+def test_what_was_written_is_what_the_next_read_returns(live_aw):
+    """The compiler verifies its own write by re-reading. A fake that accepted the write
+    and went on serving the old value would let that verify pass over nothing."""
+    live_aw(day().classify("Acme", r"\[ACME\]"))
+    aw.post_setting("classes", [RULE])
+    assert aw.get("/settings")["classes"] == [RULE]
+
+
+def test_a_write_to_an_absent_settings_endpoint_raises(live_aw):
+    """The read swallows this — a machine with no rules has an empty timeline and that is
+    all. A write that quietly did nothing would report an install as configured when the
+    rules never landed, so the caller is made to see it and fall back to the manual route.
+    """
+    live_aw(day(), settings_status=404)
+    with pytest.raises(urllib.error.HTTPError):
+        aw.post_setting("classes", [RULE])
 
 
 # The request, dedupe and timestamp helpers the two day-reading scripts each used to carry

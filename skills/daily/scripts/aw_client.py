@@ -8,6 +8,9 @@ to carry their own copy of that code, so a fix to one left the other wrong; `win
 below is the fetch-and-refuse the two window readers share, and `NOISE_FLOOR` / `GAP_FOLD`
 are the one copy of what they both treat as noise.
 
+Reading is most of it, and `post_setting()` is the exception: `category_rules.py` writes the
+category rules the timeline then reads. Configuration, never data — see that function.
+
 It also owns the one fact about *where* a day is read — the server's address — because
 every reader needs it and none should answer it its own way. It resolves through
 `skill_config`, so it arrives from wherever the user configured it and nothing here knows
@@ -117,6 +120,36 @@ def get(path):
         # by design — nothing downstream ever sees the object to close it.
         e.close()
         raise
+
+
+def post_setting(key, value):
+    """Write one settings key — the only thing this plugin writes to the activity source.
+
+    `GET /settings` reads every key at once; a write is per key, `POST /settings/<key>` with
+    that key's *whole* value as the body, which is what the server's own API description
+    offers (measured on 0.13.2). There is no partial update, so a caller changing one
+    category rule sends the whole `classes` list back and read-modify-write is the only
+    safe shape — `category_rules.py` is where that happens, and it backs the old value up
+    first.
+
+    An older build with no settings endpoint answers this the way it answers the read: an
+    `HTTPError`, raised here rather than swallowed. The read swallows it because a machine
+    with no rules is a machine with an empty timeline; a *write* that quietly did nothing
+    would report a configured install that is not one, which is the failure the `setup`
+    skill exists to prevent.
+    """
+    body = json.dumps(value).encode("utf-8")
+    request = urllib.request.Request(f"{resolve_base()}/settings/{key}", data=body,
+                                     headers={"Content-Type": "application/json"},
+                                     method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=15) as r:
+            raw = r.read()
+    except urllib.error.HTTPError as e:
+        # As in `get()`: an HTTPError never reaches the `with`, so its body is left open.
+        e.close()
+        raise
+    return json.loads(raw) if raw.strip() else None
 
 
 def pick_bucket(buckets, prefix):

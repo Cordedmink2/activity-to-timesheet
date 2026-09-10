@@ -70,9 +70,26 @@ holds nothing generic.
 breaks, active spans, and each span's `active_ratio`. Arithmetic, not judgement, and taken
 verbatim.
 
-**Signal** — an observable in the activity data that points at a client: a work-item number, a
-browser profile, an environment URL, an editor workspace, a repo path, a meeting participant, a
-calendar event's subject or attendees.
+**Signal** — an observable in the activity data that points at a client, and one that occurs
+naturally in the work: a work-item number, an environment URL, an editor workspace, a repo path, a
+meeting participant, a calendar event's subject or attendees. The user declares theirs per client in
+`.context.md`, and a **category rule** is compiled from them.
+
+**Client code** — the short name the user picks for a client, two to twelve characters: `ACME`.
+Theirs, not the provider's client name and not a project code.
+
+**Profile tag** — the client code in brackets, `[ACME]`, injected into every window title by the
+browser extension in one browser profile. Not a signal: nothing about the work puts it there, the
+user configured it, and it says only which profile the window belonged to. It belongs on a profile
+dedicated to a single client and nowhere else, and it is the lowest-ranked evidence a rule is
+compiled from — a general profile carrying one absorbs every page whose own content names a
+different client, because the first matching rule wins.
+
+**Category rule** — the regex the activity source matches a window against to label it with a
+client. Derived: the plugin compiles them from the signals in `.context.md` and writes them, and
+nothing reads them back as authority. What a wrong one costs is a mislabelled span, seen at review —
+which is why the activity source's *configuration* is written to while its data is only read
+(ADR-0007).
 
 **Work item** — the identifier the work is tracked under in the user's own **work-item source**: a
 ticket, case, story or bug. The highest-confidence signal there is, and what an entry's note should
@@ -162,6 +179,7 @@ Habits, not prohibitions — the rule above (no account's strings) is the hard o
 | "timesheet line", "time entry row" | entry |
 | "time chunk", "segment", "slot" | block |
 | "category" for what a block was | work kind (the activity source's own `category` keeps that name) |
+| "tag" on its own for the bracketed marker | profile tag, and client code for the short name inside it |
 | "ticket" as the general term | work item ("ticket" is fine where the user's work-item source calls it one) |
 | "Dataverse catalog", "the case list" | work-item catalog (the work-item source's own listing) |
 | "the user's backend", "the ticket system" | work-item source |

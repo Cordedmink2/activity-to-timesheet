@@ -460,10 +460,20 @@ def _overlaps(event: dict, start: str | None, end: str | None) -> bool:
 def aw_server(buckets: dict[str, list[dict]], settings: dict | None = None,
               last_updated: dict[str, str] | None = None,
               settings_status: int = 200) -> FakeServer:
-    """A fake ActivityWatch exposing `/api/0/buckets/`, `.../events` and `/api/0/settings`.
+    """A fake ActivityWatch exposing `/api/0/buckets/`, `.../events` and `/api/0/settings`,
+    the last of which is written to as well as read.
 
-    `settings_status` != 200 simulates an AW build whose settings endpoint is absent,
-    which is the real-world reason `load_classes()` has to survive an exception.
+    `settings_status` != 200 simulates an AW build whose settings endpoint is absent, which
+    is the real-world reason `load_classes()` has to survive an exception — and, since #70,
+    the reason `category_rules.py` has to refuse a write in words a run can act on rather
+    than raise. It answers for the write route as well as the read: an endpoint that is not
+    there is not there for either.
+
+    A write stores what arrived, so a caller that re-reads the settings afterwards gets what
+    it wrote — which is what makes the compiler's verify step testable end to end. The
+    request itself is recorded by `FakeServer` like every other, so a test asserts on the
+    body sent from `.requests` / `.sent()`; the prior art is the fake timesheet provider
+    below, whose routes inspect a body the same way.
     """
     settings = settings if settings is not None else {"classes": []}
     last_updated = last_updated or {}
@@ -477,6 +487,14 @@ def aw_server(buckets: dict[str, list[dict]], settings: dict | None = None,
             if settings_status != 200:
                 return settings_status, {"error": "not found"}
             return 200, settings
+        if path.startswith("/api/0/settings/"):
+            if settings_status != 200:
+                return settings_status, {"error": "not found"}
+            key = path[len("/api/0/settings/"):]
+            if method == "POST":
+                settings[key] = body
+                return 200, body
+            return 200, settings.get(key)
         if path.startswith("/api/0/buckets/") and path.endswith("/events"):
             bid = path[len("/api/0/buckets/"):-len("/events")]
             if bid not in buckets:
