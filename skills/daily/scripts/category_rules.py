@@ -551,11 +551,14 @@ def main():
         return 2
 
     try:
+        # `--inspect` resolves no workspace on purpose: it writes nothing, and creating a
+        # state directory to read the activity source would leave a mark on whatever
+        # directory a run happened to start in.
+        if args.inspect:
+            return inspect(args.days, args.max_share)
         directory = state_dir(args.workspace)
         if args.status:
             return status(directory)
-        if args.inspect:
-            return inspect(args.days, args.max_share)
         return compile_rules(args.candidates, args.days, args.max_share, directory)
     except Refusal as exc:
         print(f"ERR {exc}", file=sys.stderr)

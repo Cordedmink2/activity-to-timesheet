@@ -27,6 +27,7 @@ SETUP = SKILLS / "setup"
 SETUP_MD = SETUP / "SKILL.md"
 SCREENSHOT_SETUP = SKILLS / "daily" / "scripts" / "setup_screenshot_pipeline.ps1"
 CALENDAR_WRAPPER = SKILLS / "daily" / "scripts" / "calendar_day.py"
+RULE_COMPILER = SKILLS / "daily" / "scripts" / "category_rules.py"
 
 # `one` to `ten` is every count this walkthrough could plausibly reach; a step count outside
 # it should fail the test that reads it rather than be quietly skipped.
@@ -140,6 +141,63 @@ def test_the_calendar_step_tells_the_two_refusals_apart_in_the_wrapper_s_own_wor
     assert phrase in body, (
         f"the calendar step does not carry {phrase!r}, so the run has to guess which "
         "refusal it got")
+
+
+def one_step_about(pattern: str) -> tuple[str, str]:
+    """The single step whose heading matches `pattern`, as (heading, body)."""
+    found = [step for step in steps() if re.search(pattern, step[0], re.I)]
+    assert len(found) == 1, (
+        f"expected exactly one step matching {pattern!r}, found {len(found)}: {step_ids()}")
+    return found[0]
+
+
+def test_the_category_step_writes_the_rules_with_the_compiler_the_plugin_ships():
+    """#69: the plugin owns the category rules, and this is the step that writes them.
+
+    The step used to hand the user a regular expression to type into a settings dialog —
+    the step most likely to be wrong in a way nobody notices, since a rule matching nothing
+    leaves a client's whole day uncategorized and a rule matching too much silently takes
+    the label off a correct one. Pinned against the shipped script, so a rename fails here
+    rather than leaving the walkthrough naming a file no run can execute.
+    """
+    assert RULE_COMPILER.is_file(), f"{RULE_COMPILER.name} is what this step runs and is not shipped"
+    heading, body = one_step_about(r"categor")
+    assert RULE_COMPILER.name in body, (
+        f"step '{heading.strip()}' never runs {RULE_COMPILER.name}, so the rules are back to "
+        "being typed by hand into a dialog with nothing gating them")
+    assert "Bash" in body, (
+        f"step '{heading.strip()}' does not say which tool to run it in — the configuration "
+        "reaches Bash tool calls alone, so the address of the activity source is missing "
+        "anywhere else")
+
+
+def test_the_category_step_keeps_a_loud_fallback_for_a_source_that_will_not_take_the_write():
+    """An older build has no settings endpoint at all, and the read path has always
+    tolerated that. A write cannot: the step falls back to the instruction the user used to
+    get every time, and says that it did — a step that looks like it worked and did nothing
+    is what this whole skill exists to prevent."""
+    heading, body = one_step_about(r"categor")
+    do = body.split("**Verify**", 1)[0]
+    assert re.search(r"^\s*>", do, re.M), (
+        f"step '{heading.strip()}' has no block-quoted instruction to fall back to when the "
+        "activity source will not take the write")
+    assert re.search(r"say so out loud|loudly", body, re.I), (
+        f"step '{heading.strip()}' can fall back silently, which reads exactly like a step "
+        "that worked")
+
+
+def test_the_profile_step_confines_a_tag_to_a_profile_with_one_client_in_it():
+    """#69: the profile tag is the fallback signal for browser time carrying no other
+    evidence, and the first matching rule wins — so a tag on a general profile absorbs every
+    page in it that names a different client. The step has to say which profiles get one,
+    and what to do about a general profile that already has one."""
+    heading, body = one_step_about(r"profile")
+    assert re.search(r"single[- ]client|one client|dedicated to", body, re.I), (
+        f"step '{heading.strip()}' does not say a profile tag belongs only on a profile "
+        "dedicated to one client")
+    assert re.search(r"general or default profile|general profile", body, re.I), (
+        f"step '{heading.strip()}' never says what a general profile carries, which is the "
+        "half that decides whether a shared browser bills the right client")
 
 
 @pytest.mark.parametrize("step", steps(), ids=step_ids())

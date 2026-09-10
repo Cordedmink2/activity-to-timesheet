@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Walk a first-time user through the parts of installing this plugin that only a person can do — installing the activity source, adding the browser extension, tagging each browser profile with a client code, building the category rules, getting the screenshot task past endpoint security, and settling whether the Outlook calendar is read — verifying each one before moving on. User-invoked.
+description: Walk a first-time user through installing this plugin — installing the activity source, adding the browser extension, tagging the browser profiles that belong to a single client, writing and verifying their category rules, getting the screenshot task past endpoint security, and settling whether the Outlook calendar is read — verifying each one before moving on. User-invoked.
 compatibility: Windows-first. Reads a running ActivityWatch server over HTTP (default http://localhost:5600). Step 5 registers a Windows scheduled task and needs PowerShell plus Python 3.10+; on macOS and Linux there is no screenshot capture to set up and that step is skipped. Step 6 is entered everywhere, and reports the calendar off on any machine without classic Outlook. Needs a harness that can execute local commands and make HTTP requests. Posts nothing to any timesheet provider.
 disable-model-invocation: true
 ---
@@ -15,7 +15,7 @@ Where a step's **Do** carries a block-quoted instruction — steps 1 to 4 — th
 
 ## What this covers, and what it does not
 
-It covers only the residue a person has to do. Everything a machine can do belongs elsewhere and is not repeated here:
+It covers what a person has to do — and one thing they should not. Step 4 used to ask the user to write regular expressions into a settings dialog; it is now yours to compose, gate and write, because it was the step most often wrong in a way nobody noticed (#69). The rest of what a machine can do belongs elsewhere and is not repeated here:
 
 - **The values** — credentials, timezone, paths — are declared plugin configuration, collected once at install. This skill checks whether they are *present* and routes a gap to `/plugin configure billables`. It never asks for one, and never asks the user to type a token into the conversation, which is written to disk in the session transcript. If the user pastes one in anyway, say so at the time and suggest they rotate it before that transcript is shared anywhere — the dialog is the fix going forward, but the token that has already been written down is not fixed by using the dialog next time.
 
@@ -26,7 +26,7 @@ Six steps, and then a stated finish.
 
 ## Finding the files this skill needs
 
-Steps 5 and 6 run scripts that ship with the `daily` skill, in a directory beside this one. Resolve **this** skill's folder from where this `SKILL.md` was read, then look for a sibling named `daily` — or, in the shared export, `billables-daily`, because that directory is flat and every skill in it is prefixed. Check which of the two exists rather than guessing; a wrong prefix fails as "file not found", which reads like a broken install rather than a wrong path.
+Steps 4, 5 and 6 run scripts that ship with the `daily` skill, in a directory beside this one. Resolve **this** skill's folder from where this `SKILL.md` was read, then look for a sibling named `daily` — or, in the shared export, `billables-daily`, because that directory is flat and every skill in it is prefixed. Check which of the two exists rather than guessing; a wrong prefix fails as "file not found", which reads like a broken install rather than a wrong path.
 
 ## Before you start
 
@@ -91,26 +91,51 @@ The verify below is aggregate, so the profile list is not what it is judged agai
 
 **If it fails** — the usual cause is the extension living in one profile while the user browsed in another. Ask which profile they just used and check it directly. A managed browser can also refuse the install outright: on Edge or Chrome under policy, the extension has to be allow-listed by ID, and the ID is `ignpacbgnbnkaiooknalneoeladjnfgb` — a precise request, which `references/endpoint-security.md` says how to evidence before making.
 
-### 3. Each work profile tags its titles with a client code
+### 3. A browser profile dedicated to one client carries that client's tag
 
-**Do** — settle one short code per client with the user first, then give them this, once per profile with that profile's own code substituted:
+**Do** — first work out with the user which of their profiles belongs to exactly one client. **A profile tag goes on those and nowhere else.** A general or default profile — the one they use for everything, their own admin, research, the tools they share across clients — carries none, and its time is attributed from what is on the page instead. Settle a short, collision-resistant **client code** per single-client profile, then give the user this once per such profile, with that profile's own code substituted:
 
 > **Tag this profile's titles with its client code.**
 >
 > - In this profile, open `edge://extensions` (or `chrome://extensions`), find **URL in title**, click **Details**, then **Extension options**.
 > - Set the title format to: `{title}-{hostname}{path}{args}{hash} - [ACME]` — with `ACME` replaced by this profile's code.
 > - **Save.**
-> - Repeat in every other work profile, each with its own code.
+> - Repeat in each of your other single-client profiles, each with its own code. In a profile you use for more than one client, leave the title format alone.
 
-Help the user pick codes that are short and collision-resistant; write down which profile carries which code, because step 4 has to agree with it exactly and the end of this run hands the list to the `daily` skill.
+The narrowing is the point, and it is not tidiness. A tag is the *fallback* signal — the one thing that identifies browser time carrying no other evidence — so step 4 ranks it below every other signal. But the first matching rule wins, so a tag on a general profile swallows every page in it that names a real client: an hour of Acme's work done in the shared profile bills to whichever client that profile is tagged for. **A user who has already tagged a general profile** — most people migrating from an earlier version of this walkthrough — clears that profile's format string back to `{title}-{hostname}{path}{args}{hash}` in the same options page, and step 4 then writes no rule for it.
 
-**Verify** — from the same recent-events read as step 2, check the browser titles for a bracketed code, `\[[A-Za-z0-9-]{2,12}\]`. Go through the codes the user named one at a time: **each has to appear in at least one real title.** A code with zero matches is a profile whose format string was never saved — which is invisible in the options page, because it shows what was typed rather than what was stored.
+Write down which profile carries which code: step 4 composes a rule from it, and the end of this run hands the list to the `daily` skill.
 
-**If it fails** — the format was saved in a different profile from the one browsed in; or it was typed and the page left without saving. Re-check per profile, not in aggregate: an aggregate pass hides the one profile that is wrong, and that client's whole day comes back uncategorized.
+**Verify** — have the user browse for a minute in each profile they tagged, then read recent events as in step 2 and check the browser titles for a bracketed code, `\[[A-Za-z0-9-]{2,12}\]`. Two checks, and the second is new:
 
-### 4. The category rules match the tags
+1. Go through the codes the user named one at a time: **each has to appear in at least one real title.** A code with zero matches is a profile whose format string was never saved — which is invisible in the options page, because it shows what was typed rather than what was stored.
+2. Have them browse for a minute in the **general** profile, if they have one, and check those titles carry **no** bracketed code. A leftover tag there is the failure this step now exists to prevent, and it is silent: everything still classifies, to the wrong client.
 
-**Do** — give the user this, with the activity source's own address from "Before you start" written out in place of `<activity-url>`, and their own codes substituted:
+**If it fails** — the format was saved in a different profile from the one browsed in; or it was typed and the page left without saving. Re-check per profile, not in aggregate: an aggregate pass hides the one profile that is wrong, and that client's whole day comes back uncategorized. A code appearing in the general profile's titles is the reverse of the same fault — the format string was pasted into the wrong profile's options page, and it is cleared there rather than fixed in step 4.
+
+### 4. The category rules are written and verified
+
+This step is yours, not the user's. They name their clients and what identifies each one; you compose a pattern per signal and hand it to a bundled script that gates, orders, backs up, writes and verifies. **The user never sees a regular expression or a JSON body** — they see a sentence saying what is being added and what is being left alone.
+
+**Do** — in this order.
+
+1. **Read what is already there.** In the Bash tool, `python "<daily>/scripts/category_rules.py" --inspect`. It prints one `RULE` line per category the activity source holds, with the share of recent window titles each matches. Rules this plugin did not write are the user's own and are left exactly as they are.
+2. **Settle the clients and their signals with the user, in plain words.** For each client: what shows up in a window title when they are working on them? A work-item prefix (`ACM1234S`), the address of an environment or a site they work in, the name of an editor workspace, the team they meet in — and the profile tag from step 3, where that client has a profile of their own. Ask for the *thing*, never for a pattern.
+3. **Compose one candidate per signal** and name its type, which is what decides how specifically it is matched and which rule wins a title two clients both match: `work_item_prefix`, `url_host`, `editor_workspace`, `teams_team`, `title_token`, `browser_profile`, `profile_tag`. A signal that never reaches a window title — a local repository path — is skipped with the reason, so it costs nothing to offer one. **Don't write the application into the pattern**: the script anchors a browser, editor or meeting signal on the right app names itself, on both the Windows and macOS spellings. And never compose a pattern that is only the client's name — it labels every unrelated page that mentions them, and the gate refuses it.
+4. **Say what you are about to do, in one sentence** — "adding three categories, Acme, Beta and Northwind, and leaving your six existing ones alone" — then write them:
+
+   ```bash
+   python "<daily>/scripts/category_rules.py" --candidates - <<'JSON'
+   [{"client": "Acme", "signal": "work_item_prefix", "pattern": "ACM\\d{3,}S?"},
+    {"client": "Acme", "signal": "profile_tag", "pattern": "\\[ACME\\]"}]
+   JSON
+   ```
+
+   In the **Bash** tool, like every other configured read in this skill. The script backs the existing rules up into the workspace before it writes a thing, so there is nothing to confirm and no diff to show.
+
+**The user's own internal work gets no category and no client.** Leave it uncategorized: internal time is carried at review by an exclusion and the internal-admin task, and inventing a client name for the user's own firm puts a name in the client field that their timesheet provider does not have.
+
+**Where the activity source will not take the write** — an `ERR` naming the settings endpoint, or one saying the write was refused — this machine needs the rules entered by hand. **Say so out loud**: a step that looks like it worked and did nothing is the failure this whole skill exists to prevent. Then give the user this, with the address from "Before you start" in place of `<activity-url>` and their own codes substituted:
 
 > **Add one category per client.**
 >
@@ -122,13 +147,19 @@ Help the user pick codes that are short and collision-resistant; write down whic
 
 Save per category rather than once at the end, which is the order `README.md` § "Configure ActivityWatch categories" uses. Keep the category flat and named for the client: the timeline joins a category's name path with `>`, so a grouping parent changes the label every downstream consumer matches on.
 
-**Verify** — do not trust the UI having saved. `GET <activity-url>/api/0/settings` and read `classes[]`. Each entry carries a `name` (a list — the category and its parents) and a `rule`. **Only test the entries whose `rule.type` is `"regex"`**: a grouping category has `{"type": "none"}` and no `regex` at all, and reaching for a field that isn't there turns a healthy configuration into an error. Compile each regex, honouring its `ignore_case`, and run it against the browser titles collected in step 2.
+**Verify** — the same evidence either way, and never the UI having appeared to save.
 
-Judge the result against **the codes the user demonstrated in this session**, not against every rule on the machine: each of those must match at least one real title. A rule that matches nothing is only a defect if its code is one the user just showed you working — on a machine that has been running a while, a zero usually means that client simply wasn't worked on inside the sampled window, and calling it broken sends the user to fix something that is fine. A leftover placeholder (`New class`, `FILL ME`) is a defect either way.
+- **On the written route**, the script's own output: one `VERIFY` line per rule, each naming how many of the sampled titles it matched. Those come from reading the rules *back* out of the activity source, so a rule that is missing from them is a write that did not land, and the run says so and exits non-zero. A `WROTE` line with no `VERIFY` lines under it is the same thing.
+- **On the manual route**, re-run `--inspect` and read the `RULE` lines. Judge them against **the codes the user demonstrated in this session**, not against every rule on the machine: each of those must match at least one real title. A rule that matches nothing is only a defect if its code is one the user just showed you working — on a machine that has been running a while, a zero usually means that client simply wasn't worked on inside the sampled window, and calling it broken sends the user to fix something that is fine. A leftover placeholder (`New class`, `FILL ME`) is a defect either way.
 
-**If it fails** — first separate "the rules are wrong" from "there are no rules to read". The settings endpoint can be absent or return an empty `classes[]` on some versions of the activity source, and the bundled reader is written to survive exactly that; an empty list is not a saved-rules failure and sending the user back to the UI to re-enter rules they already entered wastes their time. Confirm the endpoint answered and returned entries before diagnosing any of the below.
+**If it fails** — the gate refuses in words, and a refusal anywhere means *nothing* was written, so answer every line it printed and re-run. In order of how often each is the answer:
 
-Then, in order of how often it is the answer: a bracketed rule against a bare tag, or a bare rule against a bracketed tag, which matches nothing and silently leaves every block uncategorized; spaces inside an alternation (`Contract | ACME` requires the literal spaces); a rule saved for a code no profile actually emits, which is really a step 3 failure surfacing here. The fix is to make the tag and the rule agree — either end may move, as long as both do. If this install carries `demo/tag-rule-demo.html`, opening it shows each of these failure modes live and is faster than explaining them.
+- **`matches none of the N sampled titles`** — the signal is not in this machine's titles. Usually the code and the tag disagree (a bracketed rule against a bare tag, or the reverse), or the profile carrying it was never browsed in, which is really a step 3 failure surfacing here. Fix the signal; never widen the ceiling to get a rule through.
+- **`over the … ceiling`** — the pattern is too broad. The first matching rule wins, so a broad rule does not merely add noise, it takes the label off a correct one: the measured case matched 256 of 552 browser titles in a single day. Name a narrower signal — an environment address rather than a word.
+- **`the pattern is only the client's name`**, **`does not compile`**, **`unknown signal type`** — all three are yours, not the user's. Recompose and re-run; the script lists the types that compile.
+- **An `ERR` about the settings endpoint or the write** — the manual route above, loudly.
+
+If this install carries `demo/tag-rule-demo.html`, opening it shows the matching failures live and is faster than explaining them.
 
 ### 5. The screenshot task is registered and actually capturing
 
@@ -188,7 +219,7 @@ Setup is finished when steps 1 to 6 have each passed their own check on this mac
 
 Say so plainly, and say what is now true: the activity source is recording, titles carry client codes, the rules classify them, and screenshots are being captured on a schedule. **Where step 6 left the calendar on, say that too** — the calendar is read as a fourth source, so a meeting sat through without touching the keyboard is drafted as a block rather than lost as a break, and one the activity source cannot corroborate is put as a question at review rather than billed. It is the one thing here whose result is invisible until a day is drafted, so a user not told about it meets it as a surprise in their first timesheet. Leave the sentence out where the calendar is off. Then hand over the two things that are not this skill's:
 
-- The `daily` skill has its own first run — it scaffolds the workspace and walks the user through the `Timesheets/.context.md` that carries their clients, colleagues and billing conventions. **Hand over the profile-to-code list from step 3 in writing, and say where it goes: `Timesheets/.context.md`, one entry per client alongside that client's other signals.** It is the same information, re-deriving it is waste, and a list that exists only in this conversation is a list that does not survive the session. Tell the user to invoke that skill next, for a day they have already worked.
-- Two things go stale on their own and are worth naming now: a new client needs both a profile tag and a matching category rule, and a screenshot task that stops firing does so silently. `Get-ScheduledTaskInfo -TaskName WorkScreenshots` with a `LastTaskResult` of `0` is the health check.
+- The `daily` skill has its own first run — it scaffolds the workspace and walks the user through the `Timesheets/.context.md` that carries their clients, colleagues and billing conventions. **Hand over every client, code and signal settled in steps 3 and 4 in writing, and say where it goes: `Timesheets/.context.md`, one entry per client with that client's signals under it.** That file is the source of truth the category rules are rebuilt from, so a signal that exists only in this conversation is one the next rebuild will drop. Tell the user to invoke that skill next, for a day they have already worked.
+- Two things go stale on their own and are worth naming now: a new client needs its signals adding to `.context.md` — the rules follow from them on the next run, and a single-client browser profile also wants its own tag — and a screenshot task that stops firing does so silently. `Get-ScheduledTaskInfo -TaskName WorkScreenshots` with a `LastTaskResult` of `0` is the health check.
 
 Nothing in this skill posts to a timesheet provider, and the `daily` skill will not either without passing the confirmation gate. Say that too — it is the question a new user has and does not always ask.
