@@ -1,0 +1,48 @@
+# The two gates AGENTS.md § "Before reporting a change complete" names, run on every push to
+# main and every pull request, on both platforms the plugin ships to. From the repo root on
+# purpose: `skills/daily/pytest.ini` scopes a run started in that folder to the skill's own
+# suite, which skips every repo-level guard and still reports green.
+#
+# Both operating systems, not one: `tests/test_install_scripts.py` drives the PowerShell
+# installers, the screenshot pipeline is Windows-only, and the session hook is a `sh` script
+# whose known Windows gap is a machine without Git Bash. Whatever a platform cannot run
+# surfaces here as a skip, which is the point of running it there.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: pytest + pyright (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        # The floor README.md states and pyrightconfig.json enforces, and a current release.
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # `tzdata` because `zoneinfo` has no zone database on Windows without it — the same
+      # install README.md § Prerequisites asks of a user. `pyright` from PyPI wraps the npm
+      # package and finds the runner's own node.
+      - name: Install the test tools
+        run: python -m pip install --upgrade pip pytest tzdata pyright
+
+      - name: Tests
+        run: python -m pytest -q tests skills/daily/tests
+
+      - name: Type check
+        run: pyright

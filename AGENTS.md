@@ -27,6 +27,12 @@ the manifest version, and `/plugin update` has nothing to move to while it is un
 holds the pair. Then tag the release commit. See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)
 § Releasing for the full steps.
 
+The **maintainer** cuts the tag, by hand, once the `Checks` workflow is green on `main` for the
+release commit — an agent bumps the version and writes the changelog entry, and stops there.
+Pushing the tag runs `.github/workflows/release.yml`, which publishes the GitHub Release from the
+matching `## [x.y.z]` section; a tag with no such heading fails there rather than publishing an
+empty note.
+
 ## Where a thing goes
 
 - **Changing a skill, a reference or a script** → read

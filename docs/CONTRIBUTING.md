@@ -176,4 +176,9 @@ git push origin vX.Y.Z
 ```
 
 `git push` does not carry tags, which is why the second line is there. Tag the last commit
-of that version rather than the one that bumped the manifest, if cleanup followed it.
+of that version rather than the one that bumped the manifest, if cleanup followed it — and
+only once `.github/workflows/checks.yml` is green on `main` for it. The pushed tag runs
+`.github/workflows/release.yml`, which publishes a GitHub Release whose body is that version's
+`## [X.Y.Z]` changelog section: nothing to write by hand, and a tag with no matching heading
+fails the workflow instead of publishing an empty note. `tests/test_ci.py` holds both workflows
+to the commands in `AGENTS.md` and to this tag form.

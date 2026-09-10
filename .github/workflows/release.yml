@@ -1,0 +1,46 @@
+# A GitHub Release for every `v*` tag, with the matching CHANGELOG.md section as its body.
+# Marketplace users have no other way to see what a version changed: `/plugin update` moves
+# them to the new manifest version and shows nothing. The heading is the same one
+# `tests/test_distribution.py::test_every_version_marker_agrees` holds equal to the manifest,
+# so a tag whose section is missing fails here — loudly — rather than publishing an empty note.
+#
+# Who cuts the tag, and when, is AGENTS.md § Releasing. Releases start at v0.5.0; the older
+# tags predate the changelog's per-version headings and are not backfilled.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Take the tag's section out of CHANGELOG.md
+        shell: python
+        run: |
+          import os, re, sys
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          found = re.search(rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## \[|\Z)",
+                            text, re.M | re.S)
+          if not found:
+              sys.exit(f"CHANGELOG.md has no `## [{version}]` heading for tag "
+                       f"{os.environ['GITHUB_REF_NAME']}; add it before tagging.")
+          body = found.group(1).strip() + "\n"
+          open("release-notes.md", "w", encoding="utf-8").write(body)
+          print(body)
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          --title "$GITHUB_REF_NAME"
+          --notes-file release-notes.md
+          --verify-tag
