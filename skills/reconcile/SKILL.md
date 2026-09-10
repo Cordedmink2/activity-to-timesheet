@@ -25,7 +25,7 @@ Every command below runs a script that ships with the `daily` skill, in a direct
 
 `python` in those commands means the interpreter this machine actually uses. `Timesheets/.context.md` records one if a previous run resolved it; otherwise, on Windows prefer `py` — a bare `python` is often the Store app-execution stub, whose tell is a help message about installing from the Store and exit code 49.
 
-The month listing needs the configured Harvest credentials and the day skeletons need `TIMESHEET_TIMEZONE`. A run that stops naming one of those keys is a configuration gap: route it to `/plugin configure billables`, or to the `.env` beside the sibling skill's `SKILL.md` on an exported install. Do not ask for a value here.
+The month listing needs the configured Harvest credentials. A run that stops naming one of those keys is a configuration gap: route it to `/plugin configure billables`, or to the `.env` beside the sibling skill's `SKILL.md` on an exported install. Do not ask for a value here. The day skeletons need a zone, which is `TIMESHEET_TIMEZONE` where it is set and this machine's own zone where it is not — the skeleton's header says which, and a skeleton read in a *derived* zone carries that label into the worklist. Only a run that stops saying it could read neither is the same gap.
 
 ## Step 1 — Sweep the month in two cheap reads
 

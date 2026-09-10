@@ -259,7 +259,7 @@ def test_an_unmarked_reading_inside_the_skipped_hour_takes_the_instant_the_clock
 # for the same typo. That is the drift the shared modules exist to prevent, and the reason
 # the list is asserted on rather than trusted — a private copy reads identically at the
 # call site.
-SHARED = ["resolve_zone", "zone_label", "utc_bounds", "local_clock", "parse_range"]
+SHARED = ["resolve_zone_with_source", "zone_label", "utc_bounds", "local_clock", "parse_range"]
 
 
 @pytest.mark.parametrize("module", [ab, tl], ids=["afk_blocks", "activity_timeline"])
@@ -269,3 +269,70 @@ def test_the_day_reading_scripts_use_the_shared_zone_helper_rather_than_their_ow
     assert getattr(module, name, None) is getattr(tz, name), (
         f"{module.__name__}.{name} is not the shared timezone one"
     )
+
+
+# --------------------------------------------------------------------------------------
+# Reading the machine's own zone (#30) — the two branches, driven by argument
+#
+# Bound at import, before the hermetic fixture replaces `tz.machine_zone_name` with a miss:
+# that replacement is what keeps every *other* test independent of this machine's zone, and
+# these are the tests of the reader itself, so they hold the real one.
+# --------------------------------------------------------------------------------------
+
+read_machine_zone = tz.machine_zone_name
+
+def test_a_windows_identifier_maps_to_its_iana_zone():
+    """The registry holds `New Zealand Standard Time`; the scripts need `Pacific/Auckland`.
+    The table is CLDR's, one IANA zone per identifier, and the mapping is a lookup rather
+    than a call into .NET — which is what `TryConvertWindowsIdToIanaId` would have been,
+    and it does not exist under the Windows PowerShell 5.1 the setup skill supports."""
+    got = read_machine_zone(platform="win32", registry=lambda: "New Zealand Standard Time")
+    assert got == "Pacific/Auckland"
+
+
+@pytest.mark.parametrize("reading", [None, "", "Nowhere Standard Time"],
+                         ids=["unreadable", "blank", "unknown"])
+def test_a_windows_identifier_the_table_does_not_know_is_a_miss(reading):
+    """An identifier absent from the table is a miss, never an approximation: the caller
+    then refuses with the message naming the setting, which is the safe answer."""
+    assert read_machine_zone(platform="win32", registry=lambda: reading) is None
+
+
+def test_every_table_entry_names_a_zone_this_interpreter_can_load():
+    """The table was generated from CLDR, and several right-hand names are the zone
+    database's older spellings. Loading each is what shows they are still links the
+    database resolves — on this interpreter, with whatever `tzdata` it has."""
+    unloadable = []
+    for windows_id, iana in tz.WINDOWS_ZONES.items():
+        try:
+            ZoneInfo(iana)
+        except Exception:
+            unloadable.append((windows_id, iana))
+    assert not unloadable, f"table names zones that do not load here: {unloadable}"
+
+
+def test_tz_in_the_environment_wins_on_posix(tmp_path):
+    got = read_machine_zone(platform="linux", environ={"TZ": ":Europe/Paris"},
+                               root=tmp_path)
+    assert got == "Europe/Paris", "a leading colon is the POSIX spelling and is dropped"
+
+
+def test_the_localtime_symlink_names_the_zone_on_posix(tmp_path):
+    etc = tmp_path / "etc"
+    etc.mkdir()
+    try:
+        (etc / "localtime").symlink_to("/usr/share/zoneinfo/America/Sao_Paulo")
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot create a symlink")
+    assert read_machine_zone(platform="linux", environ={}, root=tmp_path) == "America/Sao_Paulo"
+
+
+def test_etc_timezone_is_read_when_there_is_nothing_else(tmp_path):
+    etc = tmp_path / "etc"
+    etc.mkdir()
+    (etc / "timezone").write_text("Asia/Tokyo\n", encoding="utf-8")
+    assert read_machine_zone(platform="linux", environ={}, root=tmp_path) == "Asia/Tokyo"
+
+
+def test_a_posix_machine_with_none_of_the_three_is_a_miss(tmp_path):
+    assert read_machine_zone(platform="linux", environ={"TZ": "  "}, root=tmp_path) is None

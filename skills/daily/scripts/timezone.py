@@ -17,22 +17,68 @@ year the clocks change it has two — so every conversion below takes the zone i
 resolves each instant at the offset in force for *it*. `resolve_zone()` says what a single
 figure read once cost.
 
-No third-party deps — stdlib `zoneinfo`, like the sibling modules.
+**Configured, or the machine's own — never assumed.** With nothing configured the zone is
+read from the machine (#30), and every run that does so says so: the source travels with
+the zone (`resolve_zone_with_source()`), and `zone_label()` names a derived zone as the
+machine's. What it never does is fall back to a fixed offset; `resolve_zone_with_source()`
+carries the history of the one that used to be here.
+
+No third-party deps — stdlib `zoneinfo`, `winreg` where there is one, like the sibling
+modules.
 """
 import datetime as dt
+import os
+import sys
+from pathlib import Path
 from typing import NamedTuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import skill_config
 
+# Where a resolved zone came from. The words are read by the prose the run writes — the
+# label a derived zone carries into a skeleton header and a timesheet's notes — so they are
+# constants rather than spellings, and a test holds the documents to them.
+CONFIGURED, DERIVED, OVERRIDE = "configured", "derived", "override"
+
+
+class Resolved(NamedTuple):
+    """A zone and which of the three sources answered for it."""
+    zone: dt.tzinfo
+    source: str
+
 
 def resolve_zone(flag, offers_offset_flag: bool = True):
-    """The timezone this day's local clock is read in.
+    """The timezone this day's local clock is read in — the zone alone.
 
-    `flag` is whatever `--utc-offset` supplied, or None; it wins, so a day spent in
-    another zone can still be reconstructed without reconfiguring anything. It resolves to
-    a zone that is that offset all year, which is what passing a number has always meant.
-    Otherwise the configured `TIMESHEET_TIMEZONE` is loaded.
+    For the callers that only convert. A caller that will *print* the zone wants
+    `resolve_zone_with_source()`, because a zone read from the machine has to be announced
+    as such wherever the user reads it.
+    """
+    return resolve_zone_with_source(flag, offers_offset_flag).zone
+
+
+def resolve_zone_with_source(flag, offers_offset_flag: bool = True) -> Resolved:
+    """The timezone this day's local clock is read in, and where it came from.
+
+    Three sources, highest first:
+
+    1. `flag` is whatever `--utc-offset` supplied, or None; it wins, so a day spent in
+       another zone can still be reconstructed without reconfiguring anything. It resolves
+       to a zone that is that offset all year, which is what passing a number has always
+       meant. Source `OVERRIDE`.
+    2. The configured `TIMESHEET_TIMEZONE`, when it is set. Source `CONFIGURED`.
+    3. The machine's own zone, read by `machine_zone_name()`, when nothing is configured.
+       Source `DERIVED` — and that word reaches the user, which is the whole difference
+       between this and a default. A derived value that is never announced is a silent
+       default; one announced every run follows the user across zones and tells them it did.
+
+    Nothing after that. A derivation that misses, or that names a zone this interpreter
+    cannot load, produces the same refusal an unconfigured run has always produced — naming
+    the setting and how to set it, and never an offset. The unloadable case adds the one
+    line saying what the machine reported and the install that makes it load, because on
+    Windows `zoneinfo` has no data without `tzdata`: the machine can name `Pacific/Auckland`
+    correctly and the run still cannot read a day in it, so a derivation is validated by
+    resolving, never by producing a string.
 
     `offers_offset_flag=False` says the calling script has no such per-run override —
     which the provider scripts have not, carrying no flags but their fields and the
@@ -56,14 +102,15 @@ def resolve_zone(flag, offers_offset_flag: bool = True):
     place. Handing the zone itself to the arithmetic below lets each instant be converted
     at the offset in force for *it*.
 
-    There is deliberately no fallback. This used to be `default=12.0` in both day-reading
-    scripts' argument parsers, so every user who was not in New Zealand got a day boundary
-    up to twelve hours out — and, again, nothing failed. No offset is safe to guess, so an
-    unconfigured run stops and says which value it needs.
+    There is deliberately no fixed fallback. This used to be `default=12.0` in both
+    day-reading scripts' argument parsers, so every user who was not in New Zealand got a
+    day boundary up to twelve hours out — and, again, nothing failed. No offset is safe to
+    guess; the machine's own zone is not a guess, and is labelled so that a wrong one is
+    seen rather than billed from.
     """
     if flag is not None:
         try:
-            return dt.timezone(dt.timedelta(hours=flag))
+            return Resolved(dt.timezone(dt.timedelta(hours=flag)), OVERRIDE)
         except (ValueError, OverflowError):
             # Every other bad input to these scripts produces a line and a non-zero exit;
             # one that escaped from here would be the single traceback, and a traceback
@@ -74,22 +121,42 @@ def resolve_zone(flag, offers_offset_flag: bool = True):
                 f"--utc-offset {flag} is not an offset any zone has.\n"
                 "  It is hours from UTC, between -24 and 24, e.g. 13 or -5.5.")
     name = skill_config.setting("TIMESHEET_TIMEZONE")
-    if not name:
-        skill_config.fail_missing(
-            ("No timezone configured, and no --utc-offset given.\n" if offers_offset_flag
-             else "No timezone configured.\n") +
-            "  Your zone decides where a day begins and ends, and when the clocks change\n"
-            "  inside it, so there is nothing safe to assume.\n"
-            "  Set it once:  /plugin configure billables  -> TIMESHEET_TIMEZONE\n"
-            "                (an IANA name, e.g. Europe/London or Pacific/Auckland)\n"
-            "  Already set it? Start a new session — the value is published at session\n"
-            "  start. If a new session still shows this, see references/first-run.md\n"
-            "  § 'When the configuration does not arrive'." +
-            ("\n  Or for this run only:  --utc-offset <hours>" if offers_offset_flag else "")
-            # Last, after the escape hatch, because it is the cause a user cannot deduce
-            # and the two lines above are the wrong advice for it. Shared with
-            # `harvest_client.load_creds()`: one absence, one cause, one wording.
-            + skill_config.note_for_an_unreached_shell())
+    if name:
+        return Resolved(_load(name, offers_offset_flag), CONFIGURED)
+    derived = machine_zone_name()
+    if derived:
+        try:
+            return Resolved(ZoneInfo(derived), DERIVED)
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    skill_config.fail_missing(
+        ("No timezone configured, and no --utc-offset given.\n" if offers_offset_flag
+         else "No timezone configured.\n") +
+        "  Your zone decides where a day begins and ends, and when the clocks change\n"
+        "  inside it, so there is nothing safe to assume.\n"
+        "  Set it once:  /plugin configure billables  -> TIMESHEET_TIMEZONE\n"
+        "                (an IANA name, e.g. Europe/London or Pacific/Auckland)\n"
+        "  Already set it? Start a new session — the value is published at session\n"
+        "  start. If a new session still shows this, see references/first-run.md\n"
+        "  § 'When the configuration does not arrive'." +
+        (f"\n  This machine reports its zone as {derived}, which could not be loaded —\n"
+         "  on Windows the zone database is a separate install:  pip install tzdata"
+         if derived else
+         "\n  This machine's own zone could not be read, or is not one this plugin knows.") +
+        ("\n  Or for this run only:  --utc-offset <hours>" if offers_offset_flag else "")
+        # Last, after the escape hatch, because it is the cause a user cannot deduce
+        # and the two lines above are the wrong advice for it. Shared with
+        # `harvest_client.load_creds()`: one absence, one cause, one wording.
+        + skill_config.note_for_an_unreached_shell())
+
+
+def _load(name: str, offers_offset_flag: bool) -> ZoneInfo:
+    """A configured name as a zone, or the refusal that names it.
+
+    Two causes, one message: a mistyped IANA name, and a Windows Python with no zone
+    database installed. Both are "this name did not resolve", and both are fixed by one of
+    the two lines below, so the message names the check and the escape hatch rather than
+    guessing which."""
     try:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError) as exc:
@@ -101,16 +168,94 @@ def resolve_zone(flag, offers_offset_flag: bool = True):
              else ""))
 
 
-def zone_label(zone):
+def machine_zone_name(platform: str | None = None, environ=None, root: Path = Path("/"),
+                      registry=None) -> str | None:
+    """The IANA name of this machine's own zone, or None when it cannot be read.
+
+    Windows keeps its zone under its own names — `New Zealand Standard Time` — in the
+    registry, read here with `winreg` and mapped through `WINDOWS_ZONES` below, the CLDR
+    table of one IANA zone per Windows identifier. An identifier the table does not know is
+    a miss, not an approximation. `TryConvertWindowsIdToIanaId` would do the same in one
+    call and was rejected: it is .NET 6+, so it exists under `pwsh` and not under the
+    Windows PowerShell 5.1 the `setup` skill supports, and it would mean spawning a shell to
+    learn a fact the registry holds.
+
+    A POSIX machine names its zone in one of three places, any of which may be absent:
+    `TZ` in the environment, the target of the `/etc/localtime` symlink (the path after
+    `zoneinfo/`), and the contents of `/etc/timezone`. The first that yields a name wins;
+    none of them is validated here — the caller loads it, and a name that will not load is
+    the caller's refusal.
+
+    Every parameter is for the tests: `platform` and `environ` drive the branch, `root`
+    relocates `/etc`, and `registry` stands in for the `winreg` read. A run passes none of
+    them.
+    """
+    platform = sys.platform if platform is None else platform
+    environ = os.environ if environ is None else environ
+    if platform == "win32":
+        return _windows_zone_name(registry or _registry_zone_key_name)
+    return _posix_zone_name(environ, root)
+
+
+def _registry_zone_key_name() -> str | None:
+    """`TimeZoneKeyName` under `HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation`,
+    or None off Windows or when the key cannot be read."""
+    try:
+        import winreg
+    except ImportError:
+        return None
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                            r"SYSTEM\CurrentControlSet\Control\TimeZoneInformation") as key:
+            value, _ = winreg.QueryValueEx(key, "TimeZoneKeyName")
+    except OSError:
+        return None
+    # Some Windows releases pad the value with NULs past the name; stripped rather than
+    # matched, so the lookup below sees the name and not its storage.
+    return str(value).rstrip("\x00").strip() or None
+
+
+def _windows_zone_name(registry) -> str | None:
+    key_name = registry()
+    return WINDOWS_ZONES.get(key_name) if key_name else None
+
+
+def _posix_zone_name(environ, root: Path) -> str | None:
+    tz = (environ.get("TZ") or "").strip().lstrip(":")
+    if tz:
+        return tz
+    localtime = root / "etc" / "localtime"
+    try:
+        if localtime.is_symlink():
+            target = os.readlink(localtime).replace("\\", "/")
+            _, sep, tail = target.rpartition("zoneinfo/")
+            if sep and tail:
+                return tail
+    except OSError:
+        pass
+    timezone_file = root / "etc" / "timezone"
+    try:
+        text = timezone_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
+
+
+def zone_label(zone, source: str = CONFIGURED):
     """How a resolved zone names itself in a header a person reads.
 
     A real zone is named, because on a transition day no single offset describes it and
     printing one would be a claim the run is not making. A `--utc-offset` zone keeps the
-    wording it always had, since that is exactly what the user typed.
+    wording it always had, since that is exactly what the user typed. A zone the machine
+    supplied says so — `zone Europe/London, derived from this machine` — because that
+    announcement is what makes reading it safe: a wrong one is seen, not billed from.
     """
     key = getattr(zone, "key", None)
     if key:
-        return f"zone {key}"
+        label = f"zone {key}"
+        if source == DERIVED:
+            label += f", {DERIVED} from this machine"
+        return label
     return f"offset UTC{zone.utcoffset(None).total_seconds() / 3600:+g}"
 
 
@@ -383,3 +528,153 @@ def local_clock(moment, zone):
     """
     local = moment.astimezone(zone)
     return local.strftime("%H:%M:%S") + (SECOND_PASS_MARK if local.fold else "")
+
+
+# One IANA zone per Windows time-zone identifier: the `territory="001"` rows of CLDR's
+# `common/supplemental/windowsZones.xml`, generated rather than typed, on 2026-09-11. A
+# Windows machine names its zone with the left-hand string, in the registry; the scripts
+# need the right-hand one. Several right-hand names are the zone database's older spellings
+# (`Asia/Calcutta`, `Europe/Kiev`) because that is what CLDR carries — they load as links to
+# the current names, and a name is validated by loading in any case. An identifier absent
+# from this table is a miss, and the run says so rather than approximating.
+WINDOWS_ZONES = {
+    "Dateline Standard Time":            "Etc/GMT+12",
+    "UTC-11":                            "Etc/GMT+11",
+    "Aleutian Standard Time":            "America/Adak",
+    "Hawaiian Standard Time":            "Pacific/Honolulu",
+    "Marquesas Standard Time":           "Pacific/Marquesas",
+    "Alaskan Standard Time":             "America/Anchorage",
+    "UTC-09":                            "Etc/GMT+9",
+    "Pacific Standard Time (Mexico)":    "America/Tijuana",
+    "UTC-08":                            "Etc/GMT+8",
+    "Pacific Standard Time":             "America/Los_Angeles",
+    "US Mountain Standard Time":         "America/Phoenix",
+    "Mountain Standard Time (Mexico)":   "America/Mazatlan",
+    "Mountain Standard Time":            "America/Denver",
+    "Yukon Standard Time":               "America/Whitehorse",
+    "Central America Standard Time":     "America/Guatemala",
+    "Central Standard Time":             "America/Chicago",
+    "Easter Island Standard Time":       "Pacific/Easter",
+    "Central Standard Time (Mexico)":    "America/Mexico_City",
+    "Canada Central Standard Time":      "America/Regina",
+    "SA Pacific Standard Time":          "America/Bogota",
+    "Eastern Standard Time (Mexico)":    "America/Cancun",
+    "Eastern Standard Time":             "America/New_York",
+    "Haiti Standard Time":               "America/Port-au-Prince",
+    "Cuba Standard Time":                "America/Havana",
+    "US Eastern Standard Time":          "America/Indianapolis",
+    "Turks And Caicos Standard Time":    "America/Grand_Turk",
+    "Paraguay Standard Time":            "America/Asuncion",
+    "Atlantic Standard Time":            "America/Halifax",
+    "Venezuela Standard Time":           "America/Caracas",
+    "Central Brazilian Standard Time":   "America/Cuiaba",
+    "SA Western Standard Time":          "America/La_Paz",
+    "Pacific SA Standard Time":          "America/Santiago",
+    "Newfoundland Standard Time":        "America/St_Johns",
+    "Tocantins Standard Time":           "America/Araguaina",
+    "E. South America Standard Time":    "America/Sao_Paulo",
+    "SA Eastern Standard Time":          "America/Cayenne",
+    "Argentina Standard Time":           "America/Buenos_Aires",
+    "Greenland Standard Time":           "America/Godthab",
+    "Montevideo Standard Time":          "America/Montevideo",
+    "Magallanes Standard Time":          "America/Punta_Arenas",
+    "Saint Pierre Standard Time":        "America/Miquelon",
+    "Bahia Standard Time":               "America/Bahia",
+    "UTC-02":                            "Etc/GMT+2",
+    "Azores Standard Time":              "Atlantic/Azores",
+    "Cape Verde Standard Time":          "Atlantic/Cape_Verde",
+    "UTC":                               "Etc/UTC",
+    "GMT Standard Time":                 "Europe/London",
+    "Greenwich Standard Time":           "Atlantic/Reykjavik",
+    "Sao Tome Standard Time":            "Africa/Sao_Tome",
+    "Morocco Standard Time":             "Africa/Casablanca",
+    "W. Europe Standard Time":           "Europe/Berlin",
+    "Central Europe Standard Time":      "Europe/Budapest",
+    "Romance Standard Time":             "Europe/Paris",
+    "Central European Standard Time":    "Europe/Warsaw",
+    "W. Central Africa Standard Time":   "Africa/Lagos",
+    "Jordan Standard Time":              "Asia/Amman",
+    "GTB Standard Time":                 "Europe/Bucharest",
+    "Middle East Standard Time":         "Asia/Beirut",
+    "Egypt Standard Time":               "Africa/Cairo",
+    "E. Europe Standard Time":           "Europe/Chisinau",
+    "Syria Standard Time":               "Asia/Damascus",
+    "West Bank Standard Time":           "Asia/Hebron",
+    "South Africa Standard Time":        "Africa/Johannesburg",
+    "FLE Standard Time":                 "Europe/Kiev",
+    "Israel Standard Time":              "Asia/Jerusalem",
+    "South Sudan Standard Time":         "Africa/Juba",
+    "Kaliningrad Standard Time":         "Europe/Kaliningrad",
+    "Sudan Standard Time":               "Africa/Khartoum",
+    "Libya Standard Time":               "Africa/Tripoli",
+    "Namibia Standard Time":             "Africa/Windhoek",
+    "Arabic Standard Time":              "Asia/Baghdad",
+    "Turkey Standard Time":              "Europe/Istanbul",
+    "Arab Standard Time":                "Asia/Riyadh",
+    "Belarus Standard Time":             "Europe/Minsk",
+    "Russian Standard Time":             "Europe/Moscow",
+    "E. Africa Standard Time":           "Africa/Nairobi",
+    "Iran Standard Time":                "Asia/Tehran",
+    "Arabian Standard Time":             "Asia/Dubai",
+    "Astrakhan Standard Time":           "Europe/Astrakhan",
+    "Azerbaijan Standard Time":          "Asia/Baku",
+    "Russia Time Zone 3":                "Europe/Samara",
+    "Mauritius Standard Time":           "Indian/Mauritius",
+    "Saratov Standard Time":             "Europe/Saratov",
+    "Georgian Standard Time":            "Asia/Tbilisi",
+    "Volgograd Standard Time":           "Europe/Volgograd",
+    "Caucasus Standard Time":            "Asia/Yerevan",
+    "Afghanistan Standard Time":         "Asia/Kabul",
+    "West Asia Standard Time":           "Asia/Tashkent",
+    "Ekaterinburg Standard Time":        "Asia/Yekaterinburg",
+    "Pakistan Standard Time":            "Asia/Karachi",
+    "Qyzylorda Standard Time":           "Asia/Qyzylorda",
+    "India Standard Time":               "Asia/Calcutta",
+    "Sri Lanka Standard Time":           "Asia/Colombo",
+    "Nepal Standard Time":               "Asia/Katmandu",
+    "Central Asia Standard Time":        "Asia/Bishkek",
+    "Bangladesh Standard Time":          "Asia/Dhaka",
+    "Omsk Standard Time":                "Asia/Omsk",
+    "Myanmar Standard Time":             "Asia/Rangoon",
+    "SE Asia Standard Time":             "Asia/Bangkok",
+    "Altai Standard Time":               "Asia/Barnaul",
+    "W. Mongolia Standard Time":         "Asia/Hovd",
+    "North Asia Standard Time":          "Asia/Krasnoyarsk",
+    "N. Central Asia Standard Time":     "Asia/Novosibirsk",
+    "Tomsk Standard Time":               "Asia/Tomsk",
+    "China Standard Time":               "Asia/Shanghai",
+    "North Asia East Standard Time":     "Asia/Irkutsk",
+    "Singapore Standard Time":           "Asia/Singapore",
+    "W. Australia Standard Time":        "Australia/Perth",
+    "Taipei Standard Time":              "Asia/Taipei",
+    "Ulaanbaatar Standard Time":         "Asia/Ulaanbaatar",
+    "Aus Central W. Standard Time":      "Australia/Eucla",
+    "Transbaikal Standard Time":         "Asia/Chita",
+    "Tokyo Standard Time":               "Asia/Tokyo",
+    "North Korea Standard Time":         "Asia/Pyongyang",
+    "Korea Standard Time":               "Asia/Seoul",
+    "Yakutsk Standard Time":             "Asia/Yakutsk",
+    "Cen. Australia Standard Time":      "Australia/Adelaide",
+    "AUS Central Standard Time":         "Australia/Darwin",
+    "E. Australia Standard Time":        "Australia/Brisbane",
+    "AUS Eastern Standard Time":         "Australia/Sydney",
+    "West Pacific Standard Time":        "Pacific/Port_Moresby",
+    "Tasmania Standard Time":            "Australia/Hobart",
+    "Vladivostok Standard Time":         "Asia/Vladivostok",
+    "Lord Howe Standard Time":           "Australia/Lord_Howe",
+    "Bougainville Standard Time":        "Pacific/Bougainville",
+    "Russia Time Zone 10":               "Asia/Srednekolymsk",
+    "Magadan Standard Time":             "Asia/Magadan",
+    "Norfolk Standard Time":             "Pacific/Norfolk",
+    "Sakhalin Standard Time":            "Asia/Sakhalin",
+    "Central Pacific Standard Time":     "Pacific/Guadalcanal",
+    "Russia Time Zone 11":               "Asia/Kamchatka",
+    "New Zealand Standard Time":         "Pacific/Auckland",
+    "UTC+12":                            "Etc/GMT-12",
+    "Fiji Standard Time":                "Pacific/Fiji",
+    "Chatham Islands Standard Time":     "Pacific/Chatham",
+    "UTC+13":                            "Etc/GMT-13",
+    "Tonga Standard Time":               "Pacific/Tongatapu",
+    "Samoa Standard Time":               "Pacific/Apia",
+    "Line Islands Standard Time":        "Pacific/Kiritimati",
+}

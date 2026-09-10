@@ -1,7 +1,7 @@
 {
   "name": "billables",
   "description": "Turns captured desktop activity into a reviewable billable timesheet and, on your explicit confirmation, logs it to your timesheet provider.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "author": {
     "name": "Connor Parsons"
   },
@@ -34,8 +34,7 @@
     "TIMESHEET_TIMEZONE": {
       "type": "string",
       "title": "Your timezone",
-      "description": "IANA name, e.g. Europe/London or Pacific/Auckland. Decides where your day starts and ends; there is no default, because guessing it would mis-date someone else's timesheet.",
-      "required": true
+      "description": "IANA name, e.g. Europe/London or Pacific/Auckland. Decides where your day starts and ends. Leave blank to use this machine's own zone — every run then says the zone came from the machine. Set it to pin a zone the machine does not carry. Not sure? Leave it as it is and run /billables:setup."
     },
     "TIMESHEET_ACTIVITY_URL": {
       "type": "string",

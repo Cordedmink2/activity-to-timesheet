@@ -27,10 +27,12 @@ Usage:
   python scripts/activity_timeline.py 2026-06-19 --json
   python scripts/activity_timeline.py 2026-06-19 --utc-offset 13   # this run only
 
-The day's boundaries come from the configured TIMESHEET_TIMEZONE, converted at
-each instant rather than once for the day, so the day the clocks change is read
-at its true length. --utc-offset overrides it for one run. There is no assumed
-zone — see timezone.resolve_zone.
+The day's boundaries come from the configured TIMESHEET_TIMEZONE — or, when none
+is configured, from this machine's own zone, which the output then labels as
+derived — converted at each instant rather than once for the day, so the day the
+clocks change is read at its true length. --utc-offset overrides both for one
+run. There is no assumed zone and no fixed fallback — see
+timezone.resolve_zone_with_source.
 """
 import argparse
 import datetime as dt
@@ -41,7 +43,8 @@ import sys
 
 from aw_client import (GAP_FOLD, NOISE_FLOOR, SourceError, UsageError, dedupe_heartbeats,
                        fetch_events, get, parse_ts, pick_bucket, unreachable, window_day)
-from timezone import local_clock, parse_range, resolve_zone, utc_bounds, zone_label
+from timezone import (CONFIGURED, local_clock, parse_range, resolve_zone_with_source,
+                      utc_bounds, zone_label)
 
 WEB_WATCHERS = ("aw-watcher-web-firefox", "aw-watcher-web-chrome")
 
@@ -151,12 +154,14 @@ def zoom(spans, web_events, ws, we, zone, noise_floor: float = NOISE_FLOOR):
 
 
 def timeline(win_events, web_events, classes, date, zone, win_bucket=None, window=None,
-             noise_floor: float = NOISE_FLOOR, gap_fold: float = GAP_FOLD):
+             noise_floor: float = NOISE_FLOOR, gap_fold: float = GAP_FOLD,
+             source: str = CONFIGURED):
     """The day's categorised window timeline — from events, printing nothing.
 
     `window` is the raw `--window` value; a zoom restricts the spans to it and adds the
     web rows, `web` staying `None` outside zoom mode so a reader can tell "no tabs" from
-    "not asked". Both renderings in `main()` run over what this returns.
+    "not asked". Both renderings in `main()` run over what this returns. `source` is where
+    `zone` came from, and the result's `zone` label says so when it was the machine (#30).
     """
     spans = build_window_spans(win_events, classes, noise_floor, gap_fold)
     rollup = category_rollup(win_events, classes, noise_floor)
@@ -170,6 +175,7 @@ def timeline(win_events, web_events, classes, date, zone, win_bucket=None, windo
         spans, web_rows = zoom(spans, web_events, ws, we, zone, noise_floor)
     return {
         "date": date.isoformat(),
+        "zone": zone_label(zone, source),
         "window_bucket": win_bucket,
         "spans": [{"start": local_clock(s["start"], zone), "end": local_clock(s["end"], zone),
                    "min": round((s["end"] - s["start"]).total_seconds() / 60, 1),
@@ -194,8 +200,9 @@ def main():
     ap = argparse.ArgumentParser(description="Categorized window-activity timeline for one day.")
     ap.add_argument("date", help="YYYY-MM-DD (local date)")
     ap.add_argument("--utc-offset", type=float, default=None,
-                    help="Local zone offset from UTC in hours, for this run only. "
-                         "Omit to use the configured TIMESHEET_TIMEZONE.")
+                    help="Local zone offset from UTC in hours, for this run only. Omit to "
+                         "use the configured TIMESHEET_TIMEZONE, or this machine's own "
+                         "zone when none is configured.")
     ap.add_argument("--noise-floor", type=float, default=NOISE_FLOOR,
                     help=f"Drop events shorter than this many seconds as tab-switch noise "
                          f"(default {NOISE_FLOOR})")
@@ -220,8 +227,9 @@ def main():
         return 2
 
     # After the date parse: a typo in the date should be reported before a configuration
-    # problem the user cannot act on until the date is right anyway.
-    zone = resolve_zone(args.utc_offset)
+    # problem the user cannot act on until the date is right anyway. With the source,
+    # because a zone the machine supplied is announced in both renderings below.
+    zone, source = resolve_zone_with_source(args.utc_offset)
 
     start_utc, end_utc = utc_bounds(local_date, zone)
     try:
@@ -250,7 +258,7 @@ def main():
     try:
         result = timeline(win_events, web_events, classes, local_date, zone, win_bucket,
                           window=args.window, noise_floor=args.noise_floor,
-                          gap_fold=args.gap_fold)
+                          gap_fold=args.gap_fold, source=source)
     except UsageError as e:
         print(f"ERR {e}", file=sys.stderr)
         return 2
@@ -260,7 +268,7 @@ def main():
         print(json.dumps(result, indent=2))
         return 0
 
-    hdr = f"Window timeline for {result['date']} ({zone_label(zone)})"
+    hdr = f"Window timeline for {result['date']} ({result['zone']})"
     if args.window:
         hdr += f"  [zoom {args.window}]"
     print(hdr)

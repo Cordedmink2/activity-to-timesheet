@@ -205,3 +205,57 @@ def test_the_inventory_entry_lists_exactly_the_flags_its_scripts_parse(name):
         "tell every run the skill accepts it. `_subprocess_argv` in `flag_scan.py` excludes those, and "
         "only reaches an argv list written at the call — build one into a variable and it "
         "stops reaching, which is a bug in this test rather than a gap in SKILL.md.")
+
+
+# --------------------------------------------------------------------------------------
+# A zone the machine supplied is announced where the user reads it (#30)
+# --------------------------------------------------------------------------------------
+
+def read(path: str) -> str:
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def section(text: str, heading: str) -> str:
+    """The body of one heading, up to the next heading of the same or a higher level."""
+    level = len(heading) - len(heading.lstrip("#"))
+    found = re.search(rf"^{re.escape(heading)}\s*$\n(.*?)(?=^#{{1,{level}}} |\Z)", text,
+                      re.M | re.S)
+    assert found, f"no {heading!r} section"
+    return found.group(1)
+
+
+def test_a_derived_zone_is_announced_in_the_document_and_the_confirmation():
+    """A zone read from the machine is only safe because it is announced: a derived value
+    nobody sees is the silent default 0.5.0 removed. The scripts label it with the word in
+    `timezone.DERIVED`; this holds the two places the user reads to the same word — the
+    output format's conventions, which is where the Notes line is prescribed, and the
+    Step 8 confirmation, which is the last thing shown before anything reaches the
+    provider — and to the setting that pins a zone instead.
+    """
+    import timezone
+    conventions = section(read(os.path.join(SKILL, "references", "output-format.md")),
+                          "## Conventions")
+    confirmation = section(read(os.path.join(SKILL, "SKILL.md")),
+                           "### Step 8 — Confirmation gate before Harvest")
+    for name, text in (("output-format.md § Conventions", conventions),
+                       ("SKILL.md Step 8", confirmation)):
+        assert timezone.DERIVED in text and "machine" in text, (
+            f"{name} never says a zone can be *{timezone.DERIVED}* from the machine, so a "
+            "run reading a day in one has nothing telling it to say so")
+        assert "TIMESHEET_TIMEZONE" in text, (
+            f"{name} announces the derived zone without naming the setting that pins one")
+
+
+def test_the_label_the_prose_promises_is_the_label_the_scripts_print():
+    """The wording the documents quote — `derived from this machine` — is asserted against
+    what `zone_label()` actually prints, so a rewording on either side fails here rather
+    than leaving the prose describing output nobody produces."""
+    import timezone
+    from zoneinfo import ZoneInfo
+    label = timezone.zone_label(ZoneInfo("Europe/London"), timezone.DERIVED)
+    conventions = read(os.path.join(SKILL, "references", "output-format.md"))
+    phrase = label.split(", ", 1)[1]
+    assert phrase in conventions, (
+        f"output-format.md does not quote the label the scripts print ({phrase!r})")
+    assert phrase in read(os.path.join(SKILL, "SKILL.md"))

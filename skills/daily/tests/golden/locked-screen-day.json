@@ -1,6 +1,7 @@
 {
   "afk_json": {
     "date": "2026-08-12",
+    "zone": "offset UTC+12",
     "afk_bucket": "aw-watcher-afk_TESTHOST",
     "work_start": "08:12:00",
     "work_end": "19:01:00",
@@ -65,6 +66,7 @@
   },
   "timeline_json": {
     "date": "2026-08-12",
+    "zone": "offset UTC+12",
     "window_bucket": "aw-watcher-window_TESTHOST",
     "spans": [
       {
@@ -145,6 +147,7 @@
   "timeline_text": "Window timeline for 2026-08-12 (offset UTC+12)\n  window bucket: aw-watcher-window_TESTHOST   classes loaded: 1\n  08:12:00-08:30:00   18.0m  uncategorized   ms-teams.exe | Meeting | Daily Standup\n  08:30:00-10:57:00  147.0m  ACME            Code.exe | sharepoint-access-sync - Visual Studio Code\n  10:57:00-18:53:00  476.0m  uncategorized   WindowsTerminal.exe | claude - AGENTS.md\n  18:53:00-19:01:00    8.0m  ACME            msedge.exe | Power Apps - example-uat.crm6.dynamics.com\n  --- day totals by category (min) ---\n     uncategorized    494.0\n     ACME             155.0\n",
   "zoom_json": {
     "date": "2026-08-12",
+    "zone": "offset UTC+12",
     "window_bucket": "aw-watcher-window_TESTHOST",
     "spans": [
       {

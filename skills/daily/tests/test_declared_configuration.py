@@ -38,8 +38,20 @@ MAY = dt.date(2026, 5, 28)
 
 @pytest.fixture
 def unconfigured(monkeypatch):
-    """No timezone anywhere — the state a user is in before they have configured one."""
+    """No timezone anywhere — nothing configured, and a machine whose own zone cannot be
+    read either. The hermetic fixture already forces the derivation to miss, so that no
+    assertion here depends on the zone of the machine running the suite; this deletes the
+    configured value on top of it."""
     monkeypatch.delenv("TIMESHEET_TIMEZONE", raising=False)
+
+
+@pytest.fixture
+def machine_says(monkeypatch):
+    """A machine whose own zone reads as `name`, with nothing configured (#30)."""
+    def _machine(name):
+        monkeypatch.delenv("TIMESHEET_TIMEZONE", raising=False)
+        monkeypatch.setattr(tz, "machine_zone_name", lambda *a, **kw: name)
+    return _machine
 
 
 # --------------------------------------------------------------------------------------
@@ -189,6 +201,83 @@ def test_the_missing_zone_message_names_both_ways_to_supply_one(unconfigured):
     message = str(exc.value)
     assert "/plugin configure" in message
     assert "--utc-offset" in message
+
+
+# --- the machine's own zone, when nothing is configured (#30) -------------------------
+
+def test_the_machines_zone_is_used_when_nothing_is_configured(machine_says):
+    """The ask from the field: nobody wants to type an answer their machine already
+    knows. A blank setting now reads the machine's zone — and says so, which is what
+    separates it from the silent default 0.5.0 removed."""
+    machine_says("Europe/London")
+    resolved = tz.resolve_zone_with_source(None)
+    assert isinstance(resolved.zone, ZoneInfo) and resolved.zone.key == "Europe/London"
+    assert resolved.source == tz.DERIVED
+    assert getattr(tz.resolve_zone(None), "key", None) == "Europe/London", (
+        "the plain resolver reads the same zone")
+
+
+def test_a_configured_zone_beats_the_machines(machine_says, monkeypatch):
+    """A day billed from elsewhere, or a laptop whose clock is set to head office: the
+    typed value wins, and is labelled as typed."""
+    machine_says("Europe/London")
+    monkeypatch.setenv("TIMESHEET_TIMEZONE", "Pacific/Auckland")
+    resolved = tz.resolve_zone_with_source(None)
+    assert getattr(resolved.zone, "key", None) == "Pacific/Auckland"
+    assert resolved.source == tz.CONFIGURED
+
+
+def test_the_offset_flag_beats_both(machine_says, monkeypatch):
+    machine_says("Europe/London")
+    monkeypatch.setenv("TIMESHEET_TIMEZONE", "Pacific/Auckland")
+    resolved = tz.resolve_zone_with_source(13.0)
+    assert resolved.zone.utcoffset(None) == dt.timedelta(hours=13)
+    assert resolved.source == tz.OVERRIDE
+
+
+def test_a_machine_zone_that_does_not_load_gets_the_same_refusal_as_no_zone_at_all(
+        machine_says):
+    """Derivation is validated by loading, not by producing a string: on Windows `zoneinfo`
+    has no data without `tzdata`, so the machine can name `Pacific/Auckland` and the run
+    still cannot read a day in it. That is a miss, answered with today's message — the
+    setting and how to set it — plus the one line saying what the machine reported and
+    the install that would make it load. Never a guess."""
+    machine_says("Nowhere/Notreal")
+    with pytest.raises(SystemExit) as exc:
+        tz.resolve_zone(None)
+    message = str(exc.value)
+    assert "TIMESHEET_TIMEZONE" in message and "/plugin configure" in message
+    assert "Nowhere/Notreal" in message and "tzdata" in message
+    assert "12" not in message
+
+
+def test_a_derived_zone_is_labelled_as_the_machines_and_a_configured_one_is_not(machine_says):
+    """The label is load-bearing: a derived value that is never announced is a silent
+    default, and a derived value announced every run follows the user across zones and
+    tells them it did. The wording is read out of the constant so the prose copies can be
+    held to the same word."""
+    machine_says("Europe/London")
+    zone = tz.resolve_zone(None)
+    derived, configured = tz.zone_label(zone, tz.DERIVED), tz.zone_label(zone, tz.CONFIGURED)
+    assert "Europe/London" in derived and tz.DERIVED in derived and "machine" in derived
+    assert configured == "zone Europe/London", "a typed zone keeps the label it always had"
+    assert derived != configured
+
+
+@pytest.mark.parametrize("module", [ab, tl], ids=["afk_blocks", "activity_timeline"])
+def test_both_reading_scripts_report_where_the_zone_came_from(module, live_aw, machine_says,
+                                                              monkeypatch):
+    """What a run reads. The model learns the source from the script's output and nowhere
+    else, so both the JSON and the text carry the label — derived here, and plain when the
+    zone was configured."""
+    machine_says("Etc/GMT-12")
+    d = day().active("09:00", "12:00").window("09:00", "12:00", "Code", "x")
+    live_aw(d, configure_zone=False)
+    result = run_cli(module, [d.date_str(), "--json"]).json()
+    assert result["zone"] == tz.zone_label(ZoneInfo("Etc/GMT-12"), tz.DERIVED)
+    assert tz.DERIVED in run_cli(module, [d.date_str()]).out
+    monkeypatch.setenv("TIMESHEET_TIMEZONE", "Etc/GMT-12")   # the configured route
+    assert run_cli(module, [d.date_str(), "--json"]).json()["zone"] == "zone Etc/GMT-12"
 
 
 def test_a_zone_that_cannot_be_loaded_says_so_and_names_the_escape_hatch(monkeypatch):

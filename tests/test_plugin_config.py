@@ -46,12 +46,14 @@ HOOKS = REPO / "hooks"
 README = REPO / "README.md"
 
 # What must be asked for, because nothing can run without it.
-REQUIRED = {"HARVEST_ACCOUNT_ID", "HARVEST_API_KEY", "TIMESHEET_TIMEZONE"}
+REQUIRED = {"HARVEST_ACCOUNT_ID", "HARVEST_API_KEY"}
 # What the harness must keep out of `settings.json` and out of the plugin folder.
 SENSITIVE = {"HARVEST_ACCOUNT_ID", "HARVEST_API_KEY"}
-# What a user can leave blank and still complete a run.
-OPTIONAL = {"TIMESHEET_ACTIVITY_URL", "TIMESHEET_SCREENSHOTS_DIR", "TIMESHEET_WORKSPACE",
-            "TIMESHEET_OUTLOOK_CALENDAR"}
+# What a user can leave blank and still complete a run. The timezone joined this set with
+# #30: blank means the machine's own zone, announced as such on every run — a fallback that
+# lives in the scripts, like every other one here, and not a manifest `default`.
+OPTIONAL = {"TIMESHEET_TIMEZONE", "TIMESHEET_ACTIVITY_URL", "TIMESHEET_SCREENSHOTS_DIR",
+            "TIMESHEET_WORKSPACE", "TIMESHEET_OUTLOOK_CALENDAR"}
 
 # The export has no manifest to be asked from, so the same keys go in a `.env` copied from
 # this template. The two are the same declaration made twice, which is why a test holds them

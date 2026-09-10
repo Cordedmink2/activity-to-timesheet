@@ -119,7 +119,7 @@ from pathlib import Path
 
 import skill_config
 from aw_client import GAP_FOLD, NOISE_FLOOR, SourceError, dedupe_heartbeats, parse_ts, window_day
-from timezone import local_clock, resolve_zone, utc_bounds, zone_label
+from timezone import CONFIGURED, local_clock, resolve_zone_with_source, utc_bounds, zone_label
 
 TOGGLE = "TIMESHEET_OUTLOOK_CALENDAR"
 
@@ -293,7 +293,8 @@ def _clocks(span: Span | None, zone) -> dict | None:
 
 
 def filtered_day(payload, local_date: dt.date, zone, window_events: list[dict],
-                 noise_floor: float = NOISE_FLOOR, gap_fold: float = GAP_FOLD) -> dict:
+                 noise_floor: float = NOISE_FLOOR, gap_fold: float = GAP_FOLD,
+                 source: str = CONFIGURED) -> dict:
     """The calendar day the rules read: what counts, on `local_date` in `zone`, sorted, each
     event with its verdict against `window_events` — the day's foreground-window events from
     the activity source, read with the timeline's two noise settings.
@@ -331,7 +332,7 @@ def filtered_day(payload, local_date: dt.date, zone, window_events: list[dict],
             "block": _clocks(judged["block"], zone),
         }))
     kept.sort(key=lambda pair: pair[0])
-    return {"date": local_date.isoformat(), "zone": zone_label(zone),
+    return {"date": local_date.isoformat(), "zone": zone_label(zone, source),
             "events": [rendered for _, rendered in kept]}
 
 
@@ -453,8 +454,9 @@ def main():
         description="One day's calendar events, filtered to what counts, as JSON.")
     ap.add_argument("date", help="YYYY-MM-DD (local date)")
     ap.add_argument("--utc-offset", type=float, default=None,
-                    help="Local zone offset from UTC in hours, for this run only. "
-                         "Omit to use the configured TIMESHEET_TIMEZONE.")
+                    help="Local zone offset from UTC in hours, for this run only. Omit to "
+                         "use the configured TIMESHEET_TIMEZONE, or this machine's own "
+                         "zone when none is configured.")
     ap.add_argument("--noise-floor", type=float, default=NOISE_FLOOR,
                     help=f"Ignore meeting windows shorter than this many seconds, as the "
                          f"timeline does (default {NOISE_FLOOR})")
@@ -477,12 +479,13 @@ def main():
         adapter = resolve_adapter(args.adapter)
         # After the toggle: a user with the calendar off should be told that, not asked
         # for a zone the read they did not want would have needed.
-        zone = resolve_zone(args.utc_offset)
+        zone, source = resolve_zone_with_source(args.utc_offset)
         # The activity source before the adapter — see the module docstring, "Output".
         window_events = day_window_events(local_date, zone)
         payload = read_adapter(adapter_argv(adapter, local_date))
         result = filtered_day(payload, local_date, zone, window_events,
-                              noise_floor=args.noise_floor, gap_fold=args.gap_fold)
+                              noise_floor=args.noise_floor, gap_fold=args.gap_fold,
+                              source=source)
     except CalendarError as exc:
         print(f"ERR {exc}", file=sys.stderr)
         return 1

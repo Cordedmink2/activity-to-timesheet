@@ -5,6 +5,22 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-11
+
+### Changed
+- **The timezone is read from the machine when you have not set one** (#30). `TIMESHEET_TIMEZONE`
+  is no longer required: left blank, every script that reads a day takes this machine's own zone —
+  the registry on Windows, `TZ`, `/etc/localtime` or `/etc/timezone` elsewhere — and labels the
+  day `zone Pacific/Auckland, derived from this machine` in its header and its JSON `zone` field.
+  The `daily` skill carries that label into the timesheet's Notes and repeats it in the Step 8
+  confirmation, so a wrong zone is seen before anything is posted. A configured zone still wins
+  and is not announced; `--utc-offset` still wins over both. There is still no fixed fallback: a
+  machine whose zone cannot be read, or that names one this interpreter cannot load, gets the same
+  refusal as before, naming the setting — plus the line saying what the machine reported and that
+  `tzdata` is what makes it load. The `setup` skill's configuration probe no longer reports a
+  blank timezone as `MISSING`, and the `reconcile` skill no longer treats one as a gap. Nothing
+  to do on upgrade: a zone you set stays set and keeps winning.
+
 ## [0.8.0] - 2026-09-10
 
 ### Upgrading

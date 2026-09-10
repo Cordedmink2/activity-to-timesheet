@@ -1,6 +1,7 @@
 {
   "afk_json": {
     "date": "2026-08-05",
+    "zone": "offset UTC+12",
     "afk_bucket": "aw-watcher-afk_TESTHOST",
     "work_start": "08:15:00",
     "work_end": "17:30:00",
@@ -59,6 +60,7 @@
   },
   "timeline_json": {
     "date": "2026-08-05",
+    "zone": "offset UTC+12",
     "window_bucket": "aw-watcher-window_TESTHOST",
     "spans": [
       {

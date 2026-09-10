@@ -33,7 +33,8 @@ for why the gate lives in the invocation rather than only in SKILL.md's prose.
 Harvest recomputes an entry's duration from its two clock times on a patch exactly as it
 does on a create, so a patch can arrive at the entry a create refuses — one worked
 straight through the autumn change, billed short by the span that happened twice. This
-needs `TIMESHEET_TIMEZONE` to know when that is, and it reads the entry to know what the
+needs the zone (`TIMESHEET_TIMEZONE`, or the machine's own when none is configured) to
+know when that is, and it reads the entry to know what the
 patch would leave behind: see `refuse_a_result_that_straddles_the_change()` below. That
 read happens on the preview too — what must not be applied must not be offered — so
 previewing a change to a time or a date now needs the provider to answer.

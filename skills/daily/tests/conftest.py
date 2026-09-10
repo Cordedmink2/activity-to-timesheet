@@ -39,6 +39,7 @@ for p in (str(SCRIPTS), str(TESTS)):
 
 import harvest_client                # noqa: E402
 import skill_config                  # noqa: E402
+import timezone                      # noqa: E402
 from support import (SETTING_KEYS, Day, aw_server, day,  # noqa: E402,F401
                      harvest_server, run_cli, with_heartbeats)
 
@@ -86,6 +87,12 @@ def _hermetic(monkeypatch, tmp_path):
     # `support.DEFAULT_OFFSET` on every date and the golden files stay stable. A test
     # about the unconfigured state deletes it again.
     monkeypatch.setenv("TIMESHEET_TIMEZONE", TEST_ZONE)
+    # ...and the machine's own zone is made unreadable (#30). With nothing configured the
+    # scripts now derive the zone from the machine, so a test about the unconfigured state
+    # would otherwise pass or fail with the developer's own settings — and pass on the
+    # maintainer's machine while failing on a CI runner set to UTC. A test about the
+    # derived path puts a name back with `monkeypatch.setattr(timezone, "machine_zone_name", ...)`.
+    monkeypatch.setattr(timezone, "machine_zone_name", lambda *a, **kw: None)
     # Left alone, every assertion on a missing-setting message would depend on which tool
     # launched the suite: `skill_config.note_for_an_unreached_shell()` appends a line when
     # the process is one the published configuration cannot have reached, and a run
@@ -110,16 +117,21 @@ def live_aw(monkeypatch):
     day means pointing them at *when* it happened as much as at where its events are. A
     zone day exists to exercise the real resolution, so handing it back a `--utc-offset`
     would leave the thing under test unrun.
+
+    `configure_zone=False` leaves the zone unconfigured for a zone day, for a test about
+    the scripts *deriving* it from the machine instead (#30).
     """
     started = []
 
-    def _start(d: Day, **kw):
+    def _start(d: Day, configure_zone: bool = True, **kw):
         srv = aw_server(d.buckets(), d.settings(), **kw)
         srv.__enter__()
         started.append(srv)
         monkeypatch.setenv("TIMESHEET_ACTIVITY_URL", srv.base)
-        if d.zone_name:
+        if d.zone_name and configure_zone:
             monkeypatch.setenv("TIMESHEET_TIMEZONE", d.zone_name)
+        elif d.zone_name:
+            monkeypatch.delenv("TIMESHEET_TIMEZONE", raising=False)
         return srv
 
     yield _start

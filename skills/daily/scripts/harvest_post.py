@@ -17,7 +17,8 @@ a fixed-duration entry (not a running timer). See SKILL.md Step 9 for context.
 
 Harvest derives the duration from those two clock times, which is wrong by an
 hour for an entry worked straight through the autumn change — so this needs
-`TIMESHEET_TIMEZONE` to know when that is, and refuses such an entry rather
+the zone (`TIMESHEET_TIMEZONE`, or the machine's own when none is configured)
+to know when that is, and refuses such an entry rather
 than billing it short. See `harvest_write.refusal_for_a_straddled_change()`,
 which `harvest_patch.py` refuses with too.
 

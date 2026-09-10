@@ -147,9 +147,10 @@ def test_every_module_that_names_the_zone_resolver_imports_the_shared_one():
     imports nothing that defines it either has its own copy — the duplication this module
     exists to prevent — or names a function it cannot call.
     """
+    resolvers = {"resolve_zone", "resolve_zone_with_source"}
     offenders = [path.name for path in bundled_scripts()
                  if path.stem != SHARED_ZONE
-                 and "resolve_zone" in names_used(path)
+                 and resolvers & names_used(path)
                  and SHARED_ZONE not in imports(path)]
     assert not offenders, (
         "these call resolve_zone() without importing the module that defines it:\n  "

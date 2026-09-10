@@ -1,6 +1,7 @@
 {
   "afk_json": {
     "date": "2026-01-20",
+    "zone": "zone Pacific/Auckland",
     "afk_bucket": "aw-watcher-afk_TESTHOST",
     "work_start": "08:30:00",
     "work_end": "17:15:00",
@@ -50,6 +51,7 @@
   },
   "timeline_json": {
     "date": "2026-01-20",
+    "zone": "zone Pacific/Auckland",
     "window_bucket": "aw-watcher-window_TESTHOST",
     "spans": [
       {

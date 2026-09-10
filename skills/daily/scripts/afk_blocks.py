@@ -27,10 +27,12 @@ Usage:
   python scripts/afk_blocks.py 2026-05-28 --json
   python scripts/afk_blocks.py 2026-05-28 --utc-offset 13   # this run only
 
-The day's boundaries come from the configured TIMESHEET_TIMEZONE, converted at
-each instant rather than once for the day, so the day the clocks change is read
-at its true length and needs nothing from the user. --utc-offset overrides it
-for one run. There is no assumed zone: see timezone.resolve_zone for why.
+The day's boundaries come from the configured TIMESHEET_TIMEZONE — or, when none
+is configured, from this machine's own zone, which the output then labels as
+derived — converted at each instant rather than once for the day, so the day the
+clocks change is read at its true length and needs nothing from the user.
+--utc-offset overrides both for one run. There is no assumed zone and no fixed
+fallback: see timezone.resolve_zone_with_source for why.
 
 The judgement constants below (--solid, --blip-gap, --min-uncovered, the two
 bands) are defaults, not policy. They are a person's working style, so they
@@ -45,7 +47,8 @@ from typing import NamedTuple
 
 from aw_client import (UsageError, dedupe_heartbeats, fetch_events, get, parse_ts,
                        pick_bucket, unreachable)
-from timezone import local_clock, parse_range, resolve_zone, utc_bounds, zone_label
+from timezone import (CONFIGURED, local_clock, parse_range, resolve_zone_with_source,
+                      utc_bounds, zone_label)
 
 DEFAULT_THRESHOLD = 1050  # 17.5 min — the skill's "real break" boundary
 
@@ -291,12 +294,17 @@ def coverage_report(spans, active, label, proposed, zone, tunables=Tunables()):
     }
 
 
-def empty_skeleton(date, afk_bucket):
+def empty_skeleton(date, afk_bucket, zone=None, source=CONFIGURED):
     """The result's one shape, with nothing in it: every key a populated day has, so
     `--json` output parses the same way whether or not the day held any activity. The
-    populated day is this dict filled in, never a second literal."""
+    populated day is this dict filled in, never a second literal.
+
+    `zone` is the label the day was read in — and, when the machine supplied it rather
+    than the configuration, says so (#30). It is in the JSON because the JSON is what a run
+    reads, and the run has to carry that fact into the timesheet it writes."""
     return {
-        "date": date.isoformat(), "afk_bucket": afk_bucket,
+        "date": date.isoformat(), "zone": zone_label(zone, source) if zone else None,
+        "afk_bucket": afk_bucket,
         "work_start": None, "work_end": None, "work_end_blip": None,
         "total_active_min": 0.0, "breaks": [], "active_spans": [],
         "window_watcher_tail": None, "window_report": None, "coverage_report": None,
@@ -323,16 +331,17 @@ def _parse_cover(label, local_date, zone):
 
 
 def day_skeleton(afk_events, win_events, date, zone, afk_bucket=None,
-                 tunables=Tunables(), window=None, cover=None):
+                 tunables=Tunables(), window=None, cover=None, source=CONFIGURED):
     """The day, reduced to the facts the skill bills against — from events, printing nothing.
 
     `afk_events` and `win_events` are the deduplicated streams for the day; `window` and
     `cover` are the raw flag values, read here so that an unreadable one on a day with
     no activity is still answered by the empty skeleton, as it always was. Both
     renderings in `main()` run over what this returns, so the JSON a test reads and the
-    text the model reads cannot disagree about the day.
+    text the model reads cannot disagree about the day. `source` is where `zone` came
+    from, which the result's `zone` label carries.
     """
-    result = empty_skeleton(date, afk_bucket)
+    result = empty_skeleton(date, afk_bucket, zone, source)
     spans = insert_data_gaps(to_spans(afk_events), tunables.afk_threshold)
     bounds = work_bounds(spans, tunables.solid, tunables.blip_gap)
     if bounds is None:
@@ -374,7 +383,7 @@ def render_text(result, zone, tunables=Tunables(), focused=False):
     """The text rendering of a skeleton, as lines. `focused` is a bare `--window` probe:
     a run that checks four thin stretches should not pay for four whole-day dumps it
     already has, so the day's ceiling stays and the two lists go."""
-    out = [f"AFK analysis for {result['date']}  ({zone_label(zone)}, "
+    out = [f"AFK analysis for {result['date']}  ({result['zone'] or zone_label(zone)}, "
            f"break>={tunables.afk_threshold}s)",
            f"  bucket:      {result['afk_bucket']}",
            f"  work start:  {result['work_start']}",
@@ -421,8 +430,9 @@ def main():
     ap = argparse.ArgumentParser(description="Analyze AW AFK watcher for one day.")
     ap.add_argument("date", help="YYYY-MM-DD (local date)")
     ap.add_argument("--utc-offset", type=float, default=None,
-                    help="Local zone offset from UTC in hours, for this run only. "
-                         "Omit to use the configured TIMESHEET_TIMEZONE.")
+                    help="Local zone offset from UTC in hours, for this run only. Omit to "
+                         "use the configured TIMESHEET_TIMEZONE, or this machine's own "
+                         "zone when none is configured.")
     ap.add_argument("--afk-threshold", type=int, default=DEFAULT_THRESHOLD,
                     help="Seconds of afk that counts as a real break (default 1050 = 17.5 min)")
     ap.add_argument("--solid", type=float, default=SOLID_S,
@@ -460,8 +470,9 @@ def main():
         return 2
 
     # After the date parse, because resolving a zone for an unparseable date would report
-    # the configuration problem in front of the typo that is actually in the way.
-    zone = resolve_zone(args.utc_offset)
+    # the configuration problem in front of the typo that is actually in the way. With the
+    # source, because a zone the machine supplied is announced in both renderings below.
+    zone, source = resolve_zone_with_source(args.utc_offset)
 
     start_utc, end_utc = utc_bounds(local_date, zone)
 
@@ -483,7 +494,7 @@ def main():
                         args.active_band, args.thin_band)
     try:
         result = day_skeleton(afk_events, win_events, local_date, zone, afk_bucket,
-                              tunables, window=args.window, cover=args.cover)
+                              tunables, window=args.window, cover=args.cover, source=source)
     except UsageError as e:
         print(f"ERR {e}", file=sys.stderr)
         return 2

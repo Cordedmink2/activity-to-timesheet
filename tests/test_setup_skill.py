@@ -415,11 +415,13 @@ def test_the_description_names_every_part_of_the_install_the_skill_covers():
 # that cannot leak — they substitute the word, so the value never leaves the variable — and
 # they are the only exemptions. Anything else this matches is the credential itself.
 #
-# Named separately from the probe's key list below because the two lists have different
-# jobs: printing a timezone is harmless, printing either of these costs the user a
-# rotation. Adding a key here is a claim that it is a secret.
+# The probe's key list is the credentials alone since #30: the timezone is derived from the
+# machine when it is blank, so a blank one is not a gap and the probe has no business
+# reporting it `MISSING`. Kept as two names because they have different jobs — this list is
+# what the probe checks, and adding a key to `CREDENTIAL_KEYS` is a claim that it is a
+# secret whose printing costs the user a rotation.
 CREDENTIAL_KEYS = ("HARVEST_ACCOUNT_ID", "HARVEST_API_KEY")
-PROBE_KEYS = CREDENTIAL_KEYS + ("TIMESHEET_TIMEZONE",)
+PROBE_KEYS = CREDENTIAL_KEYS
 
 
 def value_expansion(keys) -> re.Pattern[str]:
@@ -578,14 +580,20 @@ def test_the_configuration_probe_is_prescribed_rather_than_left_to_the_run():
     """The fix above only holds while there is a command to use instead of composing one.
     Drop the block and the skill is back to naming three keys and hoping.
 
-    Pinned against `PROBE_KEYS` rather than the credentials alone, because "Done" declares
-    setup finished on *three* configured values. A probe that quietly stopped covering the
-    timezone would leave the third one asserted in prose and checked by nothing.
+    Pinned against `PROBE_KEYS`, which is what "Done" declares setup finished on. A probe
+    that quietly stopped covering one of them would leave it asserted in prose and checked
+    by nothing — and one that went on naming the timezone after #30 would report a healthy
+    machine `MISSING`.
     """
     text = skill_text()
     # Indented, because the probe sits inside a numbered list item.
     blocks = re.findall(r"^[ \t]*```[a-z]*\n(.*?)^[ \t]*```", text, re.M | re.S)
     probes = [b for b in blocks if all(k in b for k in PROBE_KEYS)]
+    for probe in probes:
+        assert "TIMESHEET_TIMEZONE" not in probe, (
+            "the probe still checks TIMESHEET_TIMEZONE: since #30 a blank zone is read from "
+            "the machine, so a blank one is not a gap and the probe would report a healthy "
+            "machine MISSING")
     assert probes, (
         "no code block in SKILL.md checks all of "
         f"{', '.join(PROBE_KEYS)}, so the presence check is improvised again on every run")

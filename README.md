@@ -26,7 +26,7 @@ This repo is a plugin marketplace holding one plugin, `billables`. From inside C
 Take the **user**-scope install if you are offered the choice, so the plugin is enabled in every
 directory you work in. A **local**-scope install is bound to the one folder you installed it from:
 start a session anywhere else and the plugin is disabled there, its session hook never runs, and
-every command reports your credentials and timezone missing however carefully you filled them in.
+every command reports your credentials missing however carefully you filled them in.
 That one is worth avoiding rather than diagnosing — it looks identical to having configured
 nothing, and it is missing in *both* shells, so none of the usual fixes apply.
 `claude plugin list` shows which scope you got and whether the plugin is enabled where you are.
@@ -37,7 +37,7 @@ for your own details, once:
 | | |
 |---|---|
 | **Harvest account ID** and **personal access token** | From https://id.getharvest.com/developers. Both are marked sensitive, so Claude Code keeps them in its own credential store — the OS keychain on macOS, `~/.claude/.credentials.json` elsewhere — rather than in a file inside the plugin or in `settings.json`. |
-| **Your timezone** | An IANA name (`Europe/London`, `Pacific/Auckland`). Required, with no default: it decides where your day starts and ends, and a guess would date someone else's timesheet wrong without anything visibly failing. |
+| **Your timezone** | Optional. An IANA name (`Europe/London`, `Pacific/Auckland`); it decides where your day starts and ends. Blank means your machine's own zone, and every run then says the zone came from the machine — so a wrong one is seen, not billed from. There is no fixed default: a machine whose zone cannot be read stops and asks, because a guess would date someone else's timesheet wrong without anything visibly failing. |
 | **ActivityWatch address** | Optional. Leave blank unless AW runs somewhere other than `http://localhost:5600`. |
 | **Screenshot directory** | Optional. Blank means `~/Pictures/WorkScreenshots`. |
 | **Workspace directory** | Optional. Blank means the folder you run Claude Code from, if it already looks like a workspace (`.mcp/` or `Timesheets/`) — which is the normal case. Set it if you start sessions elsewhere: a plugin is never installed *inside* a workspace, so there is no second place to fall back to. Answer it after step 6, with `/plugin configure billables`. |
@@ -142,7 +142,7 @@ command line:
 | In the hand-installed copy | Where it lives now |
 |---|---|
 | `HARVEST_ACCOUNT_ID`, `HARVEST_API_KEY` in `.env` | `/plugin configure billables`. Both are declared sensitive, so they go to Claude Code's credential store instead of a file in the skill folder. |
-| `--utc-offset 12` (13 in daylight saving) on every command | **Your timezone**, asked for as an IANA name — `Pacific/Auckland`, not `12`. This is a change of kind, not a rename: the offset is derived per date, so the twice-yearly edit stops being yours to remember. There is no default, and no conversion from your old number — say where you are. |
+| `--utc-offset 12` (13 in daylight saving) on every command | **Your timezone**, as an IANA name — `Pacific/Auckland`, not `12` — or left blank to use the machine's own zone, which every run then names as derived. This is a change of kind, not a rename: the offset is derived per date, so the twice-yearly edit stops being yours to remember. There is no conversion from your old number — say where you are, or let the machine. |
 | `TIMESHEET_WORKSPACE` in `.env` | **Workspace directory** in `/plugin configure billables`. If you left it blank, look at where your workspace actually is before doing the same here: the old copy also searched the folders it was installed under, which from `~\.claude\skills\` reaches your home directory — so a `~\Timesheets` was found from any session. A plugin is never installed inside a workspace, so blank now means *the folder you start Claude Code in*, and nothing else. Blank is right if that is where you work; otherwise set it. |
 | `TIMESHEET_SCREENSHOTS_DIR` — in `.env` on later copies, and as `-ScreenshotsDir` on the scheduled task | **Screenshot directory** in `/plugin configure billables`. Blank still means `~\Pictures\WorkScreenshots`. Read the value off the task rather than trusting the `.env`, which the earliest hand installs had no key for: `(Get-ScheduledTask -TaskName WorkScreenshots).Actions.Arguments`. |
 | `DATAVERSE_URL`, `PAC_AUTH_PROFILE` in `.env` | Ordinary environment variables — [step 9](#9-optional-dataverse-ticket-catalog). They belong to one org rather than to every install, so the configuration dialog never asks for them. Do **not** put them in a `.env` inside the plugin folder. |
@@ -380,8 +380,8 @@ never edits it silently.
    not into the plugin folder, so there is nothing to git-ignore and a plugin update can't carry them
    off. On macOS that store is the OS keychain; on Windows and Linux it is `~/.claude/.credentials.json`
    — a file in your home directory, so treat that directory as holding a secret.
-   Set your **timezone** here too if you skipped it at install — the scripts refuse to date a day
-   without one.
+   Your **timezone** can stay blank: the scripts read the machine's own zone and label every
+   day as read in it. Set it here to pin a different one.
 3. Start a new session — the values are published at session start, into commands Claude Code runs
    through its **Bash** tool. Then verify there (on Windows use `py` — a bare `python` is often the
    Store stub). It has to be the Bash tool: the values are published as a POSIX shell fragment, so
@@ -395,8 +395,8 @@ never edits it silently.
 
 > **Exported install** (step 5's clone route, rather than `/plugin install`): there's no
 > configuration dialog, so the same keys go in a `.env` at the skill root instead — copy
-> `.env.example` beside it and fill in `HARVEST_ACCOUNT_ID`, `HARVEST_API_KEY` and
-> `TIMESHEET_TIMEZONE`. That file grants full access to your Harvest account: it is git-ignored,
+> `.env.example` beside it and fill in `HARVEST_ACCOUNT_ID` and `HARVEST_API_KEY`
+> (`TIMESHEET_TIMEZONE` may stay blank). That file grants full access to your Harvest account: it is git-ignored,
 > never commit it, and never share the skill folder with it still in place.
 
 ### 9. (Optional) Dataverse ticket catalog

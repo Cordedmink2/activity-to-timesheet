@@ -1,6 +1,7 @@
 {
   "afk_json": {
     "date": "2026-04-05",
+    "zone": "zone Pacific/Auckland",
     "afk_bucket": "aw-watcher-afk_TESTHOST",
     "work_start": "01:30:00",
     "work_end": "04:15:00",
@@ -64,6 +65,7 @@
   },
   "timeline_json": {
     "date": "2026-04-05",
+    "zone": "zone Pacific/Auckland",
     "window_bucket": "aw-watcher-window_TESTHOST",
     "spans": [
       {
@@ -107,6 +109,7 @@
   "timeline_text": "Window timeline for 2026-04-05 (zone Pacific/Auckland)\n  window bucket: aw-watcher-window_TESTHOST   classes loaded: 1\n  01:30:00-02:30:00   60.0m  ACME            Code.exe | release-cutover - ACME\n  02:30:00*-04:15:00  105.0m  ACME            Code.exe | release-cutover - ACME\n  --- day totals by category (min) ---\n     ACME             165.0\n",
   "zoom_json": {
     "date": "2026-04-05",
+    "zone": "zone Pacific/Auckland",
     "window_bucket": "aw-watcher-window_TESTHOST",
     "spans": [
       {

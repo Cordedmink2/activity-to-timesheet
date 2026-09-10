@@ -1102,6 +1102,41 @@ is its own source of truth and a copy goes stale. **Deferred, not rejected: trim
 `SKILL.md`** — 9,342 words against the 5,000-word ceiling the plugin-dev guidance sets — to #57,
 because every `SKILL.md` edit needs a before/after baseline and this change had none.
 
+### The zone is derived from the machine, and announced — #30
+**Rung 2.** 2026-09-11. The ask from the field was "it should just default"; 0.5.0 had removed
+the `default=12.0` deliberately (§ "The configuration surface is declared, and the New
+Zealand offset is gone"), because a fixed zone dates every other user's day wrong with
+nothing on screen saying so. What ships is neither: with nothing configured the scripts read
+the machine's own zone and label it `derived from this machine` in every header and JSON
+`zone` field, and `SKILL.md` carries the label into the Notes and the Step 8 confirmation.
+A derived value that is announced every run follows the user across zones and tells them it
+did; one that is never announced is the silent default by another name, which is why the
+label is the load-bearing half and `test_references.py` holds the two prose copies to the
+constant's word.
+
+**Three things checked rather than taken from the ticket body.** `TryConvertWindowsIdToIanaId`,
+the body's mechanism, is .NET 6+ and does not exist under the Windows PowerShell 5.1 the
+`setup` skill supports — so the Windows read is `winreg` on `TimeZoneKeyName` and a static
+CLDR table, generated from `windowsZones.xml` (139 identifiers) rather than typed. Deriving
+in the session-start hook, the body's other proposal, was rejected because the hook writes
+into the channel that means *what the user configured*, so a script could not tell a derived
+zone from a typed one and could not label it; the derivation is the script's last layer
+before the refusal, where every other fallback in this plugin lives. And a derivation is
+validated by loading, not by producing a name: on Windows `zoneinfo` has no data without
+`tzdata`, so the registry can name `Pacific/Auckland` correctly and the run still cannot read
+a day in it — that case gets the unconfigured refusal plus one line naming what the machine
+reported and the install that makes it load.
+
+**Rejected: suggesting the derived zone for the user to paste in.** A pasted value is a typed
+value; it never re-derives and goes stale silently the moment the machine moves.
+
+**Cost accepted.** The suite's hermetic fixture now forces the derivation to miss, so every
+test about the unconfigured state stays independent of the machine running it — a CI runner
+set to UTC would otherwise derive where the developer's machine refused, or the reverse.
+
+**Not measured.** No run has been watched deriving on a POSIX machine; the three POSIX
+sources are exercised against a temporary root in `test_timezone.py` and nowhere live.
+
 ## Script defects
 
 Found while building the scenario/contract suite, 2026-08-14. All **rung 1** — each was
