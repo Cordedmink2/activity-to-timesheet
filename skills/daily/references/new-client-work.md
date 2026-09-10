@@ -19,7 +19,7 @@ python "<workspace>/scripts/create_incident.py" --customer "<client>" --title "<
 - For ad-hoc work-item lookups: `python "<workspace>/scripts/read_incidents.py" --customer "<client>"` (or `--prefix`, `--ticket <code>`, `--search <text>`, `--all`). The bulk work-item catalog is a different path — `scripts/refresh_catalogs.py`, in `references/catalog-refresh.md`.
 - Both helpers authenticate through the workspace's `scripts/auth.py` device-code token, which reads `DATAVERSE_URL` / `TENANT_ID` from that workspace's `.env`; after the one interactive login the token caches and refreshes silently. The raw write the helper wraps is `POST …/api/data/v9.2/incidents` with `title` + `customerid_account@odata.bind=/accounts(<guid>)`.
 
-The replica lag the new project's catalog entry is subject to is `references/catalog-refresh.md` § "Read-replica lag".
+The replica lag the new project's catalog entry is subject to is `references/catalog-refresh.md` § "The assignment catalog", under **Read-replica lag**.
 
 ## After creating
 

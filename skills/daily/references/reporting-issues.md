@@ -25,10 +25,11 @@ it in Claude Code, and the export prints it as `Exporting billables v...`.
 A GitHub issue is public and permanent. It is more exposed than a Harvest note, which at
 least only reaches the client it belongs to.
 
-This skill reads window titles, screenshots and Harvest entries, so **everything it can
-quote is client-identifying**: client and project names, project codes, ticket numbers,
-colleague names, SharePoint and CRM URLs, environment names, local paths. Replace each one
-with a stable placeholder as you draft — `Client A`, `ACME-001`, `<ticket>`, `<env>` — and
+This plugin reads window titles, screenshots, the calendar and the timesheet provider's
+entries, so **everything it can quote is client-identifying**: client and project names,
+project codes, work-item numbers, colleague names, meeting subjects and attendees,
+SharePoint and CRM URLs, environment names, local paths. Replace each one with a stable
+placeholder as you draft — `Client A`, `ACME-001`, `<work item>`, `<env>` — and
 keep the shape, because a rollup with realistic minutes and category counts is what makes a
 report reproducible. Timestamps, durations, ratios, hours and script flags are all safe and
 are usually the whole evidence.
