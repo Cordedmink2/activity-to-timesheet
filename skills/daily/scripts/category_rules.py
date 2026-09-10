@@ -53,6 +53,7 @@ import io
 import json
 import re
 import sys
+import urllib.error
 from pathlib import Path
 
 import skill_config
@@ -319,7 +320,14 @@ def state_dir(flag: str | None, create: bool = True) -> Path:
     root = root or skill_config.find_workspace() or Path.cwd()
     directory = root / STATE_DIR
     if create:
-        directory.mkdir(parents=True, exist_ok=True)
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise Refusal(
+                f"cannot keep the backup and the stamp in {directory} ({exc}). That is where "
+                f"the rule set as it stands would be copied before anything is written, so "
+                f"nothing has been. Name a writable workspace with --workspace, or set "
+                f"TIMESHEET_WORKSPACE.") from None
     return directory
 
 
@@ -588,8 +596,15 @@ def main():
     except SourceError as exc:
         print(f"ERR {exc}", file=sys.stderr)
         return 1
-    except OSError as exc:
+    except urllib.error.URLError as exc:
         print(f"ERR {unreachable(exc)}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        # Narrower than it looks worth being: a network failure arrives as a `URLError`,
+        # which is itself an `OSError`, so catching the base class first would report a
+        # workspace this run could not write to as an activity source that is down — and
+        # send whoever read it to restart a service that was never the problem.
+        print(f"ERR {exc}", file=sys.stderr)
         return 1
 
 

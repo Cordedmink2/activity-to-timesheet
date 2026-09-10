@@ -530,6 +530,23 @@ def test_exactly_one_mode_has_to_be_asked_for(args):
     assert "exactly one" in result.err
 
 
+def test_a_workspace_that_cannot_hold_the_backup_is_refused_as_itself(live_aw, tmp_path):
+    """Not as "ActivityWatch unreachable", which is what a `URLError`-shaped catch of every
+    `OSError` would have called it — sending whoever read it to restart a service that was
+    never the problem. The backup is the recovery path, so a run that cannot write one
+    writes nothing at all."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    (root / ".mcp").write_text("a file where the state directory goes", encoding="utf-8")
+    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")],
+                         "--workspace", str(root))
+    assert result.code == 1
+    assert "cannot keep the backup" in result.err
+    assert "unreachable" not in result.err
+    assert posted(server) == []
+
+
 def test_a_sample_with_nothing_in_it_refuses_rather_than_writing_unjudged_rules(
         live_aw, workspace, tmp_path):
     """A day with no window events is not a day on which every rule is fine."""
