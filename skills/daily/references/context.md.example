@@ -39,6 +39,9 @@ is why it lives with your facts rather than in a shipped script.
   <!-- activity_timeline --gap-fold -->
 - **Smallest span the timeline prints**: `3.0 min` — shorter ones are hidden from the text
   view but still counted in the rollup  <!-- activity_timeline --min-span -->
+- **Category-rule breadth ceiling**: `0.35` — a rule matching more than this share of your
+  recent window titles is refused as over-broad. Raise it if you work for one client most
+  of the time  <!-- category_rules --max-share -->
 - **Minimum billable block**: `0.25 hr` — nothing shorter is posted as its own entry
   <!-- no flag: the model applies this when it drafts, per references/output-format.md -->
 - **Short-day floor**: `6.0 hrs` — a day billed under this is one the month-end sweep looks

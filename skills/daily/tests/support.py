@@ -459,7 +459,7 @@ def _overlaps(event: dict, start: str | None, end: str | None) -> bool:
 
 def aw_server(buckets: dict[str, list[dict]], settings: dict | None = None,
               last_updated: dict[str, str] | None = None,
-              settings_status: int = 200) -> FakeServer:
+              settings_status: int = 200, write_status: int = 200) -> FakeServer:
     """A fake ActivityWatch exposing `/api/0/buckets/`, `.../events` and `/api/0/settings`,
     the last of which is written to as well as read.
 
@@ -492,6 +492,13 @@ def aw_server(buckets: dict[str, list[dict]], settings: dict | None = None,
                 return settings_status, {"error": "not found"}
             key = path[len("/api/0/settings/"):]
             if method == "POST":
+                # `write_status` is the endpoint that is *there* and says no — an
+                # authorization or a version that reads the key differently. Distinct from
+                # `settings_status`, which is the endpoint that does not exist at all, and
+                # the two have different fallbacks: one is retried by hand, the other is
+                # never going to work on this build.
+                if write_status != 200:
+                    return write_status, {"error": "refused"}
                 settings[key] = body
                 return 200, body
             return 200, settings.get(key)
