@@ -46,6 +46,12 @@ def load_flag_scan():
     what follows here holds this skill against the same reading, so the two cannot disagree
     about what a script accepts.
     """
+    # `spec_from_file_location` answers a populated spec for a path that does not exist, and
+    # the miss surfaces as a bare `FileNotFoundError` out of `exec_module` — so the file is
+    # checked first, where the message can say which file and why it is wanted.
+    assert FLAG_SCAN.is_file(), (
+        f"{FLAG_SCAN} is missing — it is the one reader of a script's flags, shared with the "
+        "`daily` suite, and this test reads the reconcile skill's flags through it")
     spec = importlib.util.spec_from_file_location("flag_scan_under_test", FLAG_SCAN)
     assert spec and spec.loader, f"{FLAG_SCAN} is not importable as a module"
     module = importlib.util.module_from_spec(spec)
@@ -217,18 +223,40 @@ def test_every_flag_it_types_is_one_a_sibling_script_parses():
     because a walkthrough's prose is where `--` and a letter could meet by accident, and the
     reader is the same one the `daily` inventory is held against, so both documents are
     compared to one account of what each script accepts.
+
+    Held line by line, against the script named on the line. A union of every script's
+    flags would let `--window` renamed in `activity_timeline.py` through, because
+    `afk_blocks.py` still parses it — while the line here goes on handing the old name to
+    the script that no longer takes it. A line that names no script and opens with a flag is
+    a bare citation (`--full`, as the one never to pass) and is held against the union. A
+    line that names no script and opens with anything else is another program's command —
+    the PowerShell listing in Step 1 — and is not this check's to read: that is the escape
+    hatch for a `gh` or `pytest` flag, should one ever be typed here.
     """
     scan = load_flag_scan()
-    parsed: set[str] = set()
-    for script in DAILY_SCRIPTS.glob("*.py"):
-        parsed |= scan.flags_a_script_parses(script)
-    typed = scan.flags_a_document_types(shipped_text())
-    assert typed, "the skill types no flag at all — the check has nothing to read"
-    unparsed = sorted(typed - parsed)
-    assert not unparsed, (
-        f"the reconcile skill types flags no `daily` script parses: {unparsed}.\n"
-        "Every script this skill runs belongs to `daily`; a flag written here has to be one "
-        "of theirs, and the inventory in skills/daily/SKILL.md says which each accepts.")
+    parsed_by = {p.stem: scan.flags_a_script_parses(p) for p in DAILY_SCRIPTS.glob("*.py")}
+    every_flag = set().union(*parsed_by.values())
+    lines = scan.typed_lines(shipped_text())
+    assert lines, "the skill types no flag at all — the check has nothing to read"
+    findings = []
+    for line, typed in lines:
+        named = re.findall(r"scripts/([A-Za-z0-9_]+)\.py", line)
+        if named:
+            accepted = set().union(*(parsed_by.get(n, set()) for n in named))
+        elif line.startswith("--"):
+            accepted = every_flag
+        else:
+            continue
+        stray = sorted(typed - accepted)
+        if stray:
+            findings.append(f"{stray} in: {line}")
+    assert not findings, (
+        "the reconcile skill types flags the `daily` script on the same line does not parse:\n  "
+        + "\n  ".join(findings) + "\n"
+        "Every script this skill runs belongs to `daily`; a flag written beside one has to be "
+        "that script's, and the inventory in skills/daily/SKILL.md says which each accepts. A "
+        "flag meant for another program is not held here when its line opens with that "
+        "program's command rather than a daily script's path.")
 
 
 # --- it speaks the glossary -------------------------------------------------------------

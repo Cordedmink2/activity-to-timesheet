@@ -202,6 +202,6 @@ def test_the_inventory_entry_lists_exactly_the_flags_its_scripts_parse(name):
         "The inventory is the only place a run is told a flag exists, so a flag you added "
         "wants an entry. But check first that it is this script's flag: one being passed "
         "through to another program belongs to that program, and documenting it here would "
-        "tell every run the skill accepts it. `_subprocess_argv` above excludes those, and "
+        "tell every run the skill accepts it. `_subprocess_argv` in `flag_scan.py` excludes those, and "
         "only reaches an argv list written at the call — build one into a variable and it "
         "stops reaching, which is a bug in this test rather than a gap in SKILL.md.")

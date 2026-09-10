@@ -101,3 +101,37 @@ CODE = re.compile(r"```.*?```|`[^`\n]+`", re.S)
 def flags_a_document_types(text: str) -> set[str]:
     """Every flag a markdown document writes inside a code span or a fenced block."""
     return {flag for span in CODE.findall(text) for flag in FLAG.findall(span)}
+
+
+INLINE = re.compile(r"`[^`\n]+`")
+
+
+def typed_lines(text: str) -> list[tuple[str, set[str]]]:
+    """Each line of a markdown document that types a flag: the code on that line, and its
+    flags.
+
+    The same material `flags_a_document_types` reads, but kept to the document's own lines,
+    so a caller can hold a flag against the script named *beside* it rather than against
+    every script at once. The distinction matters when two scripts share a flag: `--window`
+    renamed in `activity_timeline.py` alone is still parsed by `afk_blocks.py`, so a union of
+    the two goes on accepting a line that tells a run to pass the old name to the wrong
+    script. A walkthrough line typically names the script in one code span and the flag in
+    the next — `` `python ".../activity_timeline.py" <date>` … `--window HH:MM-HH:MM` `` —
+    which is why the unit is the line and the spans on it are joined. Inside a fenced block
+    every line is code; the fence lines themselves are dropped, so a language tag never
+    reads as a flag.
+    """
+    out = []
+    in_fence = False
+    for raw in text.splitlines():
+        if raw.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            code = raw.strip()
+        else:
+            code = " ".join(span.strip("`") for span in INLINE.findall(raw))
+        flags = set(FLAG.findall(code))
+        if flags:
+            out.append((code, flags))
+    return out
