@@ -22,6 +22,7 @@ pinned to something that lives somewhere else in the tree — the scripts the sk
 the glossary's own table — so an edit over there is what fails here.
 """
 
+import importlib.util
 import re
 
 import pytest
@@ -32,6 +33,24 @@ from shipped import CONTEXT_MD, QUOTED, SKILLS, table_cells
 RECONCILE = SKILLS / "reconcile"
 RECONCILE_MD = RECONCILE / "SKILL.md"
 DAILY_SCRIPTS = SKILLS / "daily" / "scripts"
+FLAG_SCAN = SKILLS / "daily" / "tests" / "flag_scan.py"
+
+
+def load_flag_scan():
+    """The `daily` suite's flag reader, imported by path.
+
+    By path rather than by adding that suite's directory to `sys.path`: this is a repo-level
+    suite with no skill on its import path, and the module in question imports nothing of
+    the skill's, so loading it reaches nothing else. It is the one reader of "which flags
+    does this script parse" — the `daily` inventory is held against it to equality, and
+    what follows here holds this skill against the same reading, so the two cannot disagree
+    about what a script accepts.
+    """
+    spec = importlib.util.spec_from_file_location("flag_scan_under_test", FLAG_SCAN)
+    assert spec and spec.loader, f"{FLAG_SCAN} is not importable as a module"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def skill_text() -> str:
@@ -184,6 +203,32 @@ def test_every_script_it_names_is_one_the_sibling_skill_actually_ships():
     missing = sorted(named - ships)
     assert named, "the skill names no script at all — it has nothing to investigate a day with"
     assert not missing, f"named but not shipped by the `daily` skill: {missing}"
+
+
+def test_every_flag_it_types_is_one_a_sibling_script_parses():
+    """The other half of the same pin (#31). This skill is a second copy of the `daily`
+    flags — `harvest_list.py --by-day`, `--window`, and `--full` as the one never to pass —
+    and the `daily` suite's inventory check reads `skills/daily/SKILL.md` alone. Rename a
+    flag there and that suite fails loudly while this skill goes on instructing a run to
+    pass a flag that no longer exists, which fails on every gap day as a usage error.
+
+    Inclusion, not equality: this skill cites the flags it uses and is not an inventory, so
+    a flag it does not name is not a finding. Read out of code spans and fenced blocks only,
+    because a walkthrough's prose is where `--` and a letter could meet by accident, and the
+    reader is the same one the `daily` inventory is held against, so both documents are
+    compared to one account of what each script accepts.
+    """
+    scan = load_flag_scan()
+    parsed: set[str] = set()
+    for script in DAILY_SCRIPTS.glob("*.py"):
+        parsed |= scan.flags_a_script_parses(script)
+    typed = scan.flags_a_document_types(shipped_text())
+    assert typed, "the skill types no flag at all — the check has nothing to read"
+    unparsed = sorted(typed - parsed)
+    assert not unparsed, (
+        f"the reconcile skill types flags no `daily` script parses: {unparsed}.\n"
+        "Every script this skill runs belongs to `daily`; a flag written here has to be one "
+        "of theirs, and the inventory in skills/daily/SKILL.md says which each accepts.")
 
 
 # --- it speaks the glossary -------------------------------------------------------------
