@@ -1222,7 +1222,7 @@ Found by the release mirror, not by the suite. `test_edge_catalogs.py` asserted
 `find_workspace() is None` as a precondition, having repointed only the cwd.
 `find_workspace()` also walks `SKILL_ROOT.parents[1:3]`, so the test passed from
 `~/.claude/skills/` and failed from the public checkout at
-`~/Admin/activitywatch-to-harvest/skill/` — `~/Admin` is a real workspace, and the walk
+`~/Admin/activity-to-timesheet/` — `~/Admin` is a real workspace, and the walk
 resolved to it. The suite structurally could not catch this: it only ever runs from one
 leg at a time, and it is `publish.ps1` running it from the *other* leg that made the
 dependency visible.

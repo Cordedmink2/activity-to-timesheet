@@ -294,7 +294,7 @@ def test_find_catalog_dir_falls_back_to_a_dot_mcp_under_the_current_directory(tm
     # SKILL_ROOT must be repointed too, not just the cwd. find_workspace() also walks the
     # directories the skill is installed under, so this test's result depended on where the
     # checkout happened to sit: it passed from `~/.claude/skills/`, and failed from the
-    # public repo at `~/Admin/activitywatch-to-harvest/skill/`, because `~/Admin` is a real
+    # public checkout at `~/Admin/activity-to-timesheet/`, because `~/Admin` is a real
     # workspace and the walk resolved to it. Caught by the release mirror, not by this suite.
     # docs/skills/daily/decision-log.md § "A test's result depended on where the checkout sat" has the entry.
     monkeypatch.chdir(tmp_path)
