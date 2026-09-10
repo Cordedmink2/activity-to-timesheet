@@ -515,7 +515,7 @@ uncertain, and asks before posting anything to Harvest.
 ```
 activity-to-timesheet/
 ├── README.md                 # you are here
-├── .github/ISSUE_TEMPLATE/   # the form behind "New issue"
+├── .github/ISSUE_TEMPLATE/   # the two forms behind "New issue": a problem, an idea
 ├── CHANGELOG.md              # what changed in each release
 ├── LICENSE                   # MIT
 ├── AGENTS.md                 # for agents working on the repo: how to verify, where a thing goes

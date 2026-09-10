@@ -1,5 +1,5 @@
-name: Skill problem or improvement
-description: The skill produced a wrong answer, skipped a guard, crashed, or should work differently.
+name: Skill problem
+description: A skill produced a wrong answer, skipped a guard, crashed, or its documentation is wrong.
 labels: ["skill"]
 body:
   - type: markdown
@@ -7,15 +7,30 @@ body:
       value: |
         Thanks for reporting. Before you fill this in:
 
-        **Redact first.** This skill reads window titles, screenshots and Harvest entries,
-        so its output carries client names, project codes, ticket numbers and file paths.
-        This issue is public. Replace anything client-identifying with a placeholder
-        (`ACME-001`, `Client A`, `<project>`) before pasting - the shape of the output is
-        what makes a report useful, not the real names.
+        **Redact first.** This plugin reads window titles, screenshots, your calendar and your
+        timesheet entries, so its output carries client names, project codes, work-item numbers
+        and file paths. This issue is public. Replace anything client-identifying with a
+        placeholder (`ACME-001`, `Client A`, `<project>`) before pasting - the shape of the
+        output is what makes a report useful, not the real names.
 
-        If the problem is that the skill doesn't know one of *your* clients, signals or
-        machine facts, that isn't a defect - those belong in your own
-        `Timesheets/.context.md`, not here.
+        If the problem is that a skill doesn't know one of *your* clients, signals or machine
+        facts, that isn't a defect - those belong in your own `Timesheets/.context.md`, not here.
+
+        Want it to work differently rather than reporting something broken? Use the
+        **Idea or improvement** form instead.
+
+  - type: dropdown
+    id: skill
+    attributes:
+      label: Which skill
+      options:
+        - daily - drafting and posting one day
+        - reconcile - sweeping a month for unbilled days
+        - setup - standing the pipeline up
+        - the install - the plugin install, update or the shared Agent Skills export
+        - not sure
+    validations:
+      required: true
 
   - type: dropdown
     id: kind
@@ -26,7 +41,6 @@ body:
         - A guard didn't fire, or a step was skipped
         - A script errored or crashed
         - Setup or installation problem
-        - The workflow should work differently (improvement)
         - The documentation is wrong or unclear
     validations:
       required: true
@@ -39,7 +53,7 @@ body:
         The version of the `billables` plugin. In Claude Code, `/plugin` lists it. On a
         shared Agent Skills export, it is the `Exporting billables v...` line the export
         printed. "Not sure" is better than a guess.
-      placeholder: "0.4.10"
+      placeholder: "0.8.0"
     validations:
       required: true
 
@@ -47,7 +61,7 @@ body:
     id: asked
     attributes:
       label: What you asked for
-      description: The request that started the run, and the date it was scoped to.
+      description: The request that started the run, and the date or month it was scoped to.
       placeholder: '"fill in Tuesday''s timesheet" - 2026-08-18, a day with two clients interleaved'
     validations:
       required: true
@@ -56,7 +70,7 @@ body:
     id: happened
     attributes:
       label: What the skill did
-      description: What it actually proposed, posted or reported. Redacted.
+      description: What it actually proposed, posted, reported or changed. Redacted.
     validations:
       required: true
 
@@ -72,17 +86,19 @@ body:
     attributes:
       label: Relevant output
       description: >
-        Script output that shows the problem - `afk_blocks.py --json`, an
-        `activity_timeline.py` rollup, a `harvest_lookup.py` miss. Redacted. Leave blank if
-        none applies.
+        Whatever shows the problem - a script's printed lines (`--json` output where the
+        script has it), the table or worklist the skill drafted, the check a setup step
+        reported, or the error text. Redacted. Leave blank if none applies.
       render: text
 
   - type: input
     id: where
     attributes:
       label: Where in the workflow
-      description: The SKILL.md step number or the script name, if you can pin it down. "Not sure" is a fine answer.
-      placeholder: "Step 6, or scripts/afk_blocks.py"
+      description: >
+        The step heading in that skill's `SKILL.md`, or the script name, if you can pin it
+        down. "Not sure" is a fine answer.
+      placeholder: "daily Step 6, setup step 4, or scripts/afk_blocks.py"
 
   - type: checkboxes
     id: redacted
@@ -90,6 +106,6 @@ body:
       label: Before submitting
       options:
         - label: >
-            I have removed client names, project codes, ticket numbers, personal file paths
+            I have removed client names, project codes, work-item numbers, personal file paths
             and any credentials from everything above.
           required: true

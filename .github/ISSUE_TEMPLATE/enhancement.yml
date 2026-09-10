@@ -1,0 +1,58 @@
+name: Idea or improvement
+description: A skill works as documented, and you want it to work differently or do something new.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. Two things before you fill this in:
+
+        **Redact first.** This plugin reads window titles, screenshots, your calendar and your
+        timesheet entries, so anything you quote from a run carries client names, project
+        codes, work-item numbers and file paths. This issue is public. Replace them with
+        placeholders (`ACME-001`, `Client A`, `<project>`) before pasting.
+
+        If what you want is for a skill to know one of *your* clients, signals or machine
+        facts, that isn't a change to the plugin - those belong in your own
+        `Timesheets/.context.md`, and the `daily` skill reads it every run.
+
+        Something broken rather than missing? Use the **Skill problem** form instead.
+
+  - type: dropdown
+    id: skill
+    attributes:
+      label: Which skill
+      options:
+        - daily - drafting and posting one day
+        - reconcile - sweeping a month for unbilled days
+        - setup - standing the pipeline up
+        - the install - the plugin install, update or the shared Agent Skills export
+        - the plugin as a whole, or not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: trying
+    attributes:
+      label: What you were trying to do
+      description: The situation, in a sentence or two. What the skill does today is fine to quote, redacted.
+    validations:
+      required: true
+
+  - type: textarea
+    id: wanted
+    attributes:
+      label: What you wanted instead
+      description: The outcome, not the implementation - what a run would show or do differently.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: redacted
+    attributes:
+      label: Before submitting
+      options:
+        - label: >
+            I have removed client names, project codes, work-item numbers, personal file paths
+            and any credentials from everything above.
+          required: true

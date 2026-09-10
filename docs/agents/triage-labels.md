@@ -13,3 +13,15 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
 Edit the right-hand column to match whatever vocabulary you actually use.
+
+## The other labels in use
+
+Not triage roles, and not drift either:
+
+- `bug`, `enhancement`, `documentation` — what the ticket is about. The two issue forms apply
+  `skill` (a problem reported through a skill's own reporting path) and `enhancement`.
+- `wayfinder:map` and `wayfinder:<type>` — the wayfinding infrastructure in
+  [`issue-tracker.md`](./issue-tracker.md) § "Wayfinding operations".
+
+The GitHub defaults `duplicate`, `invalid`, `question`, `good first issue` and `help wanted` were
+removed as unused (#46); `wontfix` stays because it is a triage role above.
