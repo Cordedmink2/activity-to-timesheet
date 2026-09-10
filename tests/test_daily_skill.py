@@ -129,6 +129,25 @@ def test_the_workflow_checks_the_category_rules_before_it_reads_the_timeline():
         "current, so a run with stale rules mislabels the day it has already read")
 
 
+def test_step_2_carries_the_two_words_the_staleness_check_answers_with():
+    """Both verdicts exit 0, so the exit code separates nothing — the words are the whole
+    difference, exactly as the calendar wrapper's two refusals are.
+
+    Read out of `status()`'s own source, so re-wording either one fails here and names the
+    step that has to move with it, rather than leaving Step 2 branching on a word no run
+    will ever see.
+    """
+    source = RULE_COMPILER.read_text(encoding="utf-8")
+    status = source.split("def status(", 1)[-1].split("\ndef ", 1)[0]
+    text = workflow()
+    for verdict in ("CURRENT", "STALE"):
+        assert f'"{verdict}' in status or f"'{verdict}" in status, (
+            f"`status()` no longer answers {verdict} — Step 2 branches on that word")
+        assert verdict in text, (
+            f"the workflow never says what to do about {verdict}, so a run has nothing to "
+            "branch on when the check comes back")
+
+
 def test_the_workflow_names_the_calendar_wrapper_it_ships():
     """A source a run never runs is a source the user configured and did not get.
 

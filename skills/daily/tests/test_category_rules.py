@@ -40,10 +40,13 @@ TEAMS = ("Teams.exe", "Chat | Ana Client | Microsoft Teams")
 
 # Every sample day carries these as well as whatever the test names, because a share is a
 # fraction and a two-title day makes one match 50% — every good rule would be refused as
-# over-broad, and the suite would be measuring its own fixture. Seven is enough that a rule
-# matching one title lands well under the ceiling. They share the word `filler`, which is
-# what the over-broad tests below match deliberately rather than by accident.
-FILLER = [("explorer.exe", f"Downloads filler {n}") for n in range(7)]
+# over-broad, and the suite would be measuring its own fixture. They are split by
+# application on purpose: a scoped rule's share is measured against the titles of the
+# application it is scoped to, so a day with three browser titles in it would refuse every
+# browser rule however narrow. They share the word `filler`, which is what the over-broad
+# tests below match deliberately rather than by accident.
+FILLER = ([("msedge.exe", f"Downloads filler {n}") for n in range(7)]
+          + [("Code.exe", f"filler{n}.py - Scratch - Visual Studio Code") for n in range(3)])
 BROAD = r"filler"
 
 
@@ -144,7 +147,7 @@ def test_a_pattern_matching_none_of_the_sample_is_refused(live_aw, workspace, tm
     server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
     result = compile_run(tmp_path, [candidate("Gamma", "profile_tag", r"\[GAMMA\]")])
     assert result.code == 1
-    assert f"matches none of the {sampled([ACME_ITEM, PERSONAL])} sampled titles" in result.out
+    assert "matches none of the 9 sampled browser titles" in result.out
     assert posted(server) == []
 
 
@@ -217,6 +220,26 @@ def test_rules_are_written_in_signal_rank_order_however_the_candidates_arrive(
     ])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Gamma", "Beta", "Acme"]
+
+
+def test_a_managed_fallback_rule_is_written_below_the_rules_the_plugin_did_not_author(
+        live_aw, workspace, tmp_path):
+    """The other half of "the more specific evidence wins", and the half that was wrong.
+
+    A profile tag identifies browser time carrying no other evidence — so it must lose to
+    anything more specific, *including* a rule the user made themselves. Written above one,
+    a managed tag takes the label off the user's own work-item rule: the same theft the tag
+    was narrowed to single-client profiles to prevent, arriving by another route, and worst
+    for the user who declined adoption and kept their rules.
+    """
+    server = live_aw(sample_day([ACME_ITEM, BETA_TAG, PERSONAL],
+                                classes=[("Theirs", r"ACM\d{3,}")]))
+    result = compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
+        candidate("Beta", "profile_tag", r"\[BETA\]"),
+    ])
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme", "Theirs", "Beta"]
 
 
 # --------------------------------------------------------------------------------------
@@ -316,9 +339,23 @@ def test_the_run_reads_the_rules_back_and_says_what_each_matched(
     assert result.code == 0, result.err
     total = sampled([ACME_ITEM, ACME_EDITOR, BETA_TAG, PERSONAL])
     assert f"VERIFY Acme work_item_prefix — 1 of {total} sampled titles" in result.out
-    assert f"VERIFY Beta profile_tag — 1 of {total} sampled titles" in result.out
+    assert "VERIFY Beta profile_tag — 1 of 10 sampled browser titles" in result.out
     assert len(server.sent("GET", "/settings")) >= 2, (
         "the rules have to be read *back* after the write, not assumed from what was sent")
+
+
+def test_a_failed_verify_leaves_the_rules_stale_rather_than_recording_a_write(
+        live_aw, workspace, tmp_path, monkeypatch):
+    """The stamp is what tomorrow's staleness check believes. Written before the verify, a
+    write that did not land is recorded as current: the next day reports `CURRENT`, skips
+    the rebuild, and labels the whole day against rules the activity source does not hold —
+    which is the exact failure the verify exists to catch, one day later and silent."""
+    context_file(workspace)
+    live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    monkeypatch.setattr(cr, "post_setting", lambda key, value: None)
+    assert compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 1
+    assert run_cli(cr, ["--status"]).out.startswith("STALE")
 
 
 def test_a_write_the_server_accepted_and_did_not_keep_fails_the_verify(
@@ -365,6 +402,38 @@ def test_inspect_names_a_grouping_category_rather_than_erroring_on_it(live_aw, w
     result = run_cli(cr, ["--inspect"])
     assert result.code == 0, result.err
     assert "RULE Work [unmanaged] — no regex" in result.out
+
+
+def test_a_rule_broad_within_its_own_application_is_refused_however_quiet_the_rest_of_the_day(
+        live_aw, workspace, tmp_path):
+    """The calibration case, and the one a whole-sample denominator lets through.
+
+    The ceiling was set from a rule matching 256 of 552 *browser* titles. Measured against
+    every window title that machine saw — Explorer, the editor, Teams — the same rule scores
+    well under it and is written. Here the day is mostly editor titles and the rule matches
+    most of the browsing: a browser-scoped rule can only ever match browser titles, so
+    browser titles are the population it is broad within.
+    """
+    browsing = [("msedge.exe", f"Acme news roundup {n} - news.example.com") for n in range(5)]
+    editing = [("Code.exe", f"module{n}.py - Other - Visual Studio Code") for n in range(30)]
+    server = live_aw(sample_day(browsing + editing))
+    result = compile_run(tmp_path, [candidate("Acme", "url_host", r"news\.example\.com")])
+    assert result.code == 1
+    assert "sampled browser titles" in result.out and "ceiling" in result.out
+    assert posted(server) == []
+
+
+def test_a_browser_profile_named_for_its_client_is_not_refused_as_the_clients_name(
+        live_aw, workspace, tmp_path):
+    """The two markers the *user* chose as a name for the client — the bracketed code and a
+    browser profile's name — are the client's name by construction. Refusing them would
+    refuse the ordinary case of the signal type the walkthrough offers, and a refusal
+    anywhere writes nothing at all."""
+    profile = ("msedge.exe", "Acme portal - acme.example.com - Acme - Dana - Microsoft Edge")
+    server = live_aw(sample_day([profile, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "browser_profile", r"Acme")])
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme"]
 
 
 # --------------------------------------------------------------------------------------
@@ -420,6 +489,53 @@ def test_a_new_rule_does_not_take_an_id_an_unmanaged_rule_is_already_using(
     compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
     written = posted(server)
     assert len({entry["id"] for entry in written}) == len(written)
+
+
+def test_adopting_a_rule_whose_name_is_not_the_clients_leaves_one_copy(
+        live_aw, workspace, tmp_path):
+    """The README told users to make `Work > Acme` for years, so the rule being adopted
+    usually is not named for the client alone. Replacing on the client's name only would
+    write a second flat `Acme` and leave the nested one above it forever — "adopted" in
+    words, doubled in fact. The candidate names what it takes over."""
+    server = live_aw(sample_day([ACME_ITEM, PERSONAL],
+                                classes=[("Work>Acme", r"\[ACME\]")]))
+    adopts = dict(candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"), adopts="Work>Acme")
+    result = compile_run(tmp_path, [adopts])
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme"]
+
+
+def test_a_client_no_longer_declared_loses_its_rule_rather_than_being_orphaned(
+        live_aw, workspace, tmp_path):
+    """The rules are a derived copy, so the managed set is regenerated whole. Left behind,
+    a dropped client's rule goes on labelling spans *and* reads back as the user's own at
+    the next inspect — so adoption would offer them their own leftover as something they
+    made."""
+    server = live_aw(sample_day([ACME_ITEM, BETA_TAG, PERSONAL]))
+    assert compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
+        candidate("Beta", "profile_tag", r"\[BETA\]"),
+    ]).code == 0
+    # The same server, so the second run reads back what the first one wrote — which is the
+    # whole scenario. A second fake would start empty and the assertion would pass on a run
+    # that had nothing to drop.
+    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    assert result.code == 0, result.err
+    writes = server.sent("POST", "/settings/classes")
+    assert len(writes) == 2
+    assert names(writes[-1]["body"]) == ["Acme"], "Beta's rule outlived Beta"
+    assert "DROPPED Beta" in result.out
+
+
+def test_a_managed_rule_edited_in_the_settings_dialog_is_reported_by_inspect(
+        live_aw, workspace, tmp_path):
+    """#69 story 5: a rule damaged by hand is recoverable. The staleness check cannot see
+    it — two local file reads — so this is where it surfaces, and a recompile is the fix."""
+    live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    assert compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 0
+    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Acme", r"something else")]))
+    assert "EDITED since it was written" in run_cli(cr, ["--inspect"]).out
 
 
 def test_an_over_broad_rule_of_the_users_own_is_surfaced_for_correction(
@@ -481,6 +597,17 @@ def test_status_reads_no_activity_source_at_all(live_aw, workspace, tmp_path):
     before = len(server.requests)
     assert run_cli(cr, ["--status"]).out.startswith("CURRENT")
     assert len(server.requests) == before, "--status touched the activity source"
+
+
+def test_status_leaves_no_directory_behind_where_no_workspace_resolves(tmp_path, monkeypatch):
+    """Step 2 runs this at the start of every day. A read that mints a `.mcp/` in whatever
+    folder the session happened to start in does it every day, and — since the state
+    directory became a refusal when it cannot be created — could fail a check the workflow
+    describes as costing a run nothing."""
+    monkeypatch.chdir(tmp_path)
+    result = run_cli(cr, ["--status"])
+    assert result.code == 0, result.err
+    assert not (tmp_path / ".mcp").exists()
 
 
 def test_a_workspace_with_no_context_file_is_stale_rather_than_current(workspace):

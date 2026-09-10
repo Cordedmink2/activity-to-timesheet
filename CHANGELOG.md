@@ -20,7 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the rules from here on, but it keeps every category it did not write, exactly as it is — `id` and
   all — and puts them below its own. The next `/billables:setup` run reads them, proposes which
   client and which signal each one is really matching, and asks once, as a single list you accept,
-  correct or skip. Skip and they go on working as they always did.
+  correct or skip. Skip and they go on working as they always did — above the profile tags the
+  plugin writes, so a rule of yours still wins a title it has real evidence for. An adopted rule
+  keeps one copy even where its category is not named for the client alone, which the nested
+  `Work > Acme` this README recommended for a long time is the ordinary case of.
 - **Adding a client is now one edit in one file.** Signals go under that client in
   `Timesheets/.context.md`; the rules follow on the next `/billables:daily` run. A rule you edit by
   hand in the settings dialog for a client the plugin manages is discarded at the next rebuild, so
@@ -42,10 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compile, one that matches none of your recent window titles, and one that matches more than 35% of
   them (`--max-share`, and a `## Preferences` line in the workspace template). A refusal anywhere
   writes nothing at all: the rule set is written whole, and a bad rule in it would outrank a good
-  one. Rule order is imposed by signal type rather than accepted — most specific first, the profile
-  tag deliberately last — so when two clients' rules both match a span, the more specific evidence
-  wins. A signal type that never reaches a window title, a local repository path, is skipped with
-  the reason said out loud rather than refused.
+  one. A **scoped** signal is judged against the titles of the application it is scoped to, not the
+  whole day: the ceiling was calibrated on 256 of 552 *browser* titles, and measuring that same rule
+  against every Explorer and editor window the machine saw would let it through. Rule order is
+  imposed by signal type rather than accepted — most specific first, and the fallback signals (a
+  profile tag, a browser profile's name) written **below even the rules this plugin did not
+  author**, so the more specific evidence wins a span two rules both match whoever wrote them. A
+  signal type that never reaches a window title, a local repository path, is skipped with the reason
+  said out loud rather than refused.
 - **Rules become more specific rather than less.** Because the timeline matches a rule against the
   window's app name *and* its title, a rule can name the application it applies to — so a client's
   environment address is matched in a browser window and an editor workspace in an editor, and the
@@ -56,14 +63,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `daily` skill checks a stamp at the start of every run — two local file reads, nothing over the
   wire — and rebuilds when that file has moved under them. A change the skill proposed and you
   approved rebuilds inside that same approval rather than asking twice; a hand-edit you made last
-  week is caught by the check. A run whose context file has not changed writes nothing to the
+  week is caught by the check. The managed set is regenerated whole, so a client you drop from that
+  file loses its rule (reported as `DROPPED`) instead of going on labelling spans as something
+  nobody declared. What was written is recorded only once the verify passes, so a write that did not
+  land leaves the rules stale and the next run rebuilds them rather than trusting yesterday's
+  record. A run whose context file has not changed writes nothing to the
   activity source, and a rebuild the gate refuses reports itself and does not stop the day being
   drafted: a category is a first-pass signal that Steps 4 and 5 check anyway.
 - **A recovery path, and a way to see what is there.** The previous rule set is copied into
   `<workspace>/.mcp/` before the first write of a run — which is what makes the write safe to
   perform without asking you to read a diff — and `--inspect` reports every rule the activity source
   holds, marked managed or yours, with the share of your recent titles it matches and an example of
-  what it caught.
+  what it caught — and marked `EDITED` where a rule this plugin wrote has been changed in the
+  settings dialog since, which the staleness check cannot see because it reads no rules at all. A
+  rule you damaged by hand is put back by recompiling; the set as it was before any write of this
+  plugin's is the backup.
 
 ### Changed
 - **`aw_client.py` gained a write path**, `post_setting()`, and it is the only thing this plugin

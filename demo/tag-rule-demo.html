@@ -320,13 +320,13 @@ const SCENARIOS = [
   {
     id: "general",
     title: "5 · A tag on the profile you use for everything",
-    blurb: "Brackets end to end, every rule healthy — and still wrong. Tagging the profile you use for everything looks like more coverage; it is the opposite. The first matching rule wins, so that profile's tag claims every page in it, including the ones whose own address names a different client. Untag it and the page decides. This is why a profile tag belongs only on a profile dedicated to one client, and why the compiler ranks a tag below every other signal.",
+    blurb: "Brackets end to end, every rule healthy — and still wrong. Tagging the profile you use for everything looks like more coverage; it is the opposite. That profile's tag matches every page opened in it, including the ones whose own address names a different client — and in ActivityWatch the first matching rule is the one that labels the block, so which client the hour bills to comes down to rule order rather than to evidence. Untag it and only the page's own address matches, so the page decides. This is why a profile tag belongs on a profile dedicated to one client and nowhere else, and why the plugin writes tags below every other rule — including rules it did not write itself.",
     steps: [
       { label: "Reset to repo defaults", actions: [{ type: "RESET" }] },
       { label: "Give ACME the rule the plugin actually writes", note: "the SharePoint address their work lives at — a signal, not a tag", actions: [{ type: "SET_RULE", client: "ACME", regex: "acmetrust\\.sharepoint" }] },
       { label: "Do ACME work in the Personal profile", note: "untagged so far: the address alone attributes it, correctly", actions: [{ type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
       { label: "Now tag the Personal profile too", note: "the old advice — a code on every profile", actions: [{ type: "SET_PROFILE_CODE", profile: "Personal", code: "PERSONAL" }, { type: "SET_RULE", client: "Personal", regex: "\\[PERSONAL\\]" }] },
-      { label: "Re-run that same hour of ACME work", note: "two rules match one window now — and the tag is the one ordered to lose", actions: [{ type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
+      { label: "Re-run that same hour of ACME work", note: "two rules match one window now: the client's own address, and the profile's tag — the hour is no longer unambiguously ACME's", actions: [{ type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
       { label: "Untag the general profile", note: "the fix: clear its title format. The page's own evidence decides again", actions: [{ type: "SET_PROFILE_CODE", profile: "Personal", code: null }, { type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
     ],
   },

@@ -2348,6 +2348,22 @@ and 5, is shown at review, and cannot reach an invoice. The recovery path is the
 `.mcp/` before the first write of a run — which is also what makes it defensible to write without
 showing the user a diff, since the diff would be a regular expression they were never meant to read.
 
+**Two things the first implementation got wrong, both found by review before release, both of the
+same shape — a rule that is right in isolation and wrong against the population it meets:**
+
+1. **A share needs the denominator the ceiling was calibrated on.** The gate divided matches by the
+   whole sample while 0.35 was set from *browser* titles. On a real machine — where Explorer, the
+   editor and Teams are most of the window titles — the exact rule the ceiling exists to refuse
+   scores around 0.28 and is written. A browser-scoped rule can only ever match browser titles, so
+   the browser titles are the population it is broad *within*; `denominator()` now says so. Any
+   future threshold over a sample wants the same question asked of it: broad compared to *what*.
+2. **Ordering the managed rules above the user's own re-creates the theft it was written to stop.**
+   `merged()` first wrote every managed rule ahead of every unmanaged one, which put a managed
+   profile tag (rank 90) above a user's own work-item rule. That is exactly the general-profile
+   failure below, arriving by a different route, and worst for the user who *declined* adoption and
+   kept their rules. The fix is that the ranking is a property of the signal and not of who wrote
+   the rule: specific rules, then everything the plugin did not author, then the fallbacks.
+
 ### A general browser profile carrying a profile tag — rung 2, reasoned from first-match-wins, #72
 
 **The rule that changed:** a profile tag belongs only on a browser profile dedicated to one client.

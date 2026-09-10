@@ -281,7 +281,15 @@ parent would change the label everything downstream matches on.
 
 After that the rules stay current on their own: they are compiled from the signals in your
 `Timesheets/.context.md`, and a run rebuilds them when that file changes, so a client you added last
-week is matching this week.
+week is matching this week. That file is the source of truth, so a category you edit in the settings
+dialog for a client the plugin manages is replaced at the next rebuild — change the file, not the
+dialog. Drop a client from the file and its rule goes with it.
+
+**If your ActivityWatch is too old to take the write** — some builds have no settings endpoint at
+all — setup says so out loud and walks you through the same rules by hand instead, then verifies
+them the same way: **Settings → Categories**, **add a category** named for the client, give it a
+**Regex** rule matching that client's bracketed code (`\[ACME\]`), and **save each one as you go**
+rather than all at the end.
 
 > **What that machinery is for:** open [`demo/tag-rule-demo.html`](./demo/tag-rule-demo.html) in a
 > browser — one self-contained file, nothing to install. Its guided walkthroughs show a mismatched

@@ -89,6 +89,17 @@ SIGNAL_RANK = {
     "profile_tag": (90, "browser"),
 }
 
+# At or above this rank a signal is a *fallback*: it identifies browser time carrying no
+# other evidence, and it is deliberately beaten by anything more specific — including a rule
+# this plugin did not write. See `merged()`, which is where that ordering is imposed.
+FALLBACK_RANK = 80
+
+# The two signals that are the client's name by construction, because the user chose them as
+# a name for the client: the bracketed code the extension injects, and the name they gave a
+# browser profile. Exempt from the "never just the client's name" refusal, which is about
+# evidence the work produced rather than a marker the user configured.
+NAMED_BY_THE_USER = {"profile_tag", "browser_profile"}
+
 # A signal type that is real, declared by users, and never reaches a window title — so it is
 # skipped rather than refused, with the reason said out loud. On the machine this was
 # specified against there is no editor bucket at all, and an editor titles its window with
@@ -167,6 +178,35 @@ def compose(pattern: str, signal: str) -> str:
     return f"^(?:{SCOPES[scope]}).*(?:{pattern})"
 
 
+def matching(regex: str, sample: list[str]) -> list[str]:
+    """The sampled titles a regex matches, case-insensitively.
+
+    One implementation, because the three callers — the gate, the verify and `--inspect` —
+    are asking the same question and were asking it three ways. The case flag is the third
+    copy that mattered: `merged()` writes every rule with `ignore_case: true`, so a reader
+    that compiled without it would report a share the activity source will not reproduce.
+    """
+    compiled = re.compile(regex, re.IGNORECASE)
+    return [haystack for haystack in sample if compiled.search(haystack)]
+
+
+def denominator(signal: str, sample: list[str]) -> tuple[list[str], str]:
+    """The titles a rule's share is measured against, and what to call them.
+
+    Not the whole sample, for a scoped signal. The ceiling was calibrated on a rule matching
+    **256 of 552 browser titles** in one day; measured against every window title that
+    machine saw — Explorer, the editor, Teams — the same rule scores well under the ceiling
+    and is written. A browser-scoped rule can only ever match browser titles, so the browser
+    titles are the population it is broad *within*, and comparing it to anything else scales
+    the number by how much of the day was spent outside a browser.
+    """
+    scope = SIGNAL_RANK[signal][1]
+    if not scope:
+        return sample, "sampled titles"
+    anchor = re.compile(f"^(?:{SCOPES[scope]})", re.IGNORECASE)
+    return [h for h in sample if anchor.match(h)], f"sampled {scope} titles"
+
+
 def judge(candidate: dict, sample: list[str], max_share: float) -> dict:
     """One candidate, decided: `verdict` is `write`, `skip` or `refuse`, with a `reason`
     for the two that are not `write`, and the matching that earned it.
@@ -191,26 +231,27 @@ def judge(candidate: dict, sample: list[str], max_share: float) -> dict:
         return verdict("refuse", f"unknown signal type '{signal}' — the types that compile "
                                  f"are {', '.join(sorted(SIGNAL_RANK))}, and "
                                  f"{', '.join(sorted(NOT_IN_A_TITLE))} never reaches a title")
-    if signal != "profile_tag" and _is_only_the_clients_name(pattern, client):
+    if signal not in NAMED_BY_THE_USER and _is_only_the_clients_name(pattern, client):
         return verdict("refuse", f"the pattern is only the client's name. A category named "
                                  f"for {client} that matches the word {client} labels every "
                                  f"unrelated page that mentions them; match a signal instead")
     regex = compose(pattern, signal)
     out["regex"] = regex
     try:
-        compiled = re.compile(regex, re.IGNORECASE)
+        re.compile(regex)
     except re.error as exc:
         return verdict("refuse", f"the pattern does not compile: {exc}")
-    out["matched"] = sum(1 for haystack in sample if compiled.search(haystack))
-    out["share"] = out["matched"] / len(sample) if sample else 0.0
+    population, called = denominator(signal, sample)
+    out["matched"] = len(matching(regex, population))
+    out["share"] = out["matched"] / len(population) if population else 0.0
     if not out["matched"]:
         scope = SIGNAL_RANK[signal][1]
         scoped = f", scoped to a {scope} window," if scope else ""
-        return verdict("refuse", f"matches none of the {len(sample)} sampled titles{scoped} "
+        return verdict("refuse", f"matches none of the {len(population)} {called}{scoped} "
                                  f"— a rule that matches nothing leaves that client's whole "
                                  f"day uncategorized")
     if out["share"] > max_share:
-        return verdict("refuse", f"matches {out['matched']} of {len(sample)} sampled titles "
+        return verdict("refuse", f"matches {out['matched']} of {len(population)} {called} "
                                  f"({out['share']:.0%}), over the {max_share:.0%} ceiling. "
                                  f"The first matching rule wins, so a rule this broad takes "
                                  f"the label off a correct one; match a narrower signal")
@@ -221,9 +262,11 @@ def _is_only_the_clients_name(pattern: str, client: str) -> bool:
     """Whether a pattern is the client's name and nothing else.
 
     Read after stripping the regex punctuation, so `\\bAcme\\b` and `(?:Acme)` are caught
-    along with the bare word. A `profile_tag` is exempt at the call site: the whole of that
-    marker *is* the client's code in brackets, which is what makes it the one signal a user
-    configures rather than one the work produces.
+    along with the bare word. `NAMED_BY_THE_USER` is exempt at the call site: those two
+    markers are things the user *called* the client — a bracketed code, a browser profile's
+    name — so being the client's name is what they are, and refusing that would refuse the
+    ordinary case. Every other type is evidence the work produced, where the client's name
+    on its own labels every unrelated page that mentions them.
     """
     bare = re.sub(r"\\b|\(\?:|\(\?i\)", "", pattern)
     bare = re.sub(r"[\\^$()\[\]{}?*+|]", "", bare).strip()
@@ -254,11 +297,20 @@ def read_classes() -> list[dict]:
     """
     try:
         settings = get("/settings")
-    except Exception as exc:
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise Refusal(f"the activity source answered {exc.code} for its settings "
+                          f"({exc.reason}); nothing has been written.") from None
         raise Refusal(
-            f"the activity source would not answer for its settings ({exc}). On a build "
-            f"with no settings endpoint the rules have to be entered by hand — the `setup` "
-            f"skill's category step has that fallback, and it verifies the result.") from None
+            f"this activity source has no settings endpoint ({exc}), so the rules cannot be "
+            f"written to it. They have to be entered by hand — the `setup` skill's category "
+            f"step has that fallback, and it verifies the result.") from None
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise Refusal(
+            f"the activity source would not answer for its settings ({exc}). That is the "
+            f"source being unreachable rather than a build that has no such endpoint, so "
+            f"re-entering the rules by hand would not help; nothing has been written."
+        ) from None
     return [c for c in settings.get("classes", []) if isinstance(c, dict)]
 
 
@@ -279,25 +331,43 @@ def class_regex(entry: dict) -> str | None:
     return rule.get("regex") or None
 
 
-def merged(existing: list[dict], writing: list[dict]) -> list[dict]:
-    """The `classes` list to send: the rules being written, in rank order, then everything
-    the plugin did not author, untouched and in the order it was already in.
+def merged(existing: list[dict], writing: list[dict], previously: set[str],
+           adopting: set[str]) -> list[dict]:
+    """The `classes` list to send, in the order the labels are decided in.
 
-    Managed first because the order decides the span's label, and the rules compiled from
-    the user's own declared signals are the ones that should win. A class whose name is one
-    of the clients being written is *replaced* — that is what makes a rebuild a rebuild
-    rather than a second copy — and anything else is kept exactly as it was, `id` and all.
+    Three groups, and the order is the whole point, because `categorize()` takes the *first*
+    matching class as a span's label:
+
+      1. the specific rules being written — a work item number, an environment address, an
+         editor workspace;
+      2. everything the plugin did not author, untouched and in the order it was already in;
+      3. the **fallback** rules being written, a profile tag and a profile name.
+
+    Putting group 3 last rather than with the rest of the managed set is what makes "the more
+    specific evidence wins" true against the user's *own* rules as well as against ours. A
+    managed profile tag above a user's work-item rule would take the label off it — the same
+    theft the tag was narrowed to single-client profiles to prevent, arriving by a different
+    route, and worst for the user who skipped adoption and kept their rules.
+
+    **The managed set is regenerated whole.** A class is dropped when it is named by a client
+    being written, by `previously` (what the last write recorded), or by `adopting` (a rule
+    the user agreed to have taken over, whose name need not be the client's — an adopted
+    `Work > Acme` is dropped and rewritten flat). So a client removed from `.context.md`
+    loses its rule instead of being orphaned into the user's own set, and an adopted rule
+    leaves one copy rather than two. Everything else is kept exactly as it was, `id` and all.
     """
-    clients = {j["client"] for j in writing}
-    kept = [entry for entry in existing if class_name(entry) not in clients]
+    replaced = {j["client"] for j in writing} | previously | adopting
+    kept = [entry for entry in existing if class_name(entry) not in replaced]
     ids = [entry["id"] for entry in existing if isinstance(entry.get("id"), int)]
     next_id = max(ids) + 1 if ids else 0
-    out = []
-    for offset, judged in enumerate(writing):
-        out.append({"id": next_id + offset,
-                    "name": [judged["client"]],
-                    "rule": {"type": "regex", "regex": judged["regex"], "ignore_case": True}})
-    return out + kept
+    ours = [(SIGNAL_RANK[judged["signal"]][0],
+             {"id": next_id + offset,
+              "name": [judged["client"]],
+              "rule": {"type": "regex", "regex": judged["regex"], "ignore_case": True}})
+            for offset, judged in enumerate(writing)]
+    specific = [entry for rank, entry in ours if rank < FALLBACK_RANK]
+    fallback = [entry for rank, entry in ours if rank >= FALLBACK_RANK]
+    return specific + kept + fallback
 
 
 # --------------------------------------------------------------------------------------
@@ -426,13 +496,17 @@ def compile_rules(source: str, days: int, max_share: float, directory: Path) -> 
         print("ERR nothing written: no candidate compiled into a rule", file=sys.stderr)
         return 1
 
+    adopting = {name for candidate in candidates
+                for name in _named_list(candidate.get("adopts"))}
     existing = read_classes()
-    sending = merged(existing, writing)
+    previously = managed_clients(directory)
+    sending = merged(existing, writing, previously, adopting)
+    dropped = sorted({class_name(e) for e in existing} - {class_name(e) for e in sending})
     backup = back_up(existing, directory)
     print(f"BACKUP {backup}")
     try:
         post_setting("classes", sending)
-    except Exception as exc:
+    except (urllib.error.URLError, OSError, ValueError) as exc:
         raise Refusal(
             f"the activity source refused the write ({exc}). Nothing changed, and the rule "
             f"set as it was is in {backup}. The `setup` skill's category step falls back to "
@@ -440,9 +514,25 @@ def compile_rules(source: str, days: int, max_share: float, directory: Path) -> 
         ) from None
     print(f"WROTE {len(writing)} rules for {len({j['client'] for j in writing})} clients; "
           f"{len(sending) - len(writing)} rules left as they were")
+    for name in dropped:
+        print(f"DROPPED {name} — this plugin wrote it and nothing declares it now")
 
-    write_stamp(directory, writing)
-    return verify(writing, sample)
+    code = verify(writing, sample)
+    if code == 0:
+        # Only now. The stamp is what tomorrow's staleness check believes, so recording a
+        # write that did not land would report the rules current against a source that does
+        # not hold them — and the run that would have rebuilt them skips.
+        write_stamp(directory, writing)
+    return code
+
+
+def _named_list(value) -> list[str]:
+    """A candidate's `adopts` — one existing category name, or several, or nothing."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [v for v in value if isinstance(v, str)]
+    return []
 
 
 def verify(writing: list[dict], sample: list[str]) -> int:
@@ -465,10 +555,10 @@ def verify(writing: list[dict], sample: list[str]) -> int:
                   f"activity source reads back — the write did not land", file=sys.stderr)
             missing += 1
             continue
-        matched = sum(1 for haystack in sample
-                      if re.search(judged["regex"], haystack, re.IGNORECASE))
-        print(f"VERIFY {judged['client']} {judged['signal']} — {matched} of {len(sample)} "
-              f"sampled titles")
+        population, called = denominator(judged["signal"], sample)
+        matched = len(matching(judged["regex"], population))
+        print(f"VERIFY {judged['client']} {judged['signal']} — {matched} of "
+              f"{len(population)} {called}")
     return 1 if missing else 0
 
 
@@ -500,25 +590,31 @@ def inspect(days: int, max_share: float, directory: Path) -> int:
     if not classes:
         print("RULES none — the activity source holds no categories")
         return 0
-    managed = managed_clients(directory)
+    written = {rule.get("client"): rule.get("regex")
+               for rule in (read_stamp(directory) or {}).get("rules", [])}
     for entry in classes:
         name = class_name(entry) or "(unnamed)"
-        held = "managed" if name in managed else "unmanaged"
+        held = "managed" if name in written else "unmanaged"
         regex = class_regex(entry)
         if not regex:
             print(f"RULE {name} [{held}] — no regex (a grouping category), matched against "
                   f"nothing")
             continue
+        # A managed rule whose pattern is not the one the stamp recorded has been edited in
+        # the settings dialog since. The staleness check cannot see this — it reads two local
+        # files and nothing over the wire — so this is where a rule damaged by hand surfaces,
+        # and a recompile is what puts it back (#69 story 5).
+        edited = " EDITED since it was written" if (
+            held == "managed" and written.get(name) != regex) else ""
         try:
-            compiled = re.compile(regex, re.IGNORECASE)
+            hits = matching(regex, sample)
         except re.error as exc:
             print(f"RULE {name} [{held}] — does not compile ({exc}): {regex}")
             continue
-        hits = [haystack for haystack in sample if compiled.search(haystack)]
         share = len(hits) / len(sample) if sample else 0.0
         over = f"  OVER the {max_share:.0%} ceiling" if share > max_share else ""
-        print(f"RULE {name} [{held}] — {len(hits)} of {len(sample)} titles ({share:.0%})"
-              f"{over}  regex: {regex}")
+        print(f"RULE {name} [{held}]{edited} — {len(hits)} of {len(sample)} titles "
+              f"({share:.0%}){over}  regex: {regex}")
         for example in hits[:2]:
             print(f"     e.g. {example[:100]}")
     return 0
@@ -586,9 +682,11 @@ def main():
         if args.inspect:
             return inspect(args.days, args.max_share,
                            state_dir(args.workspace, create=False))
-        directory = state_dir(args.workspace)
         if args.status:
-            return status(directory)
+            # Read-only, and run at the start of every day: it must not mint a directory in
+            # whatever folder the session started in, nor fail because it could not.
+            return status(state_dir(args.workspace, create=False))
+        directory = state_dir(args.workspace)
         return compile_rules(args.candidates, args.days, args.max_share, directory)
     except Refusal as exc:
         print(f"ERR {exc}", file=sys.stderr)
