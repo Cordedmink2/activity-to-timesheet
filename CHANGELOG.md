@@ -5,6 +5,82 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-10
+
+### Upgrading
+- **A profile tag now belongs only on a browser profile you use for one client** (#72). If you
+  tagged a general or default profile — the one you use for everything, which is what the previous
+  walkthrough told you to do — clear its title format back to `{title}-{hostname}{path}{args}{hash}`
+  in the URL-in-Title options. Nothing fails if you don't, and that is the problem: the first
+  matching rule wins, so a general profile's tag claims every page in it, including the hour of
+  Acme's work you did there because the tool was already open. `/billables:setup` walks the change
+  and checks the general profile carries no code. `demo/tag-rule-demo.html` § 5 shows the hour
+  moving.
+- **Your existing category rules are untouched, and offered for adoption once.** The plugin writes
+  the rules from here on, but it keeps every category it did not write, exactly as it is — `id` and
+  all — and puts them below its own. The next `/billables:setup` run reads them, proposes which
+  client and which signal each one is really matching, and asks once, as a single list you accept,
+  correct or skip. Skip and they go on working as they always did.
+- **Adding a client is now one edit in one file.** Signals go under that client in
+  `Timesheets/.context.md`; the rules follow on the next `/billables:daily` run. A rule you edit by
+  hand in the settings dialog for a client the plugin manages is discarded at the next rebuild, so
+  edit the file rather than the dialog.
+
+### Added
+- **The plugin owns the ActivityWatch category rules** (#69). `scripts/category_rules.py` compiles
+  them from the signals you declared, gates each one, orders them, backs the old set up and writes
+  it, then reads them back and verifies. Setting this plugin up no longer asks you to type a regular
+  expression into a settings dialog, and no run shows you one. The step it replaces was the one most
+  likely to be wrong in a way nobody notices: a rule matching nothing leaves a client's whole day
+  uncategorized, and a rule matching too much is worse than noise, because the timeline takes the
+  *first* matching category as a span's label and an over-broad rule therefore takes the label off a
+  correct one. On the maintainer's own machine a bare-word rule matched 256 of 552 browser titles in
+  a single day.
+- **The gate, which is the point of the split** (#71). A run composes the pattern for a signal —
+  that is judgement, over a file that holds prose and hints, and no parser should be asked to do it
+  — and the script judges what was composed, which is not. It refuses a pattern that does not
+  compile, one that matches none of your recent window titles, and one that matches more than 35% of
+  them (`--max-share`, and a `## Preferences` line in the workspace template). A refusal anywhere
+  writes nothing at all: the rule set is written whole, and a bad rule in it would outrank a good
+  one. Rule order is imposed by signal type rather than accepted — most specific first, the profile
+  tag deliberately last — so when two clients' rules both match a span, the more specific evidence
+  wins. A signal type that never reaches a window title, a local repository path, is skipped with
+  the reason said out loud rather than refused.
+- **Rules become more specific rather than less.** Because the timeline matches a rule against the
+  window's app name *and* its title, a rule can name the application it applies to — so a client's
+  environment address is matched in a browser window and an editor workspace in an editor, and the
+  client's name appearing in an unrelated page title attributes nothing. The script anchors that
+  itself, on both the Windows and macOS spellings of each application, so a composed pattern never
+  carries one. Editor time now carries a client label without a screenshot being opened.
+- **The rules stay current on their own** (#74). They are a derived copy of `.context.md`, so the
+  `daily` skill checks a stamp at the start of every run — two local file reads, nothing over the
+  wire — and rebuilds when that file has moved under them. A change the skill proposed and you
+  approved rebuilds inside that same approval rather than asking twice; a hand-edit you made last
+  week is caught by the check. A run whose context file has not changed writes nothing to the
+  activity source, and a rebuild the gate refuses reports itself and does not stop the day being
+  drafted: a category is a first-pass signal that Steps 4 and 5 check anyway.
+- **A recovery path, and a way to see what is there.** The previous rule set is copied into
+  `<workspace>/.mcp/` before the first write of a run — which is what makes the write safe to
+  perform without asking you to read a diff — and `--inspect` reports every rule the activity source
+  holds, marked managed or yours, with the share of your recent titles it matches and an example of
+  what it caught.
+
+### Changed
+- **`aw_client.py` gained a write path**, `post_setting()`, and it is the only thing this plugin
+  writes to the activity source: configuration, never data (#70). ADR-0007 is amended for it — the
+  boundary is drawn on *what a mistake costs* rather than on direction, which is the argument its
+  own context section already made. A wrong category rule mislabels a span, is shown to you at
+  review and cannot reach an invoice; the confirmation gate stays where the expensive mistake is.
+  ADR-0005 is amended in place: four of its five manual steps are still manual, and this one is not.
+- **The glossary distinguishes three things that were all called a tag** (#70): a **profile tag** is
+  the bracketed marker the extension injects, a **client code** is the short name inside it, and a
+  **signal** is client evidence the work itself produces. The distinction is what the ordering above
+  is stated in.
+- **`references/first-run.md`, the README's category section and the tag-rule demo** no longer
+  describe a category rule as a bare client code (#75). The demo's first walkthrough is now framed
+  as what the gate refuses, and a fifth shows an hour of a client's work being claimed by a general
+  profile's tag and then correctly attributed once that tag is cleared.
+
 ## [0.7.1] - 2026-09-09
 
 ### Changed

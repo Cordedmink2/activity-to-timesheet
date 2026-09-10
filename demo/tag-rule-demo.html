@@ -85,8 +85,9 @@
     <strong>If the tag format and the rule disagree, nothing matches — silently.</strong>
     This demo lets you push realistic window titles through a tag convention and a set of
     rules, and see exactly which titles categorise where, which fall through, and which land
-    on the <em>wrong</em> client. It's why the setup docs recommend bracketed tags like
-    <code>[ACME]</code> — and insist you verify against real events either way. All clients
+    on the <em>wrong</em> client. The plugin now writes those rules for you and refuses one
+    that matches nothing or matches half your day — this is what it is refusing, and why a
+    profile tag belongs only on a browser profile dedicated to a single client. All clients
     and URLs here are fictional.
   </p>
 
@@ -157,8 +158,15 @@ const TagRuleModel = (() => {
       case "SET_TAG_STYLE":
         return { ...state, tagStyle: action.style };
       case "SET_RULE":
-        return { ...state, rules: state.rules.map(r =>
-          r.client === action.client ? { ...r, regex: action.regex } : r) };
+        return state.rules.some(r => r.client === action.client)
+          ? { ...state, rules: state.rules.map(r =>
+              r.client === action.client ? { ...r, regex: action.regex } : r) }
+          : { ...state, rules: [...state.rules,
+              { client: action.client, regex: action.regex, ignoreCase: true }] };
+      case "SET_PROFILE_CODE":
+        // A profile's tag, set or cleared. Clearing one is the fix for scenario 5: a
+        // profile you use for more than one client should carry no tag at all.
+        return { ...state, profiles: { ...state.profiles, [action.profile]: action.code } };
       case "SET_ALL_RULES_BARE":
         return { ...state, rules: state.rules.map(r => {
           const code = state.profiles[r.client];
@@ -200,8 +208,12 @@ const TagRuleModel = (() => {
                 : renderTag(state.tagStyle, state.profiles[ev.profile]);
       const title = buildTitle(ev.page, ev.url, ev.profile === null ? null : tag);
       const matches = compiled.filter(r => r.re && r.re.test(title)).map(r => r.client);
-      const expected = ev.profile !== null && state.profiles[ev.profile] !== null
-                     ? ev.profile : null;   // which client this activity belongs to, if any
+      // Which client this activity belongs to, if any. Normally the profile says — but an
+      // event may name its own `owner`, which is how a general profile is modelled: the work
+      // in it belongs to whoever the page is about, not to whatever the profile is tagged.
+      const expected = ev.owner !== undefined ? ev.owner
+                     : (ev.profile !== null && state.profiles[ev.profile] !== null
+                        ? ev.profile : null);
       let verdict;
       if (expected === null) {
         verdict = matches.length === 0 ? "none"
@@ -251,6 +263,8 @@ const ACTIONS = [
     events: [{ page: "How Stripe handles ledger reconciliation at scale", url: "https://news.example.com/", profile: "Personal" }] },
   { id: "pers-nimbus", label: "Watch a stand-mixer review (Personal profile)", profile: "Personal",
     events: [{ page: "Nimbus 9000 stand mixer review - YouTube", url: "https://youtube.com/", profile: "Personal" }] },
+  { id: "pers-acme", label: "Do ACME work in the Personal profile", profile: "Personal",
+    events: [{ page: "Contract 5-02-011 Sunnyfield - variation memo", url: "https://acmetrust.sharepoint.example.com/", profile: "Personal", owner: "ACME" }] },
   { id: "terminal",  label: "Work in the terminal (no browser)", profile: null,
     events: [{ page: "Set up the activity-to-timesheet billables plugin", url: null, profile: null }] },
   { id: "acme-explorer", label: "Browse the ACME folder in File Explorer", profile: null,
@@ -263,7 +277,7 @@ const SCENARIOS = [
   {
     id: "mismatch",
     title: "1 · The mismatch that bites",
-    blurb: "The docs say bracketed tags; a first-time setup ends up with bare codes in the extension while the rules still expect brackets. Everything looks configured. Watch the day land: every rule is dead, every browser block uncategorised — and nothing ever told you.",
+    blurb: "The classic: bare codes in the extension while the rules expect brackets. Everything looks configured. Watch the day land — every rule dead, every browser block uncategorised, and nothing ever told you. This is the one the plugin now refuses to ship: it writes the rules itself and tests each one against your real window titles first, so a rule matching none of them is rejected at setup with the reason, instead of surfacing a fortnight later as an empty timesheet. What you are looking at here is what that check is for.",
     steps: [
       { label: "Reset to repo defaults (bracketed rules)", actions: [{ type: "RESET" }] },
       { label: "Extension gets set up with bare codes", note: "tag becomes “… ACME - Google Chrome”, rules still say \\[ACME\\]", actions: [{ type: "SET_TAG_STYLE", style: "bare" }] },
@@ -301,6 +315,19 @@ const SCENARIOS = [
     steps: [
       { label: "Reset to repo defaults", note: "bracketed tags, bracketed rules", actions: [{ type: "RESET" }] },
       { label: "Simulate a full day", note: "compare the summary with scenario 2's", actions: [{ type: "ADD_EVENTS", eventsFrom: "full-day" }] },
+    ],
+  },
+  {
+    id: "general",
+    title: "5 · A tag on the profile you use for everything",
+    blurb: "Brackets end to end, every rule healthy — and still wrong. Tagging the profile you use for everything looks like more coverage; it is the opposite. The first matching rule wins, so that profile's tag claims every page in it, including the ones whose own address names a different client. Untag it and the page decides. This is why a profile tag belongs only on a profile dedicated to one client, and why the compiler ranks a tag below every other signal.",
+    steps: [
+      { label: "Reset to repo defaults", actions: [{ type: "RESET" }] },
+      { label: "Give ACME the rule the plugin actually writes", note: "the SharePoint address their work lives at — a signal, not a tag", actions: [{ type: "SET_RULE", client: "ACME", regex: "acmetrust\\.sharepoint" }] },
+      { label: "Do ACME work in the Personal profile", note: "untagged so far: the address alone attributes it, correctly", actions: [{ type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
+      { label: "Now tag the Personal profile too", note: "the old advice — a code on every profile", actions: [{ type: "SET_PROFILE_CODE", profile: "Personal", code: "PERSONAL" }, { type: "SET_RULE", client: "Personal", regex: "\\[PERSONAL\\]" }] },
+      { label: "Re-run that same hour of ACME work", note: "two rules match one window now — and the tag is the one ordered to lose", actions: [{ type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
+      { label: "Untag the general profile", note: "the fix: clear its title format. The page's own evidence decides again", actions: [{ type: "SET_PROFILE_CODE", profile: "Personal", code: null }, { type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
     ],
   },
 ];

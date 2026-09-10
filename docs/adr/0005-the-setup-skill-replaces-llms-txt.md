@@ -1,6 +1,12 @@
 # ADR-0005: The setup skill replaces `llms.txt`
 
-**Status:** Accepted — 2026-09-02
+**Status:** Accepted — 2026-09-02. **Amended in place 2026-09-10 under #75** (#69): the decision
+does not reverse, but one of the five steps it lists as human residue — the category rules — is no
+longer manual. Amended rather than superseded because what this ADR decided, that one verified
+walkthrough owns the install and `llms.txt` is deleted, still holds; the amendment is to a bullet,
+and the precedent for the distinction is
+[ADR-0002](./0002-defer-splitting-the-provider-into-its-own-plugin.md), which was superseded when
+its decision reversed.
 **Context:** distribution. Related: [`ADR-0004`](./0004-generate-the-shared-agent-skills-export.md)
 (the other install artifact), issues #12 and #14.
 
@@ -56,6 +62,18 @@ are the ones a person performs by hand either way.
 
 ## Consequences
 
+- **Amended 2026-09-10 (#69, #75): the category rules are no longer one of the manual steps.** Four
+  of the five still are — the activity source, the extension, the profile tags, the screenshot task
+  — and the rules are now composed, gated, written and verified by
+  `skills/daily/scripts/category_rules.py` during the same step. The premise this ADR argued from
+  holds: what belongs in the walkthrough is what can look like it worked and have done nothing, and
+  that is exactly why this step moved rather than left. Asking a user to hand-write a regular
+  expression was the worst case of it — a rule matching nothing leaves a client's whole day
+  uncategorized, a rule matching too much silently takes the label off a correct one, and neither
+  announces itself. The walkthrough still owns the step; the step is now performed for the user and
+  verified against their real window titles. Where the activity source will not take the write, it
+  falls back to the instruction this ADR describes and verifies it exactly as before, which is why
+  the human procedure is retained rather than deleted.
 - One install path, so there is nothing for a second one to drift from — the failure this whole
   effort removes, rather than the same failure in a new shape.
 - The manual steps are now *verified* rather than described. A step blocked by endpoint security is

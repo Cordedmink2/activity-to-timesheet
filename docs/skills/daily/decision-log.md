@@ -2313,6 +2313,59 @@ window exists, the process count does not move, and a wait loop counting process
 Enumerate top-level windows (`EnumWindows`, class `Chrome_WidgetWin_1`) instead. Edge behaves the
 same way. Any future check that counts browser windows must not go through `MainWindowHandle`.
 
+### The plugin writes the category rules, and what the gate is for — #69, #71
+
+**Rung 2, measured 2026-09-09 on the maintainer's machine.** A bare-word category rule matched
+**256 of 552 browser window titles in a single day**. That number is the whole argument for the
+gate, and it is worth restating why it is not merely noise: `activity_timeline.categorize()` takes
+the **first** matching class as a span's label, so an over-broad rule does not add a second label to
+a span, it *takes the label off* whichever rule should have won. A rule matching nothing fails the
+other way and just as quietly — that client's whole day comes back `uncategorized`, and nothing
+says so until a timesheet is drafted a fortnight later.
+
+**Composition is the model's; enforcement is a script's.** The candidates a run composes are
+patterns over prose the user wrote — `.context.md` holds hints, free text and conventions, and a
+parser asked to read it would be wrong in ways nobody could predict. So the split is: the model
+composes, `scripts/category_rules.py` judges. Everything that could differ between two runs of the
+same task is judged by something that cannot. The same reasoning decides what the script does *not*
+take: it never reads the context file, and it never trusts a rule's order — it imposes one.
+
+**Why 0.35.** The ceiling had to sit below the measured bad case (0.46) and above what a real
+client legitimately reaches. It is a judgement, so it is also `--max-share` and a `## Preferences`
+line: a consultant with one dominant client runs hotter than one with five, and the refusal message
+names the number it applied. What is *not* negotiable is that the gate runs at all — the flag moves
+the threshold, it does not skip the check.
+
+**Why the sample is a rolling seven days rather than a named date.** This runs during `setup`,
+before `TIMESHEET_TIMEZONE` is necessarily configured, and asking for a zone at that point would
+make the category step fail on a machine that has everything else right. A week also survives a
+client only worked on some days: one day's titles refuse a good rule for the client who was not
+worked on that day, which is the same false negative the gate exists to avoid producing.
+
+**The write is on the cheap side of ADR-0007, and the ADR moved to say so.** The boundary is drawn
+on what a mistake costs, not on direction: a bad rule mislabels a span, is checked again at Steps 4
+and 5, is shown at review, and cannot reach an invoice. The recovery path is the backup written into
+`.mcp/` before the first write of a run — which is also what makes it defensible to write without
+showing the user a diff, since the diff would be a regular expression they were never meant to read.
+
+### A general browser profile carrying a profile tag — rung 2, reasoned from first-match-wins, #72
+
+**The rule that changed:** a profile tag belongs only on a browser profile dedicated to one client.
+The earlier walkthrough said to tag every work profile, which reads as more coverage and is the
+opposite. Because the first matching rule wins, a general profile's tag claims every page opened in
+it — including the ones whose own address names a different client. An hour of Acme's work done in
+the shared browser, with `acmetrust.sharepoint` in the title, bills to whichever client that profile
+is tagged for.
+
+Not measured on a live machine: it is arithmetic over the matching order, and
+`demo/tag-rule-demo.html` scenario 5 is the executable version — the same hour, claimed by the tag
+and then correctly attributed once the tag is cleared. That demo is the copy to change if this rule
+is ever revisited, because it is the only one that fails visibly.
+
+**What the tag is now for:** the fallback signal for browser time carrying no other evidence, which
+is why it is ranked last of the seven signal types rather than first, and why it stays bracketed and
+collision-resistant while every other signal is matched more specifically.
+
 ## Rejected
 
 ### Setting the per-profile title format by policy — rung 1, observed, 2026-09-09

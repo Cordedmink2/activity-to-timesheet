@@ -47,9 +47,9 @@ To change any of them later: `/plugin configure billables`.
 
 ### Then run `/billables:setup`
 
-It walks you through the parts only a person can do — installing ActivityWatch, the browser
-extension, the browser-profile title tags, the category rules, the screenshot task, and whether
-your Outlook calendar is read — and *verifies each one before moving on*, which is the difference
+It walks you through installing ActivityWatch, the browser extension and the title tags for the
+profiles that belong to one client, writes your category rules for you, sets up the screenshot task
+and settles whether your Outlook calendar is read — and *verifies each one before moving on*, which is the difference
 that matters: every one of those
 steps can look like it worked and have done nothing, and the symptom arrives days later as an
 empty timesheet. It tells you when setup is finished.
@@ -79,8 +79,11 @@ told.
 1. **ActivityWatch** runs locally and logs which app/window/browser-tab is in focus, plus when you're
    away from the keyboard (AFK).
 2. The **"URL in Title" browser extension** stamps a short **client code** into every tab's title
-   (e.g. `… - [ACME]`), so browser activity carries which client it belongs to.
-3. **ActivityWatch categories** use those codes to auto-classify browser time per client.
+   in a browser profile you use for one client (e.g. `… - [ACME]`), so browsing that carries no
+   other clue still says who it was for.
+3. **ActivityWatch category rules**, which the plugin writes and keeps current from the signals you
+   declare, label activity per client — the work-item prefixes, environment addresses and workspace
+   names your work actually contains, with that profile tag as the fallback.
 4. A small **screenshot grabber** takes a periodic screenshot during work hours, used only to
    disambiguate activity that the window title alone can't pin to a client.
 5. The **skill** reads all of the above, drafts a timesheet, shows it to you, and posts confirmed
@@ -225,48 +228,66 @@ Install **URL in Title** from the Chrome Web Store:
 This extension rewrites each tab's title to include URL components. ActivityWatch records the window
 title, so anything the extension puts in the title becomes a signal the skill can read.
 
-### 3. Tag each browser profile with a client code
+### 3. Tag the browser profiles that belong to one client
 
-The trick that makes per-client classification work: **use one browser profile per client**, and in
-each profile configure the extension to append that client's short code to every title.
-
-In the URL in Title options, set the title format to something like:
+In a browser profile you use for **one client and nothing else**, configure the extension to append
+that client's short code to every title. In the URL in Title options, set the title format to:
 
 ```
 {title}-{hostname}{path}{args}{hash} - [ACME]
 ```
 
-Replace **`ACME`** with a short code for the client this profile is for (pick your own — `BETA`,
-`NIMBUS`, whatever). Do this **separately in each browser profile**, using that profile's client code.
+Replace **`ACME`** with a short code for that client (pick your own — `BETA`, `NIMBUS`, whatever),
+and do it **separately in each single-client profile**, using that profile's own code.
 
-The result: every tab you open in your "Acme" profile gets ` - [ACME]` on the end of its title, your
-"Beta" profile gets ` - [BETA]`, and so on. ActivityWatch now sees which client each tab belongs to.
+**Leave your general or default profile untagged.** That is the profile you use for everything —
+your own admin, research, tools shared across clients — and a tag on it is worse than no tag at all.
+The first matching rule wins, so a general profile's tag swallows every page in it that names a real
+client: an hour of Acme's work done in the shared browser bills to whichever client the profile is
+tagged for. Untagged, that hour is attributed from what is actually on the page. If you tagged a
+general profile under an earlier version of this walkthrough, clear its format string back to
+`{title}-{hostname}{path}{args}{hash}`.
+
+The result: every tab in your "Acme" profile ends ` - [ACME]`, your "Beta" profile ` - [BETA]`, and
+the shared one carries nothing. That tag is the **fallback** signal — it is what identifies browsing
+that carries no other clue — which is why the next step ranks it below every other signal rather
+than first.
 
 > Tip: keep the bracketed code distinct and unlikely to appear by accident (the brackets help).
-> Whatever format you pick, the tag and the category regex in the next step **must agree** — if you
-> drop the brackets here, drop them from the regex too, or nothing will ever match.
+> You do not have to make it agree with anything by hand: the next step writes the matching rule
+> from the code you chose.
 
-### 4. Configure ActivityWatch categories
+### 4. The category rules (the plugin writes these)
 
-Now teach ActivityWatch to group activity by those codes:
+This step is not yours to type. `/billables:setup` asks which clients you work for and what shows up
+in a window title when you are working on each — a work-item prefix like `ACM1234S`, the address of
+an environment or site, the name of an editor workspace, the profile tag from step 3 — and then
+compiles, checks and writes the ActivityWatch category rules for you. You never see a regular
+expression.
 
-1. Open **http://localhost:5600** → **Settings** → **Categories**.
-2. For each client, **add a category** (e.g. `Work > Acme`).
-3. Give it a **rule** of type **Regex** matching the bracketed code, e.g. `\[ACME\]`.
-4. Save. ActivityWatch will now classify any window/tab whose title contains `[ACME]` as Acme time.
+What it checks before writing anything, because both of these fail silently:
 
-Repeat per client. Then **verify it matches**: browse in a tagged profile for a minute and check the
-**Activity** / **Category** views actually attribute that time to the client. If everything lands in
-`uncategorized`, the tag format and the regex disagree (bracketed rule vs bare-code tag is the
-classic), or the regex has stray spaces inside an alternation (`Foo | Bar` requires the spaces).
-(The skill reads the raw events too, so this step mainly powers the AW dashboard and gives the skill
-a clean signal — both benefit from accurate codes.)
+- **A rule that matches nothing** leaves that client's whole day uncategorized. Every rule is tested
+  against your own recent window titles first, and one that matches none of them is refused.
+- **A rule that matches too much** is worse. The first matching rule wins, so a rule broad enough to
+  catch unrelated pages takes the label off the rule that should have won — a bare-word rule on one
+  real machine matched 256 of 552 browser titles in a single day. Anything over about a third of
+  your titles is refused, and the ceiling is yours to move.
 
-> **See these failure modes for yourself:** open
-> [`demo/tag-rule-demo.html`](./demo/tag-rule-demo.html) in a browser — one self-contained file,
-> nothing to install. Four guided walkthroughs show a mismatched tag silently categorising nothing,
-> bare codes claiming incidental prose, and a regex with spaces inside its alternation that only
-> *looks* like it works.
+It also copies your existing rules into your workspace before it writes, keeps every category you
+made yourself, and offers once to adopt those into the set it manages. Each category it writes is
+flat and named for the client — ActivityWatch joins a category's name path with `>`, so a `Work >`
+parent would change the label everything downstream matches on.
+
+After that the rules stay current on their own: they are compiled from the signals in your
+`Timesheets/.context.md`, and a run rebuilds them when that file changes, so a client you added last
+week is matching this week.
+
+> **What that machinery is for:** open [`demo/tag-rule-demo.html`](./demo/tag-rule-demo.html) in a
+> browser — one self-contained file, nothing to install. Its guided walkthroughs show a mismatched
+> tag silently categorising nothing, a bare code claiming incidental prose, a tag on a general
+> profile stealing a client's work, and a regex with spaces inside its alternation that only *looks*
+> like it works. These are the failures the gate exists to refuse.
 
 ### 5. Install the skill on a harness that isn't Claude Code
 
@@ -509,6 +530,7 @@ activity-to-timesheet/
 │   ├── references/           # classification rules, first-run, context template, formats
 │   └── scripts/              # Harvest + ActivityWatch + screenshot helpers (stdlib Python)
 │       ├── activity_timeline.py  # categorized window timeline from AW category rules
+│       ├── category_rules.py     # compiles, gates, writes and verifies those rules
 │       ├── afk_blocks.py         # AFK-anchored day skeleton (work_start/end, breaks)
 │       ├── aw_client.py          # shared ActivityWatch REST helpers for every script that reads a day
 │       ├── harvest_lookup.py     # project_id/task_id lookup by code, name or client
@@ -529,8 +551,9 @@ Two things worth knowing before you do:
 
 - **Not everything is a defect.** If the skill didn't know one of *your* clients, signals or
   machine facts, that belongs in your own `Timesheets/.context.md`. If a window title comes back
-  `uncategorized`, that's an ActivityWatch category rule on your machine — `references/first-run.md`
-  covers it. Neither is fixed by a change here.
+  `uncategorized`, the plugin has no signal for that client yet — add one to your `.context.md` and
+  the next run compiles a rule from it, which `references/first-run.md` covers. Neither is fixed by
+  a change here.
 - **Redact before you paste.** This tool reads window titles, screenshots and Harvest entries, so
   its output carries client names, project codes and file paths. Issues are public.
 

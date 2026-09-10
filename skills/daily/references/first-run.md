@@ -2,7 +2,7 @@
 
 Read this only when a prerequisite check fails (no workspace, missing `.context.md`, unconfigured credentials or timezone, no screenshot task, unknown AW buckets). Routine runs never need this file.
 
-**A first install is not this file.** The `setup` skill beside this one walks a person through the parts only they can do — the activity source, the browser extension, the profile tags, the category rules, the screenshot task — and verifies each one before moving on. This file is the mid-run diagnostic: one prerequisite came back wrong on a machine that was already working.
+**A first install is not this file.** The `setup` skill beside this one walks a first-time install — the activity source, the browser extension, the profile tags, the category rules (which it writes for the user rather than asking them to), the screenshot task — and verifies each one before moving on. This file is the mid-run diagnostic: one prerequisite came back wrong on a machine that was already working.
 
 The skill is **shareable across users**. Each user maintains their own `Timesheets/.context.md` describing *their* clients, colleagues, billing conventions, and preferences. The skill stays generic; `.context.md` carries the personal facts.
 
@@ -122,14 +122,16 @@ None of the three is a reason to hand the scripts a guessed value. `--utc-offset
 
 ActivityWatch buckets are hostname-suffixed. On first run for a user, call `GET <activity-url>/api/0/buckets/` and identify the live bucket id for `aw-watcher-window`, `aw-watcher-afk`, etc. (e.g. `aw-watcher-window_HOSTNAME`). Cache them in `.context.md` under an "AW buckets" section so future sessions can skip the discovery.
 
-## ActivityWatch categories (keep them current)
+## ActivityWatch categories (the plugin keeps them current)
 
-`activity_timeline.py` reads the user's AW category rules live from `/api/0/settings` (client-level regex on window titles — e.g. a rule matching `ACME` in the title tags events as the ACME client). These rules are the source of the CLIENT-level categories shown in the timeline; they are never project- or ticket-level, and they are a first-pass signal only, not 100% certain.
+`activity_timeline.py` reads the category rules live from `/api/0/settings`: a client-level regex matched against the window's app name and title, which is where the timeline's client labels come from. They are never project- or work-item-level, and they are a first-pass signal only, not 100% certain.
 
-Keep them useful by:
-- Filling any placeholder `New class` (`FILL ME`) rule in the AW settings UI with a real client-regex.
-- Adding missing clients as new rules when new work starts — the timeline's `uncategorized` spans are the indicator.
-- A client-level regex on window titles fundamentally cannot catch *work-content* overrides (e.g. work for client A done under client B's Edge profile). Those overrides must be captured as manual rules in `.context.md` under the relevant client section and resolved during classification.
+**The plugin owns them (#69), so this is not a section to act on by hand.** `scripts/category_rules.py` compiles them from the signals declared per client in `.context.md`, refuses any that matches nothing or an implausible share of your real window titles, orders them so the most specific signal wins, and copies the previous set into `.mcp/` before it writes. Step 2 of the workflow checks whether they are still current for `.context.md` and rebuilds them when they are not. What that means here:
+
+- **A missing client is a missing *signal*, not a missing rule.** Add it to that client's section in `.context.md` and the next run compiles it; editing the rule in the settings UI instead is a change the next rebuild discards.
+- **A rule is never the client's name alone**, and never a bare client code either. The gate refuses both: the first matching rule wins, so a rule that broad takes the label off a correct one. A profile tag is matched in its brackets, `\[ACME\]`, and every other signal is matched more specifically than that — a work-item prefix, an environment address, an editor workspace — with the browser, editor or meeting application anchored into the pattern where the signal implies one.
+- **A placeholder (`New class`, `FILL ME`) or any other rule the plugin did not write is left alone**, so it is still yours to delete in the settings UI. `--inspect` lists every rule with the share of recent titles it matches and marks which are which.
+- **A regex on window titles fundamentally cannot catch *work-content* overrides** (work for client A done in client B's browser profile). Those belong in `.context.md` under the relevant client and are resolved during classification — which is also why a profile tag belongs only on a profile dedicated to one client.
 
 ## After a machine reimage or replacement
 

@@ -1,7 +1,9 @@
 # ADR-0007: Two boundaries — the provider writes, the sources read
 
 **Status:** Proposed — drafted 2026-09-07 under #44, for Connor to accept or amend. The rule it
-records is already enforced; what is proposed is the write-up.
+records is already enforced; what is proposed is the write-up. **Amended 2026-09-10 under #75**,
+while still Proposed: the line is drawn on *what a mistake costs* rather than on direction, because
+#69 made the activity source's **configuration** a write target while its data stays read-only.
 **Context:** whole repo. Related: [`CONTEXT.md`](../../CONTEXT.md), whose opening paragraphs state
 the rule; [ADR-0006](./0006-keep-the-provider-in-plugin-but-behind-a-command-contract.md), which keeps the
 written side inside this plugin behind a command contract; [ADR-0008](./0008-the-calendar-is-evidence-of-intent-not-activity.md),
@@ -23,10 +25,26 @@ write with no more than the reads get.
 
 ## Decision
 
-**Two boundaries, drawn on direction rather than on service.** The activity source, the work-item
-source and the calendar sit on the *read* boundary. The timesheet provider sits alone on the *write*
-boundary. A new service joins whichever side its direction puts it on; it does not get a boundary of
-its own.
+**Two boundaries, drawn on what a mistake costs rather than on service.** The activity source, the
+work-item source and the calendar sit on the *cheap* boundary: a mistake there is visible at once
+and costs a re-run. The timesheet provider sits alone on the *expensive* one: a mistake there is on
+a client's invoice. A new service joins the side its worst mistake puts it on; it does not get a
+boundary of its own.
+
+**Direction is how that usually reads, and it is not the rule.** The first draft of this ADR said
+"the provider writes, the sources read", because at the time the two lines coincided. #69 separated
+them: the plugin now writes the activity source's **category rules** through
+`POST /api/0/settings/classes`, having compiled them from the signals the user declared. That write
+belongs on the cheap side, and the argument is the one this ADR's Context already makes. A wrong
+category rule mislabels a span; the label is a first-pass client signal that the classification and
+disambiguation steps check anyway, it is shown to the user at review before anything is billed, and
+it cannot reach an invoice on its own. It is also recoverable in a way a posted entry is not — the
+compiler copies the existing rules into the workspace before it writes.
+
+**What the activity source's data is stays read-only.** Nothing writes an event, and nothing reads
+those rules back as authority: `.context.md` is the source of truth and the rules are a derived
+copy, rebuilt from it. The write is configuration, held by a script that gates every rule against
+real window titles before it lands.
 
 **Credentials belong at the write boundary and nowhere else.** The provider's credentials are
 declared in the plugin manifest and marked sensitive. The read sources need none: the activity
@@ -46,8 +64,14 @@ were a day with nothing in it.
 
 ## Consequences
 
-- "Everything but the provider is read", as ADR-0008 put it when the calendar arrived. Adding a read
-  source is an adapter with no credentials and no gate; ADR-0008 is the worked example.
+- "Everything but the provider is read", as ADR-0008 put it when the calendar arrived, is no longer
+  literally true and was never the reason. Adding a *source* is still an adapter with no credentials
+  and no gate; ADR-0008 is the worked example.
+- A write on the cheap side is gated by something, just not by the user: the confirmation gate is
+  the provider's, and `scripts/category_rules.py` judges each rule against the sampled window titles
+  instead — refusing one that matches nothing and one that matches an implausible share. That is the
+  shape to copy if a second cheap-side write ever appears. It also means the user is not asked to
+  approve a diff they would have to read a regex to understand, which is the whole point of #69.
 - Adding a second provider is a second writer behind the same command contract, not a second design;
   ADR-0006 holds that side.
 - `skills/daily/tests/test_module_boundaries.py` holds the import direction: no provider script

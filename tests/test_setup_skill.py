@@ -12,6 +12,7 @@ whichever way the plugin was installed. Each one is something that goes stale on
 somewhere else in the tree — which is the only kind of prose worth a test.
 """
 
+import ast
 import re
 
 import pytest
@@ -169,6 +170,50 @@ def test_the_category_step_writes_the_rules_with_the_compiler_the_plugin_ships()
         f"step '{heading.strip()}' does not say which tool to run it in — the configuration "
         "reaches Bash tool calls alone, so the address of the activity source is missing "
         "anywhere else")
+
+
+def compiler_signal_types() -> set[str]:
+    """The signal types the compiler will accept, read out of its source.
+
+    Read rather than imported: `tests/` does not put the skill's `scripts/` on `sys.path`,
+    and the question is a property of the text either way. Both tables count — a type that
+    never reaches a window title is still one the step may legitimately offer, because the
+    script skips it with the reason instead of refusing the run.
+    """
+    tree = ast.parse(RULE_COMPILER.read_text(encoding="utf-8"))
+    found = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        names = {t.id for t in node.targets if isinstance(t, ast.Name)}
+        if names & {"SIGNAL_RANK", "NOT_IN_A_TITLE"} and isinstance(node.value, ast.Dict):
+            found |= {k.value for k in node.value.keys
+                      if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    assert found, "no signal-type table found in the compiler — the check has nothing to read"
+    return found
+
+
+# A signal type as the walkthrough writes one: backticked, lower case, and containing an
+# underscore. The underscore is what tells a type name from the rest of the step's inline
+# code — `--inspect`, `[managed]`, a filename — without a list of exclusions to keep current.
+SIGNAL_TYPE_IN_PROSE = re.compile(r"`([a-z]+(?:_[a-z]+)+)`")
+
+
+def test_the_category_step_offers_only_signal_types_the_compiler_accepts():
+    """The step tells a run which types to choose from; the script decides what they mean.
+
+    A type renamed in the table and left in the prose is a candidate refused as unknown on
+    every install, and the run's recourse — recompose and try again — cannot fix a name the
+    step keeps handing back. This is the same class as the `daily` skill's flag inventory,
+    which had lost eleven flags before anything compared it to the source.
+    """
+    _, body = one_step_about(r"categor")
+    offered = set(SIGNAL_TYPE_IN_PROSE.findall(body))
+    assert offered, "the category step names no signal types, so a run has to invent them"
+    unknown = sorted(offered - compiler_signal_types())
+    assert not unknown, (
+        f"the category step offers signal types the compiler does not accept: {unknown}. "
+        f"It accepts {sorted(compiler_signal_types())}.")
 
 
 def test_the_category_step_keeps_a_loud_fallback_for_a_source_that_will_not_take_the_write():
