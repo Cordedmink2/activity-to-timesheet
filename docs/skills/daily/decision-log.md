@@ -19,6 +19,35 @@ reads one.
 more than one copy, and how a change is released. Below this line, `SKILL.md`, `references/`,
 `scripts/` and `tests/` without a prefix mean the `daily` skill's.
 
+## Lessons that outlive their entry
+
+A few entries generalise beyond the change that produced them. One sentence each; the
+entry it points at carries the evidence, the grade and what was rejected. Add a line here
+when a new entry earns one, and leave the entry where it is.
+
+- **A test that shells out inherits no fixture.** One `subprocess` call in the suite read
+  the real `.env` and paged six months of live provider history; one flag over it would have
+  written a real entry to a client's timesheet — § "The suite was not hermetic, and one test
+  wrote against production".
+- **A failure with no plausible connection to the code it points at is a destructor, not a
+  mystery.** An unclosed error response raised from garbage collection and was blamed on
+  whichever test the collector interrupted — § "A failed request leaked its response, and the
+  warning landed on an innocent test".
+- **A clock time without a date is not an instant** on the one day a year the clock reads
+  twice, and anything billed from it needs the two told apart — § "Two instants an hour
+  apart printed the same clock time".
+- **Anchor a path on a shape you can name, never on a depth.** Two ancestors up accepts
+  *any* directory two ancestors up, and a checkout nested one level differently resolves to
+  whatever real data happens to sit above it — § "Workspace resolution is anchored on the
+  install shape, not on a depth".
+- **A prefix is a namespace you claim, not one you own.** Retiring by name deleted a user's
+  own skill and reported it as housekeeping; retire only what carries your stamp — § "Sharing
+  a prefix is not proof of authorship".
+- **A gate the prose owns is only as strong as the harness that reads the prose.** The
+  `--confirm` flag stands where a harness drops `disable-model-invocation`, so the
+  duplication is load-bearing — § "The confirmation gate is in the invocation, not only the
+  prose".
+
 ## What the instruments measure
 
 `tests/` measures the *scripts*. It stays green when the instructions break, so it is
