@@ -343,7 +343,7 @@ def test_inspect_reports_every_rule_with_the_share_it_matches(live_aw, workspace
     result = run_cli(cr, ["--inspect"])
     assert result.code == 0, result.err
     total = sampled([ACME_ITEM, BETA_TAG, PERSONAL, TEAMS])
-    assert f"RULE Acme — 1 of {total} titles" in result.out
+    assert f"RULE Acme [unmanaged] — 1 of {total} titles" in result.out
     assert "OVER the 35% ceiling" in result.out
     assert posted(server) == [], "--inspect writes nothing"
 
@@ -364,7 +364,72 @@ def test_inspect_names_a_grouping_category_rather_than_erroring_on_it(live_aw, w
     live_aw(built)
     result = run_cli(cr, ["--inspect"])
     assert result.code == 0, result.err
-    assert "RULE Work — no regex" in result.out
+    assert "RULE Work [unmanaged] — no regex" in result.out
+
+
+# --------------------------------------------------------------------------------------
+# Adopting the rules a user already had (#73)
+# --------------------------------------------------------------------------------------
+
+def test_a_rule_this_plugin_wrote_reads_back_as_managed_and_the_users_own_does_not(
+        live_aw, workspace, tmp_path):
+    """Which rules are up for adoption is a mechanical question, not a judgement — the run
+    that writes a rule records the client it wrote it for, and everything else the activity
+    source holds is the user's own."""
+    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Personal", r"metservice")]))
+    assert compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 0
+    result = run_cli(cr, ["--inspect"])
+    assert "RULE Acme [managed]" in result.out
+    assert "RULE Personal [unmanaged]" in result.out
+
+
+def test_adopting_a_rule_makes_it_managed_and_leaves_one_copy(live_aw, workspace, tmp_path):
+    """The user accepts the mapping, the rule is compiled from the signals behind it like
+    any other, and from then on a rebuild regenerates it rather than leaving it beside the
+    managed set."""
+    server = live_aw(sample_day([ACME_ITEM, PERSONAL],
+                                classes=[("Acme", r"acme"), ("Personal", r"metservice")]))
+    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme", "Personal"], "one Acme rule, not two"
+    assert "RULE Acme [managed]" in run_cli(cr, ["--inspect"]).out
+
+
+def test_skipping_adoption_leaves_an_unmanaged_rule_byte_for_byte(
+        live_aw, workspace, tmp_path):
+    """#69 story 7: nothing of the user's is silently overwritten. Asserted on the whole
+    entry rather than its name, because an `id` quietly renumbered is the same breach — the
+    settings dialog they made it in is keyed on that."""
+    theirs = {"id": 12, "name": ["Personal"],
+              "rule": {"type": "regex", "regex": "metservice", "ignore_case": False}}
+    built = sample_day([ACME_ITEM, PERSONAL])
+    built.classes.append(theirs)
+    server = live_aw(built)
+    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    assert result.code == 0, result.err
+    assert theirs in posted(server)
+
+
+def test_a_new_rule_does_not_take_an_id_an_unmanaged_rule_is_already_using(
+        live_aw, workspace, tmp_path):
+    built = sample_day([ACME_ITEM, PERSONAL])
+    built.classes.append({"id": 12, "name": ["Personal"],
+                          "rule": {"type": "regex", "regex": "metservice"}})
+    server = live_aw(built)
+    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    written = posted(server)
+    assert len({entry["id"] for entry in written}) == len(written)
+
+
+def test_an_over_broad_rule_of_the_users_own_is_surfaced_for_correction(
+        live_aw, workspace):
+    """Adoption is where an over-broad rule gets fixed rather than merely reported: the
+    measured case takes the label off a correct rule, so it is worth the one question."""
+    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Everything", BROAD)]))
+    result = run_cli(cr, ["--inspect"])
+    assert "RULE Everything [unmanaged]" in result.out
+    assert "OVER the 35% ceiling" in result.out
 
 
 # --------------------------------------------------------------------------------------

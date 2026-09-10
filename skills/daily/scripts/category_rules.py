@@ -33,9 +33,9 @@ name — so it is skipped rather than refused.
 
 Three modes:
   * `--candidates <file|->`  compile, gate, back up, write, verify
-  * `--inspect`              what the activity source holds now, each rule with the share
-                             of the sample it matches — the read behind adopting rules the
-                             plugin did not author
+  * `--inspect`              what the activity source holds now, each rule marked managed
+                             or not and carrying the share of the sample it matches — the
+                             read behind adopting rules the plugin did not author
   * `--status`               whether the rules are still current for the workspace context
                              file. Reads two local files and nothing over the wire
 
@@ -303,19 +303,23 @@ def merged(existing: list[dict], writing: list[dict]) -> list[dict]:
 # The workspace: the backup, and the stamp the staleness check reads
 # --------------------------------------------------------------------------------------
 
-def state_dir(flag: str | None) -> Path:
+def state_dir(flag: str | None, create: bool = True) -> Path:
     """Where the backup and the stamp go: `<workspace>/.mcp/`.
 
     The workspace is the configured one, else whatever `find_workspace()` resolves, else the
     directory this was run from — which is what the declared configuration promises when
-    `TIMESHEET_WORKSPACE` is left blank. It is created if it is not there, and every run
-    prints the backup's full path, so a run that resolved somewhere unexpected says so
-    rather than leaving the user to find out at recovery time.
+    `TIMESHEET_WORKSPACE` is left blank. Every run that writes prints the backup's full
+    path, so a run that resolved somewhere unexpected says so rather than leaving the user
+    to find out at recovery time.
+
+    `create=False` for the modes that only read: a read has no business leaving a directory
+    behind in wherever a run happened to start.
     """
     root = Path(flag).expanduser() if skill_config.has_value(flag) else None
     root = root or skill_config.find_workspace() or Path.cwd()
     directory = root / STATE_DIR
-    directory.mkdir(parents=True, exist_ok=True)
+    if create:
+        directory.mkdir(parents=True, exist_ok=True)
     return directory
 
 
@@ -460,13 +464,27 @@ def verify(writing: list[dict], sample: list[str]) -> int:
     return 1 if missing else 0
 
 
-def inspect(days: int, max_share: float) -> int:
-    """Every rule the activity source holds now, with the share of the sample it matches.
+def managed_clients(directory: Path) -> set[str]:
+    """The clients this plugin last wrote rules for, from the stamp.
 
-    The read behind adopting rules the plugin did not author: a run maps each to a client
-    and the signals behind it, and an over-broad one is surfaced here rather than left to
-    mislabel days. Prints the regex — the *agent* reads this, and the user reads the
-    plain-language list the agent makes of it.
+    Read by name rather than by pattern: a rebuild changes the pattern and the rule is
+    still the same rule, and the name is what `merged()` replaces on. Everything else the
+    activity source holds is the user's own, whether they made it before installing this or
+    in the settings dialog last week.
+    """
+    stamp = read_stamp(directory) or {}
+    return {rule.get("client") for rule in stamp.get("rules", [])}
+
+
+def inspect(days: int, max_share: float, directory: Path) -> int:
+    """Every rule the activity source holds now: managed or not, and the share of the
+    sample each matches.
+
+    The read behind adopting rules the plugin did not author. A run maps each unmanaged one
+    to a client and the signals behind it, puts the whole set to the user as one list, and
+    an over-broad rule is surfaced here rather than left to mislabel days. Prints the regex
+    — the *agent* reads this output, and the user reads the plain-language list the agent
+    makes of it.
     """
     bucket, sample = sample_titles(days)
     print(f"SAMPLE {len(sample)} titles over {days} days ({bucket})")
@@ -474,22 +492,25 @@ def inspect(days: int, max_share: float) -> int:
     if not classes:
         print("RULES none — the activity source holds no categories")
         return 0
+    managed = managed_clients(directory)
     for entry in classes:
         name = class_name(entry) or "(unnamed)"
+        held = "managed" if name in managed else "unmanaged"
         regex = class_regex(entry)
         if not regex:
-            print(f"RULE {name} — no regex (a grouping category), matched against nothing")
+            print(f"RULE {name} [{held}] — no regex (a grouping category), matched against "
+                  f"nothing")
             continue
         try:
             compiled = re.compile(regex, re.IGNORECASE)
         except re.error as exc:
-            print(f"RULE {name} — does not compile ({exc}): {regex}")
+            print(f"RULE {name} [{held}] — does not compile ({exc}): {regex}")
             continue
         hits = [haystack for haystack in sample if compiled.search(haystack)]
         share = len(hits) / len(sample) if sample else 0.0
         over = f"  OVER the {max_share:.0%} ceiling" if share > max_share else ""
-        print(f"RULE {name} — {len(hits)} of {len(sample)} titles ({share:.0%}){over}"
-              f"  regex: {regex}")
+        print(f"RULE {name} [{held}] — {len(hits)} of {len(sample)} titles ({share:.0%})"
+              f"{over}  regex: {regex}")
         for example in hits[:2]:
             print(f"     e.g. {example[:100]}")
     return 0
@@ -555,7 +576,8 @@ def main():
         # state directory to read the activity source would leave a mark on whatever
         # directory a run happened to start in.
         if args.inspect:
-            return inspect(args.days, args.max_share)
+            return inspect(args.days, args.max_share,
+                           state_dir(args.workspace, create=False))
         directory = state_dir(args.workspace)
         if args.status:
             return status(directory)
