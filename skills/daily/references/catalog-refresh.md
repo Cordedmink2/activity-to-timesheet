@@ -45,19 +45,7 @@ The script's design assumes:
 
 ## Creating a backend work item to bill against
 
-Sometimes a block belongs to new work with no project yet — the user creates a work item in their backend CRM, which syncs to the provider as a new project (`project.code` == the work-item id). For Dataverse (user's URL lives in the workspace `.env`):
-
-> **Note:** `create_incident.py` and `read_incidents.py` below are NOT part of this skill's `scripts/` — they live in the user's Dataverse **workspace** `scripts/` directory (alongside that workspace's `auth.py` and `.env`). `<workspace>` in the commands below is `TIMESHEET_WORKSPACE`; spell the path out rather than running a bare `scripts/…`, which resolves against the skill folder. If they're missing, ask the user to sync them from their workspace before using this path.
-
-- **Create the case with the tested helper, not a raw API call:**
-  ```
-  python "<workspace>/scripts/create_incident.py" --customer "<client>" --title "<title>"        # dry run — resolves client, prints what it would create
-  python "<workspace>/scripts/create_incident.py" --customer "<client>" --title "<title>" --yes  # actually creates it, prints the ticket number
-  ```
-  It resolves the client name → account GUID, creates the Case via the Dataverse SDK, and reads back the auto-assigned ticket number. The **customer account determines the ticket prefix**, so you only supply client + title — don't try to set the number. That governs *creating* a case. Going the other way — resolving an observed ticket number to its client — derive it by grouping `.mcp/harvest_assignments*.json` on `project.code` prefix → `client.name` rather than reading a list; `PSO` and `SLA` each span 9–14 clients, so prefix alone never decides those. It's a client-facing CRM, so confirm the resolved client + title with the user before adding `--yes`.
-- **Read / look up existing cases:** `python "<workspace>/scripts/read_incidents.py"` (flags: `--customer`, `--prefix`, `--ticket`, `--search`, `--all`). This is the convenient path for ad-hoc lookups; the bulk `dv_active_incidents.txt` catalog is still built via `pac env fetch` in `refresh_catalogs.py` above.
-- Under the hood both scripts authenticate via the workspace `scripts/auth.py` device-code token (reads `DATAVERSE_URL`/`TENANT_ID` from `.env`); first run needs a one-time interactive login, then the token caches and refreshes silently. Equivalent raw write is `POST …/api/data/v9.2/incidents` with `title` + `customerid_account@odata.bind=/accounts(<guid>)`.
-- After creating, the new project lags in the assignment catalog (see read-replica lag above) — use `wait_for_project(code)` to get its `project_id`/`task_id` before posting.
+A block that belongs to new work with no project yet is `references/new-client-work.md`'s procedure — the work item is created in the user's backend and syncs to the provider as a new project. What this file adds is the read-replica lag above: the new project surfaces in the assignment catalog minutes later, so poll with `wait_for_project(code)` rather than refreshing once.
 
 ## Sanity checks after refresh
 
