@@ -24,6 +24,7 @@ from shipped import CONTEXT_MD, SKILLS
 
 DAILY = SKILLS / "daily"
 WRAPPER = DAILY / "scripts" / "calendar_day.py"
+RULE_COMPILER = DAILY / "scripts" / "category_rules.py"
 
 # The vocabulary the wrapper's verdict is written in — the two words a rule needs in order
 # to say which events become blocks and which do not. Held against the wrapper's own source
@@ -102,6 +103,30 @@ def glossary_calendar_terms() -> list[str]:
     terms = re.findall(r"\*\*([^*]+)\*\*", match.group(0))
     assert terms, "the **Calendar** entry bolds no terms — the check has nothing to read"
     return terms
+
+
+def test_the_workflow_checks_the_category_rules_before_it_reads_the_timeline():
+    """#74: the rules are a derived copy of the signals in `.context.md`, and the timeline
+    labels every span with them.
+
+    The order is the assertion. A staleness check that runs *after* the timeline reads the
+    day is a check whose answer arrives too late to matter: the labels are already wrong,
+    every one of them silently, and a rebuild at that point fixes tomorrow. Both commands
+    are read as their first occurrence in the workflow, which is where a run meets them.
+    """
+    assert RULE_COMPILER.is_file(), f"{RULE_COMPILER.name} is what this checks and is not shipped"
+    text = workflow()
+    check = text.find(f"scripts/{RULE_COMPILER.name}")
+    timeline = text.find("scripts/activity_timeline.py")
+    assert check >= 0, (
+        f"no step of the workflow runs `scripts/{RULE_COMPILER.name}`, so a client added to "
+        "`.context.md` never reaches the rules the timeline is labelled by")
+    assert "--status" in text, (
+        "the workflow never runs the staleness check, so a rebuild either happens on every "
+        "run or on none")
+    assert timeline >= 0 and check < timeline, (
+        "the workflow reads the timeline before it checks whether the category rules are "
+        "current, so a run with stale rules mislabels the day it has already read")
 
 
 def test_the_workflow_names_the_calendar_wrapper_it_ships():

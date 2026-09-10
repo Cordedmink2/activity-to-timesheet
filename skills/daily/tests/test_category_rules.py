@@ -433,6 +433,80 @@ def test_an_over_broad_rule_of_the_users_own_is_surfaced_for_correction(
 
 
 # --------------------------------------------------------------------------------------
+# Staleness: the rules are a derived copy, so the copy is rebuilt when the source moves (#74)
+# --------------------------------------------------------------------------------------
+
+def context_file(workspace: Path, text: str = "### Acme\n- `ACM` in a title\n") -> Path:
+    path = workspace / "Timesheets" / ".context.md"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_status_is_stale_before_this_plugin_has_ever_written_the_rules(workspace):
+    context_file(workspace)
+    result = run_cli(cr, ["--status"])
+    assert result.code == 0
+    assert result.out.startswith("STALE")
+
+
+def test_status_is_current_straight_after_a_write(live_aw, workspace, tmp_path):
+    context_file(workspace)
+    live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    assert compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 0
+    assert run_cli(cr, ["--status"]).out.startswith("CURRENT")
+
+
+def test_a_hand_edit_to_the_context_file_makes_the_rules_stale(
+        live_aw, workspace, tmp_path):
+    """The edit made outside a run is the one nothing else would notice: the user adds a
+    client on Friday and Monday's timesheet is drafted against rules that never heard of
+    them."""
+    context_file(workspace)
+    live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    context_file(workspace, "### Acme\n- `ACM` in a title\n\n### Beta\n- `BET` in a title\n")
+    result = run_cli(cr, ["--status"])
+    assert result.out.startswith("STALE")
+    assert "has changed since the rules were written" in result.out
+
+
+def test_status_reads_no_activity_source_at_all(live_aw, workspace, tmp_path):
+    """A run pays for this at the start of every day, so it has to be two local file reads.
+    It is also what keeps the rule "a run whose context file has not changed does not write"
+    true without anything having to remember it."""
+    context_file(workspace)
+    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    before = len(server.requests)
+    assert run_cli(cr, ["--status"]).out.startswith("CURRENT")
+    assert len(server.requests) == before, "--status touched the activity source"
+
+
+def test_a_workspace_with_no_context_file_is_stale_rather_than_current(workspace):
+    """There is nothing to build rules from, which is a state to act on — the `daily`
+    skill's first run scaffolds that file — and not a run to report as up to date."""
+    result = run_cli(cr, ["--status"])
+    assert result.code == 0
+    assert result.out.startswith("STALE")
+
+
+def test_a_rebuild_is_gated_exactly_as_the_first_write_was(live_aw, workspace, tmp_path):
+    """The rebuild rides inside an approval the user has already given, so the only thing
+    standing between a mistyped signal and their timesheet is this gate."""
+    context_file(workspace)
+    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    result = compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
+        candidate("Beta", "profile_tag", r"\[NOPE\]"),
+    ])
+    assert result.code == 1
+    assert len(server.sent("POST", "/settings/classes")) == 1, (
+        "the refused rebuild wrote anyway — the first write is the only one that landed")
+
+
+# --------------------------------------------------------------------------------------
 # The command line itself
 # --------------------------------------------------------------------------------------
 
