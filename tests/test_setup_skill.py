@@ -578,7 +578,7 @@ def test_no_step_expands_a_configured_value_to_find_out_whether_it_is_set(key):
 
 def test_the_configuration_probe_is_prescribed_rather_than_left_to_the_run():
     """The fix above only holds while there is a command to use instead of composing one.
-    Drop the block and the skill is back to naming three keys and hoping.
+    Drop the block and the skill is back to naming the keys and hoping.
 
     Pinned against `PROBE_KEYS`, which is what "Done" declares setup finished on. A probe
     that quietly stopped covering one of them would leave it asserted in prose and checked

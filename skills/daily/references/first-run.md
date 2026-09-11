@@ -90,7 +90,7 @@ Be accurate about *where*, when telling a user. That store is the OS keychain on
 Every script reads them through the one seam, `scripts/skill_config.py`: a per-command flag, then the skill's `.env`, then the process environment (which is where the harness's values arrive), then the script's own default. That module's docstring carries the precedence and the reasoning for it.
 
 1. Visit https://id.getharvest.com/developers. Note the numeric **Account ID** at the top, then create a **Personal Access Token**.
-2. Run `/plugin configure billables` and paste both in, along with an IANA timezone name (`Europe/London`, `Pacific/Auckland`). There is deliberately no default zone — a guessed one dates the whole timesheet wrong without failing.
+2. Run `/plugin configure billables` and paste both in. Leave the timezone blank unless you want to pin one: blank reads this machine's own zone and says so on every day it dates, per the table above. Set it — an IANA name, `Europe/London`, `Pacific/Auckland` — where the machine's zone is not the one you bill in, or where it cannot be read at all. There is still no guessed default; a zone nobody can establish stops the run rather than dating the whole timesheet wrong without failing.
 3. Restart the session, or start a new one: the values reach the scripts through the plugin's SessionStart hook, which runs at the start of a session.
 4. Verify: `python scripts/harvest_list.py YYYY-MM-DD YYYY-MM-DD` for today should print existing entries without an auth error. A day with no entries prints `(no time entries from … to …)` on stderr — exit 0 plus that notice is the success case, distinguishable from a run that silently did nothing.
 
