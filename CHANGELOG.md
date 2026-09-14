@@ -5,7 +5,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - 2026-09-11
+## [0.9.0] - 2026-09-14
+
+### Fixed
+- **The screenshot setup installs Pillow and mss instead of stopping when they are missing.**
+  `setup_screenshot_pipeline.ps1` tested for each package by running the interpreter and reading
+  its exit code. Under Windows PowerShell 5.1 — the shell a stock Windows box ships with — a
+  native command that writes to stderr is a *terminating* error while `$ErrorActionPreference` is
+  `Stop`, and `2>$null` does not prevent it. So the `ModuleNotFoundError` traceback a missing
+  package prints ended the script at the check, and the install below it never ran. The machine
+  this hit is one with a fresh Python, which is the machine the setup exists for: the run stopped
+  just after `Checking Pillow...` with a `NativeCommandError` and registered no task. Nothing to
+  do on upgrade beyond re-running `/billables:setup` — it now installs both and registers the
+  task. You were unaffected if you ran the script under `pwsh` 7, which does not raise, or on a
+  machine that already had both packages.
 
 ### Changed
 - **The timezone is read from the machine when you have not set one** (#30). `TIMESHEET_TIMEZONE`
