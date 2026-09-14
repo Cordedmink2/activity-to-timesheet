@@ -2,7 +2,7 @@
 
 Goal: give each proposed **block** its attribution — `(client, project_id, task_id, billable)` — and a `confidence` rating. A block is local and still redrawable; it becomes an **entry** only when Step 9 posts it.
 
-The provider's own strings never appear here. This rubric decides a **work kind** — one of the seven in "Work kind and task selection" below — and the user's `.context.md` maps that to the task their provider actually offers. Everything a run needs is in this file; the repo's `CONTEXT.md` carries the same vocabulary for whoever is *changing* the skill, and is not something a run has to have.
+The provider's own strings never appear here. This rubric decides a **work kind** — one of the seven in "Work kind and task selection" below — and the user's `.context.md` maps that to the task their provider actually offers. Classifying a block needs this file and, once one comes out flagged, `references/disambiguation.md`; the repo's `CONTEXT.md` carries the same vocabulary for whoever is *changing* the skill, and is not something a run has to have.
 
 **`Timesheets/.context.md` is the source of truth.** It holds the per-user facts:
 - Active client profiles + signals (Edge profile names, URLs, ChatGPT projects, VS Code workspaces, repo paths, SharePoint subdomains, work-item prefixes)
@@ -57,7 +57,7 @@ URLs in browser tabs (Edge / Firefox / Chrome) expose Dynamics environments, Azu
 
 **A long browser window row is not one unit of work — and it is not evidence about the other monitors either.** Edge and Chrome title a window for its *foreground* tab and append `and N more pages`, so one `uncategorized` window event can span hours while several clients' tabs sit live behind it, and the web-watcher rows inside that span are a sample rather than a complete list of what was open. Two consequences, and the second is the one that costs money. A brief client signal in a single web row inside the span is a **lead to check, not a switch point** — resolve it against the other monitors (§3, "Focused window ≠ active attention") before splitting anything, because a 30-second tab check during a call looks identical in the web rows to the start of a new work run. And a long browser row says nothing about what a *meeting* was doing meanwhile: Teams on another monitor never reaches the window watcher at all, so a span that reads as solo browsing with a thin `active_ratio` can be a call, where a low ratio is expected and no shrink is warranted. (Observed 2026-08-21: a 124.7-min `msedge.exe | ChatGPT and 8 more pages` event ran the whole length of an 85-minute Teams call visible only on another monitor; two brief second-client tab hits inside it were first read as an end-of-block switch and billed as one, both wrongly.)
 
-**The identifier is often not in the window title at all.** Admin tools that connect to a client environment — XrmToolBox, database/API clients, RDP sessions, CLI auth profiles — carry a fixed product name in the title and show the environment only on screen: a connection dropdown, a status bar, a profile list. The connected environment decides the client; the tool name never does, and neither does the workspace behind it. Two consequences: the block stays unresolved until a screenshot shows the connection (`SKILL.md` Step 5.2), and §6's adjacency rule does **not** extend here — connecting to a different environment is frequently the switch point itself, so the neighbouring block is the wrong answer by construction. Flag these on sight: a title with no visible ambiguity won't otherwise reach the screenshot check.
+**The identifier is often not in the window title at all.** Admin tools that connect to a client environment — XrmToolBox, database/API clients, RDP sessions, CLI auth profiles — carry a fixed product name in the title and show the environment only on screen: a connection dropdown, a status bar, a profile list. The connected environment decides the client; the tool name never does, and neither does the workspace behind it. **Flag these on sight** — don't wait for the title to look ambiguous, because it never will. A block titled plain `XrmToolBox` reads as classified, so nothing downstream ever asks about it; the flag raised here is the only thing that gets it looked at. `references/disambiguation.md` is what then resolves it, and a screenshot of the connection is the only thing that can.
 
 ### 6. `claude.exe` / terminal adjacency rule
 
@@ -65,26 +65,12 @@ Pure `claude.exe` / `WindowsTerminal.exe` (or other AI-assist clients) — apply
 
 - Pure terminal time adjacent to a client app stack → attribute to that client.
 - Terminal adjacent to timesheet-automation paths (`Claude/Scheduled/`, `Pictures/WorkScreenshots/`, `Timesheets/`) → the user's internal-admin project.
-- Claude Code task names visible in terminal titles (e.g. `✳ <slug>`) are useful signals but **the slug usually names a feature, not a client** — e.g. `hardcode-confidential-team-lookups` tells you *what* is being worked on, not *who* it's for. Triangulate with the surrounding Edge profile, repo path, or open client environment to pin the client. If the slug is the only signal you have and you can't triangulate, flag the block 🔸 and ask.
+- **Adjacency stops at an admin tool.** Where the neighbouring block is one of §5's tools that shows its environment only on screen, this rule does not reach it: connecting to a different environment is frequently the switch point itself, so the neighbour is the wrong answer by construction.
+- Claude Code task names visible in terminal titles (e.g. `✳ <slug>`) are useful signals but **the slug usually names a feature, not a client** — e.g. `hardcode-confidential-team-lookups` tells you *what* is being worked on, not *who* it's for. Triangulate with the surrounding Edge profile, repo path, or open client environment to pin the client. A slug that triangulates against nothing is a 🔸, raised here; `references/disambiguation.md` has what to do with one.
 
-## Interleaved days — find the switch point, don't average
+## A day that alternated between two clients
 
-The costliest real-world misattributions are long blocks on days where the user alternated between two clients: the whole block gets billed to whichever client *dominates* the category rollup, and the other client's hours land on the wrong invoice.
-
-**Triggers — treat the block as interleaved when any of these hold:**
-- The day rollup shows ≥2 clients with ≥30 min each, and a single proposed block is >1 hr
-- The zoomed timeline alternates between two clients' signals within the block
-- Any `!MULTI` span, or a block titled by an agent-session file (`CLAUDE.md`, `AGENTS.md`, plan `.md`s)
-- An autonomous agent ran during the block (see "Focused window ≠ active attention" above)
-
-**Procedure:**
-1. Zoom the timeline over the block (`activity_timeline.py <date> --window …`) and note every point where the client signal flips.
-2. Probe screenshots economically: start with ~3 spread across the block (start / middle / end), then densify only around detected flips until each switch point is bracketed to ~10 min. Check the other monitors at every probe, and record which client's work is on screen.
-3. Locate the **switch point(s)**: the boundary between runs of consistent client evidence. Split the block there. A switch point is a real boundary even with no AFK gap — client A until 16:10 and client B after is two entries, at whatever timestamps the evidence shows.
-4. Attribute each sub-block to its own client. Never bill the whole block to the rollup-dominant client while a second client shows ≥15 min of evidence inside it — if the evidence can't pin the switch point, ask the user rather than averaging.
-5. If the two "clients" are actually work vs. personal/upskilling/internal interleaved, the same procedure applies — carve out the non-billable or internal runs, and say so in the presentation.
-6. **A named Teams meeting recurring in fragments through the block is its own sub-block** (the user attending while multitasking) — carve it out with its own attribution per signal §3, even though no single fragment is long. The parallel coding stays with its own client.
-7. **Some days have no switch point to find.** Two workspaces with an agent session in each, focus alternating every 1–3 min for hours, is genuinely parallel work — step 2 will keep finding flips and never bracket a boundary. Don't manufacture one, and don't keep spending screenshots hunting it. Ask per step 4. If the user hands the split back to you ("you decide"), tally each client's minutes across the block from the zoom, allocate proportionally, and place each boundary where that client's corroborating evidence clusters (a CRM/ADO/SharePoint run, a commit, a bug fixed). A client whose fragments total under step 4's ≥15 min bar is noise — leave that time with the dominant client. Say in the presentation that the boundary is an allocation rather than an observed switch, so the user knows which kind of call they are approving.
+A block whose signals flip between clients is not classified by this file at all: finding the boundary is a procedure, not a signal, and getting it wrong is the costliest misattribution there is. `references/disambiguation.md` § "Interleaved days" owns it — what triggers it, how to spend screenshots on it, and what to do on a day that has no boundary to find.
 
 ## Work kind and task selection
 
@@ -122,6 +108,7 @@ Resolution order:
 
 - **Bill by work item, not by window or app.** One sustained block of work on one work item = one entry, even when the surface switched between IDE, browser, Teams, and admin portals. Don't fragment by window-title change.
 - **The timesheet run itself lands *after* the last block it can bill.** Doing the timesheet is real `Internal admin` time, but it happens at the end of the day — usually in the dead stretch past `work_end`, which is unbillable anyway. The failure is back-dating it onto the last live block: the day's final 20-30 min get labelled "timesheet & expenses, non-billable" while the screenshots across that window show ordinary client work, and the client silently loses the time. **Before booking — or verifying an already-posted — timesheet-admin entry, read a screenshot inside the window and confirm a timesheet or provider surface is actually on one of the monitors.** Verification is the easier half to skip: Step 1's already-covered branch checks coverage and idle ratio, and both pass on a block that is correctly timed and booked to the wrong project. If it shows client work, bill the client; put the admin time where it really happened, or leave it off if that stretch is already excluded. Observed on 2026-08-18: 17:30-17:54 posted as internal admin, four captures across it showing client access-sync work and no timesheet UI on any monitor.
+- **Never silently bill an abandoned-task block.** Setup/sign-in/install work that ended without a client deliverable and a pivot elsewhere → surface it; default to internal-admin non-billable unless the user says otherwise. This is a billing default, not a disambiguation step: such a block is often attributed confidently — you know whose tenant you signed into — so it never gets flagged, and a rule that waited for a flag would never be read.
 - **A matching work item older than ~1 week → make a NEW one, don't reuse it.** The old one is likely closed or already invoiced. Create a fresh one (`references/new-client-work.md`) and bill to that; only reuse a genuinely recent / still-open item.
 
 ## Writing the entry note (description)
@@ -140,9 +127,11 @@ Notes go to clients on invoices — `SKILL.md` carries the hard rule (client-rea
 
 ## Confidence rating
 
+Every block leaves this file with one, so the three stay here rather than with the ladder — a rating that only loaded once something was already flagged could not be what raises the flag.
+
 - **HIGH** — direct work-item hit, OR two corroborating signals (e.g. Edge profile + URL agree).
 - **MEDIUM** — single signal (profile, URL, or app), no contradictions.
-- **LOW** — conflicting signals, or signal absent but block is non-trivial duration. Mark with 🔸 and ask the user.
+- **LOW** — conflicting signals, or signal absent but block is non-trivial duration. Mark with 🔸 and ask the user — `references/disambiguation.md` is how.
 
 ## Exclusions (NEVER bill)
 

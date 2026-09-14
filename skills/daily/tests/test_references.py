@@ -207,6 +207,35 @@ def test_the_inventory_entry_lists_exactly_the_flags_its_scripts_parse(name):
         "stops reaching, which is a bug in this test rather than a gap in SKILL.md.")
 
 
+def reference_names() -> list[str]:
+    refs = os.path.join(SKILL, "references")
+    return sorted(n for n in os.listdir(refs) if n.endswith(".md"))
+
+
+@pytest.mark.parametrize("name", reference_names())
+def test_every_reference_file_is_named_by_skill_md(name):
+    """A reference nothing points at never loads.
+
+    `SKILL.md` is the only file a run is guaranteed to read, so a reference it never names
+    is shipped and unreachable — the run does not know it exists to go looking. Derived
+    from `references/` rather than from a list, so the tenth reference is covered the day
+    it lands; this is the same drift the inventory tests above hold the scripts against.
+
+    Naming it once is the bar. *Where* a reference is loaded is a judgement the file's own
+    entry records — #40 split `disambiguation.md` out of `classification-rules.md`
+    precisely so that one loads on every run and the other only on a day that flagged
+    something, and a test that demanded both be loaded the same way would have forbidden
+    that split.
+    """
+    with open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8") as fh:
+        skill_md = fh.read()
+    assert name in skill_md, (
+        f"references/{name} ships in the skill but SKILL.md never names it. A run reads "
+        "SKILL.md and loads what it points at; a reference outside that graph is dead "
+        "weight in the package and invisible to every run. Name it where a run would need "
+        "it — and if it has no such moment, it is not a reference.")
+
+
 # --------------------------------------------------------------------------------------
 # A zone the machine supplied is announced where the user reads it (#30)
 # --------------------------------------------------------------------------------------

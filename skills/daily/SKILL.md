@@ -113,7 +113,7 @@ Convert relative dates ("yesterday", "Friday") using today's date in the user's 
 
 Read in parallel:
 - `Timesheets/.context.md` — the **whole** file (Prerequisite 1), if you have not already read it this run
-- `references/classification-rules.md` (the classification rubric — client, project, **work kind and task selection**, interleaved-day protocol)
+- `references/classification-rules.md` (the classification rubric — client, project, **work kind and task selection**). Its companion `references/disambiguation.md` is *not* loaded here: it is what Step 5 reads once a block comes out flagged **or the day turns out to have been shared between clients**, and a single-client day that flagged nothing never needs it
 - Cached catalogs from `.mcp/`
 - `python scripts/category_rules.py --status` — **before the timeline below**, because the timeline labels every span with these rules and a run that reads them stale mislabels the whole day. Two local file reads and nothing over the wire, so it costs a run nothing:
   - **`CURRENT …`** — the rules were compiled from this `.context.md` and it has not changed since. Nothing to do, and nothing is written to the activity source.
@@ -174,18 +174,13 @@ For each block determine its attribution — **client + project + task + billabl
 - The AW category from the timeline is a client-level first pass only — never project/work-item-level, never 100%. Investigate every `uncategorized` and `!MULTI` span.
 - Work-item-shaped strings (`[A-Z]{2,4}\d{3,}S?`) in titles/URLs are the highest-confidence signal: resolve the title in the user's work-item catalog and the project/task via `python scripts/harvest_lookup.py <code-name-or-client>` — it searches ALL catalog pages and falls back to the user's recent entries for archived projects. Never hand-roll a glob loop (it reads one page and misses projects). **A client's name is a first-class search term, and the top hit is not automatically the right project:** the live delivery project is often named for the *work* and matches only on `client.name` (reported as `matched_on: client`, ranked last), while a dead presales or shell project named after the client ranks above it. Read all candidates before picking — an all-non-billable task set is the tell for a shell. Trailing `S` = Support: tag the description `[Support]`, same project/task selection.
 - **Task selection and billable status: follow the rubric's "Work kind and task selection" section exactly** — `.context.md` overrides first, then the block's dominant activity gives a work kind, then `.context.md` § "Work kinds" turns that into the user's own task name. Billable comes from `task_assignments[].billable`, never from the task name.
-- **If the day shows more than one client, or a block is titled by an agent-session file (`CLAUDE.md`, `AGENTS.md`, plan `.md`s): apply the rubric's "Interleaved days" protocol before accepting any block over an hour.** This is the single largest source of real misattributions.
+- **If the day shows more than one client, or a block is titled by an agent-session file (`CLAUDE.md`, `AGENTS.md`, plan `.md`s): apply `references/disambiguation.md` § "Interleaved days" before accepting any block over an hour.** This is the single largest source of real misattributions.
 
 ### Step 5 — Disambiguate flagged blocks
 
-For any 🔸 block (low confidence, thin ratio, or ambiguous attribution):
+Every 🔸 block — low confidence, thin ratio, or ambiguous attribution — is resolved here, before Step 6 renders it. **Read `references/disambiguation.md` and work it**: the ladder (zoom the timeline, then screenshots, then ask the user), the two signals that arrive already flagged, the interleaved-day switch-point protocol, and what a block is *not* allowed to settle — AFK, which stays the AFK watcher's.
 
-- **AFK status is settled by the AFK watcher** — never re-infer active/idle from screenshots, and never from the calendar. Screenshots and zooms answer only *which client/project*; a corroborated calendar event answers *how long the meeting was* (Step 3) and says nothing about idle either.
-1. **Zoom the timeline first:** `python scripts/activity_timeline.py <date> --window HH:MM-HH:MM` folds in Firefox/Chrome web-watcher rows — richer URL/title signals without opening images.
-2. **Then screenshots**, for generic apps that don't name their client (XrmToolBox, bare VS Code, terminals): find the nearest `HH-MM-SS_mN.png` to the ambiguous timestamps, read the env URL / workspace / repo / work item on screen. Different clients in different screenshots within one block → split the block (switch-point protocol).
-   - **When several blocks need screenshot-checking, delegate the reading to a cheap subagent** (e.g. `Agent` with `model: "haiku"`) rather than reading every capture in the main session — image tokens add up fast once a date needs more than a couple of captures, and this is a plain read-what's-on-screen task a smaller model handles fine. Give the subagent no conversation context of its own, so its prompt must carry: the screenshot directory and exact timestamps to check (all monitors — `_m1`/`_m2`/…), the signal list from `.context.md`, the AFK-settled rule above, and classification-rules.md's "Interleaved days" probe-economically procedure (3 spread, densify around flips) if any block needs a switch point. It reports **raw signals per capture** (app, environment URL, ticket numbers, Edge profile, workspace) — never a billing verdict; attribution against `.context.md` stays with the main session.
-3. **Still ambiguous → ask the user**, showing which screenshots you checked, what you saw, and the candidate clients.
-- **Never silently bill an abandoned-task block.** Setup/sign-in/install work that ended without a client deliverable and a pivot elsewhere → surface it; default to internal-admin non-billable unless the user says otherwise.
+Load it on any day with a 🔸 in it — **and on any day that shows more than one client, flagged or not.** An interleaved day can score every block HIGH and still be the largest source of real misattributions there is, so the switch-point half of that file is reached by the day's shape rather than by a flag. A single-client day that flagged nothing skips this step.
 
 ### Step 6 — Present the proposed timesheet
 
@@ -331,7 +326,8 @@ Show the exact diff, one fact per ask. Example: "The XrmToolBox signal isn't in 
 - `.env.example` / `.gitignore` — Harvest credential template (copy to `.env`, gitignored)
 - `references/first-run.md` — first-run setup: screenshot task, `.context.md` creation, Harvest creds, AW discovery, AW category maintenance
 - `references/context.md.example` — starter template for `Timesheets/.context.md`
-- `references/classification-rules.md` — client/project/**work kind** rubric + interleaved-day switch-point protocol
+- `references/classification-rules.md` — client/project/**work kind** rubric: the signal hierarchy, work kind and task selection, billing conventions, note style, exclusions. Read at Step 2 on every run
+- `references/disambiguation.md` — what Step 5 does with a 🔸: the zoom → screenshots → ask ladder and its subagent brief, and the interleaved-day switch-point protocol. Loaded on a day that flagged something, or one shared between clients; what *raises* a flag is the rubric's, above
 - `references/activitywatch.md` — raw AW API reference (endpoints, buckets, heartbeat dedupe, lock-screen quirk)
 - `references/output-format.md` — timesheet .md template
 - `references/catalog-refresh.md` — refreshing `.mcp/` catalogs

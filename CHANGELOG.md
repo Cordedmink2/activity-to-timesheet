@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   machine that already had both packages.
 
 ### Changed
+- **A run only reads the disambiguation procedure on a day that needs it** (#40). The escalation
+  ladder — zoom the timeline, then screenshots, then ask you — and the switch-point protocol for a
+  day split between two clients have moved out of `SKILL.md` Step 5 and
+  `references/classification-rules.md` into a new `references/disambiguation.md`. A day whose
+  blocks all classify cleanly, against one client, never loads it. The line the split falls on is
+  what *raises* a 🔸 against what resolves one: the confidence rating, "flag an admin tool on
+  sight" and "a Claude Code slug that triangulates against nothing is a 🔸" all stay in the rubric
+  a run reads every time, because a rule that only loaded after a flag existed could not be the
+  thing that raised it. No judgement changed — the same evidence produces the same timesheet, and
+  there is nothing to do on upgrade.
 - **The timezone is read from the machine when you have not set one** (#30). `TIMESHEET_TIMEZONE`
   is no longer required: left blank, every script that reads a day takes this machine's own zone —
   the registry on Windows, `TZ`, `/etc/localtime` or `/etc/timezone` elsewhere — and labels the

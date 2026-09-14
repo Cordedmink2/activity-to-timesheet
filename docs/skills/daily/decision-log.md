@@ -63,6 +63,11 @@ when a new entry earns one, and leave the entry where it is.
 - **Probing a capability on an empty input tests nothing.** `b"".decode("oem")` returns `''`
   without reaching the codec, so it reports every alias present on every platform — § "Three ways
   the gates read clean on Windows and fail on Linux".
+- **A rule that raises a flag cannot live behind the flag.** Splitting a document by what
+  only some runs need is right; splitting it so the trigger sits in the file that loads
+  after the trigger fires is the same unreachability twice — § "What raises a flag and what
+  resolves one belong in different files" and § "Environment-connected tools are a rubric
+  signal, not only a disambiguation step".
 
 ## What the instruments measure
 
@@ -1152,6 +1157,40 @@ set to UTC would otherwise derive where the developer's machine refused, or the 
 
 **Not measured.** No run has been watched deriving on a POSIX machine; the three POSIX
 sources are exercised against a temporary root in `test_timezone.py` and nowhere live.
+
+### What raises a flag and what resolves one belong in different files — `references/disambiguation.md`
+**Rung 2.** 2026-09-11, #40. The disambiguation ladder moved out of `SKILL.md` Step 5 and
+`classification-rules.md` into its own reference, on the progressive-disclosure ground that
+only some runs need it. The line the split has to fall on is not "procedure vs. signal" —
+it is **what can raise a 🔸 against what a raised one costs you**. `classification-rules.md`
+is read at Step 2 on every run; `disambiguation.md` loads at Step 5 only on a day that
+flagged something. So anything that *creates* a flag has to stay in the first file, or it
+is behind the gate it was supposed to open.
+
+Three rules were moved across that line before the log caught it, and all three came back:
+the **confidence rating** (assigned to every block on every run — a LOW is the commonest
+way a block reaches the ladder at all), §5's **flag an admin tool on sight**, and §6's
+**a slug that triangulates against nothing is a 🔸**. The second is the one with a measured
+case behind it: § "Environment-connected tools are a rubric signal, not only a
+disambiguation step" (2026-08-18) fixed exactly this defect once already, where a block
+titled plain `XrmToolBox` reads as unambiguous and so never reaches Step 5. Moving the rule
+into a Step 5-only file would have reintroduced it a month later, with the guidance intact
+and unreachable — which is why that entry says *reachability, not absence, was the defect*.
+
+**The instrument was a phrase grep, not a reading.** Before the first edit, every distinct
+rule, threshold and trigger in the moving text was listed, and after the edits each was
+grepped by a phrase unique to it across `SKILL.md` and `references/`, expecting exactly one
+file per phrase. Two duplications survived a careful read and failed the grep — §6's "names
+a feature, not a client" restated in both files, and the interleaved-days rationale. A
+by-hand read of a move grades itself kindly; the count does not.
+
+**Rejected: splitting `daily` into several skills**, the shape #40 opened by rejecting.
+Every skill here sets `disable-model-invocation: true`, so a skill that "triggers when the
+client is unclear" cannot trigger itself — `daily` would have to name it, which is what a
+reference pointer already does, one hop cheaper.
+
+**Cost accepted.** `SKILL.md` lost only ~90 words to this (11,061 → 10,968), so #57's 5,000
+ceiling is untouched by it. The saving is per-run context on a clean day, not file size.
 
 ## Script defects
 
