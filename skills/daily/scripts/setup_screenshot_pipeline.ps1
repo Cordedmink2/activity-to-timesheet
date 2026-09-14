@@ -126,7 +126,15 @@ if (-not (Test-Path $CaptureScript)) { throw "Capture script not found: $Capture
 foreach ($pkg in @("PIL:Pillow", "mss:mss")) {
     $importName, $pipName = $pkg -split ":"
     Write-Host "Checking $pipName..."
-    & $pipExe -c "import $importName" 2>$null
+    # Probed with $ErrorActionPreference dropped to Continue for this one call. Under
+    # Stop, Windows PowerShell 5.1 turns a native command's *stderr* into a terminating
+    # NativeCommandError, and `2>$null` does not prevent it — so the ModuleNotFoundError
+    # traceback a missing module prints killed the script here, leaving the install below
+    # unreachable on the only shell a stock Windows box ships with. A fresh Python is the
+    # machine this script exists to set up, so that was the one case it could not handle.
+    # pwsh 7 does not raise, which is why the `pwsh -File` example above never showed it.
+    # $LASTEXITCODE is set by the call and readable after the block.
+    & { $ErrorActionPreference = 'Continue'; & $pipExe -c "import $importName" 2>$null }
     if ($LASTEXITCODE -ne 0) {
         if ($DryRun) { Write-Host "  would install $pipName (user scope)"; continue }
         Write-Host "Installing $pipName (user scope)..."

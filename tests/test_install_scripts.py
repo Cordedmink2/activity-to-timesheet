@@ -577,6 +577,34 @@ def test_python_exe_override_is_probed_and_used(dry_run_setup, tmp_path):
 
 
 @requires_winps
+def test_setup_survives_an_interpreter_that_is_missing_pillow(dry_run_setup, tmp_path):
+    """The branch that installs Pillow and mss has to be *reachable* on the shell a stock
+    Windows box ships with. Under Windows PowerShell 5.1 a native command writing to
+    stderr is a terminating error while `$ErrorActionPreference` is `Stop`, and `2>$null`
+    does not prevent it — so the import probe's own `ModuleNotFoundError` traceback killed
+    the script at the check, before the `$LASTEXITCODE` branch could install anything.
+    A fresh Python is exactly the machine this script exists to set up, so the missing
+    module was the one case it could not handle. pwsh 7 does not raise, which is why the
+    header's `pwsh -File` example never showed it.
+
+    `--without-pip` keeps this near a second: -DryRun only reports the install it would
+    do, so the venv needs no pip — only an interpreter that genuinely lacks `PIL`.
+    """
+    venv = tmp_path / "bare"
+    subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(venv)],
+                   capture_output=True, check=True)
+    python = venv / "Scripts" / "python.exe"
+    probe = subprocess.run([str(python), "-c", "import PIL"], capture_output=True)
+    assert probe.returncode != 0, "the fixture venv can see PIL; it is not testing anything"
+
+    res = dry_run_setup("-PythonExe", str(python), "-ScreenshotsDir", str(tmp_path / "shots"))
+    assert res.returncode == 0, (
+        f"the missing-module branch aborted the setup:\n{res.stdout}{res.stderr}")
+    assert "would install Pillow" in res.stdout, (
+        f"the install branch was never reached:\n{res.stdout}{res.stderr}")
+
+
+@requires_winps
 @pytest.mark.parametrize("breakage", ["zero-byte", "runs-but-fails"])
 def test_python_exe_override_rejects_a_broken_interpreter(dry_run_setup, tmp_path, breakage):
     """Pointing -PythonExe at a broken install must be an error, not a silent fallback

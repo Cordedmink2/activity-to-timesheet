@@ -47,6 +47,11 @@ when a new entry earns one, and leave the entry where it is.
   `--confirm` flag stands where a harness drops `disable-model-invocation`, so the
   duplication is load-bearing — § "The confirmation gate is in the invocation, not only the
   prose".
+- **Under Windows PowerShell 5.1 a native command's stderr is a terminating error** while
+  `$ErrorActionPreference` is `Stop`, and `2>$null` does not prevent it — so any branch that
+  reads `$LASTEXITCODE` after a command that can print to stderr is unreachable on the one
+  shell a stock Windows box ships with — § "The install branch was unreachable on the shell a
+  stock Windows box ships with".
 - **A runtime guard is not a static guard.** `try: import winreg / except ImportError` is correct
   when it runs and invisible to a type checker, which reads the module against the platform it is
   running on; `sys.platform` is the guard that narrows — § "Three ways the gates read clean on
@@ -2504,6 +2509,52 @@ honest about its own platform.
 **Verified after:** Linux `1081 passed, 51 skipped`, pyright `0 errors`; Windows `1126 passed,
 6 skipped`, pyright `0 errors`. The skip count moving 50 → 51 is the `cp437` case, correctly
 skipping for the first time.
+
+### The install branch was unreachable on the shell a stock Windows box ships with — rung 1, observed, 2026-09-14
+
+**Rung 1.** The first `Checks` run, 2026-09-14, immediately after the push that put the workflows
+on the remote. Both Windows legs failed and both Linux legs passed — the reverse of what was
+predicted. Six failures, all in `test_install_scripts.py`, none of them in the change that
+triggered the run.
+
+`setup_screenshot_pipeline.ps1:129` tested for a package with
+`& $pipExe -c "import $importName" 2>$null`, under the `$ErrorActionPreference = "Stop"` set at
+line 50. **Windows PowerShell 5.1 turns a native command's *stderr* into a terminating
+`NativeCommandError`, and `2>$null` does not prevent it.** A missing module prints a
+`ModuleNotFoundError` traceback, so the probe killed the script at the check and the
+`if ($LASTEXITCODE -ne 0)` branch below — the one that installs Pillow and mss — was dead code
+on 5.1. The script's stated job is to install those two when they are absent, and the absent
+case was the one it could not survive. The machine it hits is a fresh Python install, which is
+the machine the script exists to set up.
+
+Measured on the three-cell grid rather than reasoned, each cell probing `import PIL` against a
+venv with no Pillow:
+
+| shell | `$ErrorActionPreference` | result |
+|---|---|---|
+| Windows PowerShell 5.1 | `Stop` | `NativeCommandError`, script dies |
+| Windows PowerShell 5.1 | `Continue` | `$LASTEXITCODE` = 1, branch reached |
+| pwsh 7 | `Stop` | `$LASTEXITCODE` = 1, branch reached |
+
+pwsh 7 not raising is why the header's own `pwsh -File` example never showed it, and why the
+defect survived every by-hand run.
+
+**Rejected: `2>&1 | Out-Null`.** The usual suggestion for this, and measured to still raise under
+5.1 — the redirection merges the streams but the native-stderr rule fires first. The fix is the
+scoped `& { $ErrorActionPreference = 'Continue'; ... }`, which leaves `$LASTEXITCODE` readable
+after the block and drops the preference for one call rather than for the script.
+
+**The repo already knew.** `install/install_skill.ps1:34` runs the same probe shape and wraps it
+in `try { } catch { continue }`, with a comment naming this exact hazard — "under `Stop` that ends
+the script instead of the candidate". Two scripts with one probe between them, and only one
+carried the guard. The other two `.ps1` files setting `Stop` invoke no native command, so those
+two were the whole exposure.
+
+**Instrument.** `test_setup_survives_an_interpreter_that_is_missing_pillow` builds a
+`--without-pip` venv, asserts it genuinely cannot import `PIL`, and runs the real script through
+Windows PowerShell 5.1 expecting `would install Pillow` and exit 0. Red in 3.6s before the fix.
+The assertion that the fixture is broken in the way the test needs is load-bearing: a venv that
+could see `PIL` would pass this test while testing nothing.
 
 ## Rejected
 
