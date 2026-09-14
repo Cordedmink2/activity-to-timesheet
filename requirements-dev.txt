@@ -1,11 +1,8 @@
-# What the two gates in AGENTS.md § "Before reporting a change complete" need, and nothing
-# the plugin itself needs at runtime — a user installs none of this to run the skill.
-#
-# One list, read by both the maintainer and `.github/workflows/checks.yml`, because the two
-# drifting is a defect that reports green: `mss` and `Pillow` were installed on the machine
-# the gates were written on and nowhere in the repo, so pyright read clean there and failed
-# on a fresh clone. See docs/skills/daily/decision-log.md § "Three ways the gates read clean
-# on Windows and fail on Linux".
+# Add a package here when a gate in AGENTS.md § "Before reporting a change complete" needs it to
+# pass. That is the whole membership rule: a user runs the plugin having installed none of this.
+# Read by the maintainer and by `.github/workflows/checks.yml`, so the two cannot drift.
+# What it cost to find that out: docs/skills/daily/decision-log.md § "Three ways the gates read
+# clean on Windows and fail on Linux".
 
 pytest
 pyright

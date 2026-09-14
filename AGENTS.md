@@ -19,11 +19,6 @@ Healthy is a single `passed` line and `0 errors`. The root matters: `skills/dail
 collects the skill's own suite alone, so a run started in that folder skips every repo-level guard
 and still reports green.
 
-`requirements-dev.txt` owns what the gates need, and `.github/workflows/checks.yml` installs from
-that file rather than repeating it — `test_ci.py` holds the workflow to the block above, so a
-command added here without being added there fails. What the two gates need is not what the plugin
-needs: `mss` and `Pillow` are imported lazily by the capture script and matter to `pyright` alone.
-
 ## Releasing
 
 A version bump is the only thing that reaches an installed user — the plugin cache is keyed on
