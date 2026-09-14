@@ -2920,6 +2920,42 @@ finding in `## Rejected`).
 Not resolved here, because picking a side without a control is the untested-diagnosis move
 this file exists to prevent.
 
+### `LockApp.exe` in the foreground does not mean the screen was locked — rung 2, observed, 2026-09-14, #77
+
+`references/activitywatch.md` (pitfalls) says a `LockApp.exe` / `unknown` foreground "usually
+means the screen is locked", that "the AFK watcher will also read `afk` for the same window",
+and concludes "don't bill these spans". On the 2026-09-10 day the second clause was false,
+and following the conclusion would have dropped 46 minutes of real work.
+
+**Observed.** `aw-watcher-window_<HOST>` reports `LockApp.exe | Windows Default Lock
+Screen` as the foreground window for 15:49:32-16:21:41 and 16:22:09-16:36:04 — 46.1 min.
+Over 15:49-16:36, `afk_blocks.py --window` returns `active_ratio` **0.64** (29.9/47.0 min),
+not the `afk` the reference predicts. Captures at 15:54:21 and 16:19:21 show two monitors of
+live, changing content: a VS Code `Admin` workspace editing `Timesheets/.context.md` with an
+`activitywatch-to-harvest` agent session, and a VS Code `Acme` workspace on
+`ControlManifest.Input.xml` with a `pcf-multiselection` agent session. LockApp was stuck as
+the foreground window after an unlock; the session was not locked.
+
+**The two genuine lock stretches inside that window are visible only in the captures, never
+in the window events** — 16:04:21-16:11:51 and 16:29:21-16:36:51, each identifiable by the
+byte signature `_m1` = 3,037,266 (a static wallpaper, byte-identical tick to tick) and `_m2`
+= 10,810 (black). Both are ~8 min, below the break threshold, so they fold in as designed.
+The `LockApp` span is 46 min and bears no relation to either. See § "Byte size as a 'static
+screen' signal" for why that signature triages and does not settle.
+
+**Consequence if the reference is followed as written:** the stretch is excluded, 46 min of
+two-workstream agent supervision goes unbilled, and `--cover` reports it as a declared known
+exclusion rather than a defect — the under-billing is silent, which is what Step 3's
+"under-billing is as much an error as over-billing" exists to catch.
+
+Not resolved here. This is one day on one machine, and the rung-2 bar is not met for
+rewriting the reference: what was measured is that the claim's second clause *can* be false,
+not how often it is. The narrower fix — weakening "the AFK watcher will also read `afk`" to a
+hedge, and naming `active_ratio` as the arbiter rather than the window title — is cheap and
+testable, but wants a second observation before it lands. Whoever picks it up should also ask
+whether `aw_client.py` ought to drop `LockApp.exe` spans from the timeline altogether, since a
+46-min `uncategorized` row that means nothing is itself misleading.
+
 
 - **Largely closed at the data layer, 2026-08-18** (see the `insert_data_gaps` entry
   above): holes now surface as labelled breaks, so an agent no longer has to infer an
