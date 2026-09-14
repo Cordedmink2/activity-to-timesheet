@@ -47,6 +47,10 @@ when a new entry earns one, and leave the entry where it is.
   `--confirm` flag stands where a harness drops `disable-model-invocation`, so the
   duplication is load-bearing — § "The confirmation gate is in the invocation, not only the
   prose".
+- **A fix no interpreter you own can falsify needs a simulated seam, not a CI runner.** Pin
+  it with a monkeypatched stand-in that fails the way the old version did, or the next edit
+  drops the normalization and nothing local goes red — § "A boundary that only spells UTC `Z`
+  on a UTC clock, parsed only by a 3.11 interpreter".
 - **Under Windows PowerShell 5.1 a native command's stderr is a terminating error** while
   `$ErrorActionPreference` is `Stop`, and `2>$null` does not prevent it — so any branch that
   reads `$LASTEXITCODE` after a command that can print to stderr is unreachable on the one
@@ -2555,6 +2559,30 @@ two were the whole exposure.
 Windows PowerShell 5.1 expecting `would install Pillow` and exit 0. Red in 3.6s before the fix.
 The assertion that the fixture is broken in the way the test needs is load-bearing: a venv that
 could see `PIL` would pass this test while testing nothing.
+
+### A boundary that only spells UTC `Z` on a UTC clock, parsed only by a 3.11 interpreter — rung 1, observed, 2026-09-14
+
+**Rung 1.** The second `Checks` run, 2026-09-14, once the probe above was fixed. Windows 3.13
+went green and Windows 3.10 stayed red, alone, on
+`ValueError: Invalid isoformat string: '2026-09-14T09:00:00Z'`.
+
+`test_install_scripts.py` read Task Scheduler's `Start boundary` with a bare
+`datetime.fromisoformat`. Two coincidences hid it: `fromisoformat` learned the `Z` suffix in
+**3.11**, and Task Scheduler only *writes* that suffix on a machine whose clock is **UTC**. A
+developer machine on NZ time running 3.13 misses it twice over, so no local run of any kind
+could have caught it — which is the whole reason the matrix names 3.10 and not just a current
+release.
+
+The normalization is already house idiom at `aw_client.py:188` and
+`skills/daily/tests/support.py`, and `test_aw_client.py` already pins it with a monkeypatched
+`fromisoformat` that raises on `Z`. This one line had simply never adopted it.
+
+**The fix is the seam, not the swap.** Adding `.replace("Z", "+00:00")` inline would have been
+correct and unguarded — invisible on every interpreter that could run it here, exactly as
+`test_parse_ts_reads_the_z_suffix_on_python_310` warns in its own docstring. So the read moved
+into `parse_boundary()` and is pinned by
+`test_the_start_boundary_parses_on_python_310`, which simulates 3.10 the same way and needs
+neither Windows nor a UTC clock. Red in 0.10s on 3.14 before the swap, against both spellings.
 
 ## Rejected
 

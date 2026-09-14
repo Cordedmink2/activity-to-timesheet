@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -494,6 +494,38 @@ def dry_run_field(stdout, field):
     return match.group(1).strip()
 
 
+def parse_boundary(value: str):
+    """`Start boundary` as Task Scheduler prints it, which spells UTC `Z` on a machine whose
+    clock is UTC and as an offset everywhere else. Its own function so the spelling is pinned
+    by a test that needs neither Windows nor a UTC clock — see the test below for why reading
+    it inline could not be.
+
+    The `Z` swap is the house idiom, the same one `aw_client.parse_ts` and
+    `skills/daily/tests/support.py` apply for the same reason."""
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+@pytest.mark.parametrize("spelling", ["2026-09-14T09:00:00Z", "2026-09-14T09:00:00+00:00"])
+def test_the_start_boundary_parses_on_python_310(monkeypatch, spelling):
+    """`fromisoformat` only learned the `Z` suffix in 3.11 and the README supports 3.10, so a
+    boundary read without normalizing it raises there. Simulated, the same way
+    `skills/daily/tests/test_aw_client.py` simulates it: on a newer interpreter both spellings
+    parse either way, and a machine offset from UTC never even produces the `Z` one — so the
+    defect is invisible twice over locally and surfaces only on a 3.10 CI runner.
+    """
+    real = datetime
+
+    class Py310Datetime(real):
+        @classmethod
+        def fromisoformat(cls, s):
+            if s.endswith("Z"):
+                raise ValueError(f"Invalid isoformat string: {s!r}")
+            return real.fromisoformat(s)
+
+    monkeypatch.setattr(sys.modules[__name__], "datetime", Py310Datetime)
+    assert parse_boundary(spelling) == real(2026, 9, 14, 9, 0, tzinfo=timezone.utc)
+
+
 @requires_winps
 def test_dry_run_registers_no_task(dry_run_setup, tmp_path):
     """The switch exists so the rest of these tests can inspect a real task definition
@@ -539,7 +571,7 @@ def test_dry_run_repeats_across_the_requested_workday(dry_run_setup, tmp_path):
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "not a weekdays-only trigger"
 
     # Task Scheduler normalizes the boundary to UTC, so compare it back in local time.
-    boundary = datetime.fromisoformat(dry_run_field(res.stdout, "Start boundary"))
+    boundary = parse_boundary(dry_run_field(res.stdout, "Start boundary"))
     local = boundary.astimezone() if boundary.tzinfo else boundary
     assert local.strftime("%H:%M") == "09:00", f"first run is not at -StartTime: {boundary}"
 
