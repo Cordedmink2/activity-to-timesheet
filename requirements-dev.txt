@@ -1,0 +1,21 @@
+# What the two gates in AGENTS.md § "Before reporting a change complete" need, and nothing
+# the plugin itself needs at runtime — a user installs none of this to run the skill.
+#
+# One list, read by both the maintainer and `.github/workflows/checks.yml`, because the two
+# drifting is a defect that reports green: `mss` and `Pillow` were installed on the machine
+# the gates were written on and nowhere in the repo, so pyright read clean there and failed
+# on a fresh clone. See docs/skills/daily/decision-log.md § "Three ways the gates read clean
+# on Windows and fail on Linux".
+
+pytest
+pyright
+
+# `zoneinfo` ships no zone database on Windows; this is the same install README.md
+# § Prerequisites asks of a user.
+tzdata
+
+# Imported inside `take_screenshots` in skills/daily/scripts/screenshot_capture.py, so the
+# module loads without them and only pyright needs them present. `setup_screenshot_pipeline.ps1`
+# installs the same two on a user's machine.
+mss
+Pillow

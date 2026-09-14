@@ -200,10 +200,14 @@ def machine_zone_name(platform: str | None = None, environ=None, root: Path = Pa
 def _registry_zone_key_name() -> str | None:
     """`TimeZoneKeyName` under `HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation`,
     or None off Windows or when the key cannot be read."""
-    try:
-        import winreg
-    except ImportError:
+    # Guarded on `sys.platform` and not by catching `ImportError`, though both refuse off
+    # Windows at runtime: `winreg` is Windows-only in typeshed, so a type checker running
+    # on Linux resolves none of its attributes and reports three errors an import guard
+    # cannot narrow away. `sys.platform` it does narrow, which is what keeps the Linux half
+    # of the `Checks` matrix green.
+    if sys.platform != "win32":
         return None
+    import winreg
     try:
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                             r"SYSTEM\CurrentControlSet\Control\TimeZoneInformation") as key:

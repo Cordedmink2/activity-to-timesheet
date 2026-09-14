@@ -33,6 +33,31 @@ SCRIPT = os.path.join("skills", "daily", "scripts", "screenshot_capture.py")
 SHOTS = r"C:\Users\someone\Pictures\Work Shots"
 
 
+def _oem_decodes_cp437() -> bool:
+    """Whether `oem` — the alias Python registers on Windows alone, resolving to the code
+    page a console actually inherited — reads cp437 bytes back as themselves. Probed rather
+    than assumed from `sys.platform`, the way the other suites probe for `gh`, `bash` and
+    Windows PowerShell.
+
+    The round trip and not `codecs.lookup("oem")`, because the alias being *registered* is
+    not the capability the case below needs: on a Windows whose OEM page is cp932, `Å` as
+    cp437 is `0x8F`, a cp932 lead byte, which mis-decodes or raises while `lookup` still
+    succeeds. cp437 and cp850 — the Western pages — agree on `0x8F`, so this stays true
+    where the case is meaningful and refuses where it is not.
+
+    Not `b"".decode("oem")`: decoding empty bytes returns `''` without ever reaching the
+    codec, so that probe reports the alias present on every platform, Linux included."""
+    try:
+        return "Å".encode("cp437").decode("oem") == "Å"
+    except (LookupError, UnicodeDecodeError):
+        return False
+
+
+requires_oem_cp437 = pytest.mark.skipif(
+    not _oem_decodes_cp437(),
+    reason="no 'oem' codec, or an OEM code page that is not cp437-compatible")
+
+
 @pytest.fixture
 def roots(tmp_path):
     """Two sibling version directories the way the plugin cache lays them out, the current
@@ -87,7 +112,13 @@ def test_output_that_is_not_a_task_reads_as_nothing():
     assert publisher.stored_arguments("\x00\x00not xml at all") is None
 
 
-@pytest.mark.parametrize("encoding", ["utf-8", "cp437", "utf-16"])
+@pytest.mark.parametrize("encoding", [
+    "utf-8",
+    # Only this one needs the OEM page to read cp437 back, so only this one skips where it
+    # cannot. The other two hold everywhere and keep the test honest on both CI legs.
+    pytest.param("cp437", marks=requires_oem_cp437),
+    "utf-16",
+])
 def test_console_output_is_decoded_whatever_code_page_the_hook_inherited(encoding):
     """The code page is the console's, not ours: UTF-8 was observed in a pwsh console, an OEM
     page is what a plain `cmd` inherits, and UTF-16 is what the declaration claims. A

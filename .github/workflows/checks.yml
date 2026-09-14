@@ -35,11 +35,14 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # `tzdata` because `zoneinfo` has no zone database on Windows without it — the same
-      # install README.md § Prerequisites asks of a user. `pyright` from PyPI wraps the npm
-      # package and finds the runner's own node.
+      # From `requirements-dev.txt` and not a list repeated here: the maintainer running the
+      # gates by hand reads that same file out of AGENTS.md § "Before reporting a change
+      # complete", and two lists drifting is a defect that reports green on one machine and
+      # fails on the next. Each entry says there why the gates need it.
       - name: Install the test tools
-        run: python -m pip install --upgrade pip pytest tzdata pyright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
 
       - name: Tests
         run: python -m pytest -q tests skills/daily/tests

@@ -47,6 +47,13 @@ when a new entry earns one, and leave the entry where it is.
   `--confirm` flag stands where a harness drops `disable-model-invocation`, so the
   duplication is load-bearing — § "The confirmation gate is in the invocation, not only the
   prose".
+- **A runtime guard is not a static guard.** `try: import winreg / except ImportError` is correct
+  when it runs and invisible to a type checker, which reads the module against the platform it is
+  running on; `sys.platform` is the guard that narrows — § "Three ways the gates read clean on
+  Windows and fail on Linux".
+- **Probing a capability on an empty input tests nothing.** `b"".decode("oem")` returns `''`
+  without reaching the codec, so it reports every alias present on every platform — § "Three ways
+  the gates read clean on Windows and fail on Linux".
 
 ## What the instruments measure
 
@@ -2445,6 +2452,58 @@ is ever revisited, because it is the only one that fails visibly.
 **What the tag is now for:** the fallback signal for browser time carrying no other evidence, which
 is why it is ranked last of the seven signal types rather than first, and why it stays bracketed and
 collision-resistant while every other signal is matched more specifically.
+
+### Three ways the gates read clean on Windows and fail on Linux — rung 1, observed, 2026-09-14
+
+**Rung 1.** 2026-09-14, before #45's workflows had ever run. `beee2bd` added the two-platform
+`Checks` matrix but sits in eleven unpushed commits, so no CI run exists and the Linux half had
+never executed. Run here under WSL Ubuntu 24.04 against the same command lines the workflow uses.
+Windows was green throughout — `1126 passed`, pyright `0 errors` — while Linux failed three
+separate ways, each invisible from the machine the gate was written on.
+
+**1. An `ImportError` guard does not narrow for a type checker.** `timezone.py`'s
+`_registry_zone_key_name` wrapped `import winreg` in `try/except ImportError`, which is correct at
+runtime and worthless statically: `winreg` is Windows-only in typeshed, so pyright on Linux
+resolved none of its attributes and reported three `reportAttributeAccessIssue` errors. Replaced
+with an early `if sys.platform != "win32": return None`, which pyright *does* narrow. Same runtime
+behaviour, and the branch is what keeps the Linux leg green.
+
+**2. `b"".decode(enc)` is not a codec probe.** The first attempt to skip the `cp437` case off
+Windows probed the `oem` alias with `b"".decode("oem")`. Decoding empty bytes short-circuits before
+the codec is ever looked up, so it returned `''` on Linux and reported the alias present — the skip
+never applied and the test failed a second time, identically. Probing a capability on an empty
+input is the general shape of the mistake.
+
+`codecs.lookup("oem")` fixed that and was still the wrong probe, which review caught: the alias
+being *registered* is not the capability the case needs. On a Windows whose OEM page is cp932,
+`Å` as cp437 is `0x8F` — a cp932 lead byte — so the decode mis-reads while `lookup` succeeds and
+the skip does not fire. The probe is now the round trip itself,
+`"Å".encode("cp437").decode("oem") == "Å"`, which refuses exactly where the case is meaningless.
+cp437 and cp850 agree on `0x8F`, so it stays true on the Western pages.
+
+**3. The gate's dependency list was the author's machine.** With those fixed, pyright still failed
+on both legs for `mss` and `Pillow`: `screenshot_capture.py` imports them inside `take_screenshots`,
+no requirements file declares them, and `checks.yml` installed only `pytest tzdata pyright`. They
+read clean locally because `setup_screenshot_pipeline.ps1` had installed them on this machine years
+of runs ago. This one was never Linux-specific — it would have reddened the Windows leg too on its
+first real run.
+
+Adding the two to the workflow's install line fixed CI and moved the same failure onto the next
+clean clone, where `AGENTS.md` still promised `0 errors` and nothing named the install — review
+caught that too. They now live in `requirements-dev.txt`, which the fenced block in `AGENTS.md`
+§ "Before reporting a change complete" installs and `checks.yml` installs from. That block was
+already the single owner: `test_ci.py::test_the_checks_workflow_runs_exactly_the_commands_agents_md_prescribes`
+asserts every command in it appears in the workflow, so the maintainer's gate and CI cannot
+drift apart without failing.
+
+**Rejected: `"pythonPlatform": "Windows"` in `pyrightconfig.json`.** It would have silenced finding
+1 in one line and made both legs agree, but by making the Linux leg stop checking Linux — the
+opposite of why #45 asks for two platforms. The narrowing fix costs three lines and keeps each leg
+honest about its own platform.
+
+**Verified after:** Linux `1081 passed, 51 skipped`, pyright `0 errors`; Windows `1126 passed,
+6 skipped`, pyright `0 errors`. The skip count moving 50 → 51 is the `cp437` case, correctly
+skipping for the first time.
 
 ## Rejected
 
