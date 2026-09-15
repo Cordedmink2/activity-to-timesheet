@@ -34,8 +34,11 @@ manifest left alone. Bump when the newest heading is tagged — then bump
 holds the pair. Then tag the release commit. See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)
 § Releasing for the full steps.
 
-The **maintainer** cuts the tag, by hand, once the `Checks` workflow is green on `main` for the
-release commit — an agent bumps the version and writes the changelog entry, and stops there.
+The **maintainer** decides when a version is cut, and says so for that version by name. With that
+go-ahead an agent tags the release commit and pushes it, once the `Checks` workflow is green on
+`main` for that commit. Absent a go-ahead for the version in front of it, an agent bumps the
+version and writes the changelog entry and stops there — the decision is the maintainer's every
+time, and a previous release's go-ahead does not carry to the next one.
 Pushing the tag runs `.github/workflows/release.yml`, which publishes the GitHub Release from the
 matching `## [x.y.z]` section; a tag with no such heading fails there rather than publishing an
 empty note.

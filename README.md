@@ -265,14 +265,11 @@ an environment or site, the name of an editor workspace, the profile tag from st
 compiles, checks and writes the ActivityWatch category rules for you. You never see a regular
 expression.
 
-What it checks before writing anything, because both of these fail silently:
-
-- **A rule that matches nothing** leaves that client's whole day uncategorized. Every rule is tested
-  against your own recent window titles first, and one that matches none of them is refused.
-- **A rule that matches too much** is worse. The first matching rule wins, so a rule broad enough to
-  catch unrelated pages takes the label off the rule that should have won — a bare-word rule on one
-  real machine matched 256 of 552 browser titles in a single day. Anything over about a third of
-  your titles is refused, and the ceiling is yours to move.
+Every candidate is gated against your own recent window titles before anything is written, because
+a bad rule fails silently rather than loudly — one matching nothing leaves that client's day
+uncategorized, and one matching too much takes the label off the rule that should have won. The
+demo below runs each failure live, and `/billables:setup` step 4 answers them in the words the gate
+prints.
 
 It also copies your existing rules into your workspace before it writes, keeps every category you
 made yourself, and offers once to adopt those into the set it manages. Each category it writes is
@@ -373,31 +370,17 @@ never edits it silently.
 
 ### 8. Set your Harvest API credentials
 
-1. Go to **https://id.getharvest.com/developers**:
-   - Note your numeric **Account ID** (shown at the top).
-   - Create a **Personal Access Token**. A member-scope token is enough.
-2. Run **`/plugin configure billables`** and paste both in. They go to Claude Code's credential store,
-   not into the plugin folder, so there is nothing to git-ignore and a plugin update can't carry them
-   off. On macOS that store is the OS keychain; on Windows and Linux it is `~/.claude/.credentials.json`
-   — a file in your home directory, so treat that directory as holding a secret.
-   Your **timezone** can stay blank: the scripts read the machine's own zone and label every
-   day as read in it. Set it here to pin a different one.
-3. Start a new session — the values are published at session start, into commands Claude Code runs
-   through its **Bash** tool. Then verify there (on Windows use `py` — a bare `python` is often the
-   Store stub). It has to be the Bash tool: the values are published as a POSIX shell fragment, so
-   the same command in PowerShell reports the credentials missing on an account that is set up
-   perfectly well.
-   ```bash
-   py "<skill folder>/scripts/harvest_list.py" 2026-01-01 2026-01-01
-   ```
-   Entries print one per line; a day with no entries prints `(no time entries from … to …)`.
-   Either of those with no auth error is success — a 401/403 means the token is wrong.
+The [install section](#install) above covers this: an **Account ID** and a **Personal Access
+Token** from **https://id.getharvest.com/developers**, entered once with
+**`/plugin configure billables`**, then a new session so the values reach the scripts. A
+member-scope token is enough. `/billables:setup` checks they arrived and tells you which gap it is
+when they haven't.
 
-> **Exported install** (step 5's clone route, rather than `/plugin install`): there's no
-> configuration dialog, so the same keys go in a `.env` at the skill root instead — copy
-> `.env.example` beside it and fill in `HARVEST_ACCOUNT_ID` and `HARVEST_API_KEY`
-> (`TIMESHEET_TIMEZONE` may stay blank). That file grants full access to your Harvest account: it is git-ignored,
-> never commit it, and never share the skill folder with it still in place.
+The reasoning behind each of those steps — the order a setting resolves in, where a sensitive value
+actually sits on your platform, why a new session is what delivers it, and the `.env` an exported
+install uses in place of the dialog — is in `skills/daily/references/first-run.md`
+§ "First-run: configuration", which is also what the skill reads when a run reports a credential
+missing.
 
 ### 9. (Optional) Dataverse ticket catalog
 

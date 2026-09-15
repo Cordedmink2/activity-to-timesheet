@@ -31,7 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nothing changed about the task itself or how it is registered, so there is nothing to do on
   upgrade. `docs/CONTRIBUTING.md` § "Rules with more than one copy" gained a row for this, one
   for the Harvest credential steps and one for the rule-failure list, each naming every copy; two
-  new guards in the repo-level suite refuse a second copy of the first two.
+  new guards in the repo-level suite refuse a second copy of the first two. `README.md` § 8 is now
+  a pointer at the install table above it rather than a second copy of the credential steps, and
+  § 4 points at the demo and the setup step instead of listing the ways a rule is refused — the
+  step-by-step walkthrough around them is #38's to remove once #37 has moved the work-item source.
 - **A run only reads the disambiguation procedure on a day that needs it** (#40). The escalation
   ladder — zoom the timeline, then screenshots, then ask you — and the switch-point protocol for a
   day split between two clients have moved out of `SKILL.md` Step 5 and
