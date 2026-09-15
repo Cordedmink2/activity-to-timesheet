@@ -13,6 +13,12 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Which ticket is next
+
+Milestone names trail the manifest version — `v0.7.0` and `v0.8.0` both still held open issues
+at 0.9.0 — so they rank nothing. Pick by label and blockers: `ready-for-agent`, with every issue
+named in a `Blocked by:` line or in `issue_dependencies_summary.blocked_by` closed.
+
 ## Before a ticket is done
 
 On any ticket larger than a single-file change, dispatch a review subagent over the finished change

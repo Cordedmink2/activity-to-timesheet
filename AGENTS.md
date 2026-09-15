@@ -15,14 +15,20 @@ python -m pytest -q tests skills/daily/tests
 pyright
 ```
 
-Healthy is a single `passed` line and `0 errors`. The root matters: `skills/daily/pytest.ini`
+Healthy is a single `passed` line and `0 errors`. Read pyright's verdict with
+`pyright | grep -E '^[0-9]+ errors?'` — a version-upgrade notice trails the summary, so a `tail`
+shows the notice instead of the answer. The root matters: `skills/daily/pytest.ini`
 collects the skill's own suite alone, so a run started in that folder skips every repo-level guard
 and still reports green.
 
 ## Releasing
 
 A version bump is the only thing that reaches an installed user — the plugin cache is keyed on
-the manifest version, and `/plugin update` has nothing to move to while it is unchanged. Bump
+the manifest version, and `/plugin update` has nothing to move to while it is unchanged.
+
+Check `git tag --list` before bumping anything: while the newest `## [x.y.z]` heading carries no
+tag, that version is still in progress, and a change ships by adding to its sections with the
+manifest left alone. Bump when the newest heading is tagged — then bump
 `version` in `.claude-plugin/plugin.json` and add the matching `## [x.y.z]` heading to
 `CHANGELOG.md` in the same change; `tests/test_distribution.py::test_every_version_marker_agrees`
 holds the pair. Then tag the release commit. See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)
