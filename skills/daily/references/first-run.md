@@ -8,15 +8,9 @@ The skill is **shareable across users**. Each user maintains their own `Timeshee
 
 ## Screenshot grabber (one-time, per machine)
 
-The skill bundles its own capture pipeline. From the skill's `scripts/` folder:
+**Standing the task up is the `setup` skill's step 5, and it is not restated here.** That step runs the same bundled `scripts/setup_screenshot_pipeline.ps1`, passes the configured capture directory through to it, and reads the registration back before it moves on — including the two-shell order that clears an `Access is denied` for good, which re-running elevated does not. A run that finds no screenshot task at all belongs there, not in this file.
 
-```powershell
-pwsh -File setup_screenshot_pipeline.ps1
-```
-
-This installs Pillow + mss if needed and registers a single scheduled task (`WorkScreenshots`) that runs *this* `scripts/screenshot_capture.py` in place every ~2.5 min on weekdays, 08:30–20:00, saving to `~/Pictures/WorkScreenshots/<date>/`. Because it points at the script in the skill folder, future skill updates take effect with no re-copying. The capture script creates the dated folders itself. Re-running the setup safely replaces the task (`-Force`); pass `-StartTime`/`-EndTime`/`-IntervalSeconds` to adjust the window. Add `-DryRun` to print the task it would register — command line, schedule and capture directory — without installing packages or registering anything. To capture somewhere other than `~/Pictures/WorkScreenshots`, set `TIMESHEET_SCREENSHOTS_DIR` (`/plugin configure billables`, or `.env` on an exported install) **and** pass the same path as `-ScreenshotsDir`, so the reader and the scheduled task agree. The scheduled task runs outside any Claude Code session, so it never sees the configured value — passing it explicitly is what keeps the two in step, not a convenience. This is the *only* screenshot task the skill relies on. (`daily_exports/` is a separate, optional Cowork-sandbox bridge — not part of screenshot capture.)
-
-> **If a previous `WorkScreenshots` task was registered as Administrator**, re-running setup from a normal shell fails with `Access is denied`. Re-running it *elevated* clears the error and recreates the same problem — the replacement is owned by `BUILTIN\Administrators` as well, so the next ordinary re-register fails the same way. Do it in two steps: `Unregister-ScheduledTask -TaskName WorkScreenshots -Confirm:$false` from an **elevated** PowerShell, then run the setup script from a **normal** one. That is what leaves the task owned by the user, so no later update needs elevation.
+What is left below is the case that skill cannot reach, because it is not an install problem: a task that registered cleanly, has been capturing for weeks, and has stopped.
 
 ### Health check — captures stopped
 

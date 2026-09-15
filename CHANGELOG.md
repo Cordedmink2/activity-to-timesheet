@@ -21,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   machine that already had both packages.
 
 ### Changed
+- **The screenshot task is set up in one place, and diagnosed in the other** (#39). The
+  registration procedure was written out three times — `README.md`, the `setup` skill's step 5,
+  and the `daily` skill's `references/first-run.md` — and so was the fix for a task registered
+  from an elevated shell, which needs two shells in the right order because re-running elevated
+  recreates the same `BUILTIN\Administrators` owner. Step 5 is now the owner and says what the
+  task it registers actually does; `references/first-run.md` points there and keeps the health
+  check for a task that was working and has stopped, the one case the `setup` skill cannot reach.
+  Nothing changed about the task itself or how it is registered, so there is nothing to do on
+  upgrade. `docs/CONTRIBUTING.md` § "Rules with more than one copy" gained a row for this, one
+  for the Harvest credential steps and one for the rule-failure list, each naming every copy; two
+  new guards in the repo-level suite refuse a second copy of the first two.
 - **A run only reads the disambiguation procedure on a day that needs it** (#40). The escalation
   ladder — zoom the timeline, then screenshots, then ask you — and the switch-point protocol for a
   day split between two clients have moved out of `SKILL.md` Step 5 and

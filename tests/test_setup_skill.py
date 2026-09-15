@@ -302,19 +302,82 @@ def test_a_step_s_quoted_instruction_stays_inside_its_do():
 # screenshot setup script, not here, so renaming either there is what this catches — the
 # skill would go on naming a task that no longer exists, in a request nobody can action.
 def screenshot_setup_defaults() -> dict[str, str]:
-    """Read off the two defaults the setup script binds, not off its prose.
+    """Read off the defaults the setup script binds, not off its prose.
 
     The capture script is matched at its `$CaptureScript` default rather than as the first
     `.py` token anywhere in the file — the docstring at the top of that script names it
     too, so a looser match would keep passing after the registered default was renamed,
     which is the whole failure this is here to catch.
+
+    The two schedule boundaries are here for the same reason and a newer one (#39): step 5
+    is now the only copy in the shipped skills of *what* the task it registers does, so a
+    boundary moved in the param block leaves that copy quietly wrong. Matched at the
+    `param()` binding, not at the `.EXAMPLE` block above it that also spells them.
     """
     src = SCREENSHOT_SETUP.read_text(encoding="utf-8-sig")
     task = re.search(r"\$TaskName\s*=\s*[\"']([^\"']+)[\"']", src)
     assert task, "no default -TaskName in the screenshot setup script"
     capture = re.search(r"\$CaptureScript\s*=\s*Join-Path[^\r\n]*?[\"']([^\"']+\.py)[\"']", src)
     assert capture, "the screenshot setup script binds no default capture script"
-    return {"task": task.group(1), "capture": capture.group(1)}
+    found = {"task": task.group(1), "capture": capture.group(1)}
+    for flag in ("StartTime", "EndTime"):
+        bound = re.search(rf"\[string\]\${flag}\s*=\s*[\"']([^\"']+)[\"']", src)
+        assert bound, f"the screenshot setup script binds no default -{flag}"
+        found[flag] = bound.group(1)
+    return found
+
+
+def registration_paragraph() -> str:
+    """The paragraph of the screenshot step that runs the setup script, not the whole step.
+
+    Scoped this tightly because the step body *already* carried the schedule somewhere else:
+    the **Do** above it warns that registration resets a migrated task "silently back on
+    08:30–20:00", which is an aside about what someone loses, not a statement of what the
+    task does. A check over the whole step is satisfied by that sentence and would go on
+    passing with the paragraph below it deleted — which is the edit it exists to catch.
+    """
+    heading, body = one_step_about(r"screenshot")
+    found = [p for p in re.split(r"\n\s*\n", body) if SCREENSHOT_SETUP.name in p]
+    assert len(found) == 1, (
+        f"step '{heading.strip()}' runs {SCREENSHOT_SETUP.name} in {len(found)} paragraphs; "
+        "the check cannot tell which one is the copy of record")
+    return found[0]
+
+
+@pytest.mark.parametrize("field", ["StartTime", "EndTime"])
+def test_the_screenshot_step_names_the_schedule_the_setup_script_binds(field):
+    """#39: the registration procedure had three copies — here, `README.md`, and the
+    `daily` skill's `references/first-run.md`. The other two restated the whole of it,
+    including the two-shell fix for a task registered elevated, so a correction to one was
+    a correction to one. This step is the owner; the reference beside it now points here.
+
+    So the paragraph that runs the script is where a reader is told what the task does, and
+    it is worth pinning to the script rather than to nothing: someone reading "08:30 to
+    20:00" off a step whose `param()` block binds something else has no way to tell, and the
+    symptom is a day with no evidence on the hours they thought were covered.
+    """
+    value = screenshot_setup_defaults()[field]
+    assert value in registration_paragraph(), (
+        f"the paragraph running {SCREENSHOT_SETUP.name} never names {value!r}, the default "
+        f"-{field} that script binds — a reader is left to take the schedule on trust")
+
+
+def test_the_elevated_registration_fix_has_one_copy_in_the_shipped_skills():
+    """#39: re-running the setup elevated to clear `Access is denied` *recreates* the
+    trap, because the replacement task is owned by `BUILTIN\\Administrators` too. The fix
+    is two shells in the right order, and it was written out three times.
+
+    Scoped to `skills/` on purpose. `README.md` carries a third copy that #38 deletes with
+    the rest of the step-by-step walkthrough; holding it here would fail on a file this
+    issue deliberately did not touch. What this catches is the copy coming *back* into a
+    skill — which is how it got to three in the first place.
+    """
+    carriers = sorted(p.relative_to(REPO).as_posix() for p in SKILLS.rglob("*.md")
+                      if "Unregister-ScheduledTask" in p.read_text(encoding="utf-8"))
+    assert carriers == [SETUP_MD.relative_to(REPO).as_posix()], (
+        "the two-shell fix for a task registered elevated is written out in "
+        f"{len(carriers)} shipped files ({carriers}) — the `setup` skill's step 5 owns it, "
+        "and a second copy is one that goes stale without anything failing")
 
 
 @pytest.mark.parametrize("field", ["task", "capture"])

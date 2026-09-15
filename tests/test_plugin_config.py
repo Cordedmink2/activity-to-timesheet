@@ -396,6 +396,28 @@ def test_the_install_instruction_names_the_scope_that_publishes_everywhere():
         "nothing tells the user how to see which scope they ended up with:\n" + section)
 
 
+def test_the_credential_procedure_has_one_owner_among_the_shipped_skills():
+    """#39: getting a Harvest account ID and a personal access token is written out twice —
+    `README.md` § 8 and the `daily` skill's `references/first-run.md`, near
+    sentence-for-sentence. The reference is the owner: it is the copy that carries *why*
+    each step is there — the precedence the seam applies, where a sensitive value is
+    actually stored on this platform, and why a new session is what makes the values arrive.
+
+    Scoped to `skills/` because the README copy is #38's to delete along with the rest of
+    the step-by-step walkthrough, and failing here on a file this issue deliberately left
+    alone would just be noise. Green the day it was written, which is the point: it holds
+    the count at one so the procedure cannot quietly spread into the `setup` skill, which
+    routes a missing credential to the configure dialog and must never collect one itself.
+    """
+    carriers = sorted(p.relative_to(REPO).as_posix()
+                      for p in (REPO / "skills").rglob("*.md")
+                      if "id.getharvest.com" in p.read_text(encoding="utf-8"))
+    assert carriers == ["skills/daily/references/first-run.md"], (
+        f"the Harvest credential procedure is written out in {len(carriers)} shipped files "
+        f"({carriers}) — `references/first-run.md` § 'First-run: configuration' owns it, "
+        "and a second copy is one that goes stale without anything failing")
+
+
 def test_only_the_injected_options_are_published():
     """The bridge publishes what the harness injected and nothing else. It must not carry
     the rest of a hook process's environment into every command in the session."""

@@ -324,7 +324,7 @@ Show the exact diff, one fact per ask. Example: "The XrmToolBox signal isn't in 
 
 - `SKILL.md` — this file
 - `.env.example` / `.gitignore` — Harvest credential template (copy to `.env`, gitignored)
-- `references/first-run.md` — first-run setup: screenshot task, `.context.md` creation, Harvest creds, AW discovery, AW category maintenance
+- `references/first-run.md` — first-run setup: the screenshot task's health check (standing one up is the `setup` skill), `.context.md` creation, Harvest creds, AW discovery, AW category maintenance
 - `references/context.md.example` — starter template for `Timesheets/.context.md`
 - `references/classification-rules.md` — client/project/**work kind** rubric: the signal hierarchy, work kind and task selection, billing conventions, note style, exclusions. Read at Step 2 on every run
 - `references/disambiguation.md` — what Step 5 does with a 🔸: the zoom → screenshots → ask ladder and its subagent brief, and the interleaved-day switch-point protocol. Loaded on a day that flagged something, or one shared between clients; what *raises* a flag is the rubric's, above
