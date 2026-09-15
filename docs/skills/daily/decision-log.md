@@ -25,6 +25,10 @@ A few entries generalise beyond the change that produced them. One sentence each
 entry it points at carries the evidence, the grade and what was rejected. Add a line here
 when a new entry earns one, and leave the entry where it is.
 
+- **Scope a prose guard to the passage that owns the fact, not the section containing it.**
+  A check for the task schedule anywhere in a step was satisfied by an aside two paragraphs
+  up and stayed green with the owning paragraph deleted — § "A prose guard scoped to a whole
+  step was satisfied by an aside elsewhere in it".
 - **A test that shells out inherits no fixture.** One `subprocess` call in the suite read
   the real `.env` and paged six months of live provider history; one flag over it would have
   written a real entry to a client's timesheet — § "The suite was not hermetic, and one test
@@ -1191,6 +1195,40 @@ reference pointer already does, one hop cheaper.
 
 **Cost accepted.** `SKILL.md` lost only ~90 words to this (11,061 → 10,968), so #57's 5,000
 ceiling is untouched by it. The saving is per-run context on a clean day, not file size.
+
+### A prose guard scoped to a whole step was satisfied by an aside elsewhere in it
+
+**Observed hazard**, 2026-09-15, #39. Collapsing the screenshot-setup procedure to one owner
+left the `setup` skill's step 5 carrying the schedule the registered task fires on, so a new
+guard in `tests/test_setup_skill.py` pinned that prose to the `-StartTime` and `-EndTime` the
+script's own `param()` block binds. It asserted the two values appeared in the step's body,
+which is how every other prose guard in that file is written, and it passed.
+
+It passed *before the edit as well*. The step's **Do** paragraph already warned that
+re-registering puts a migrated task "silently back on 08:30–20:00" — an aside about what the
+user loses, not a statement of what the task does — and that sentence carries both literals.
+Deleting the entire paragraph the guard existed to protect left it green. Confirmed by
+mutating the owning paragraph to drop the schedule and re-running: green at whole-step scope,
+red once scoped to the paragraph that runs the script.
+
+Nothing in the first run would have shown this. The guard was red on its first execution, but
+for an unrelated reason — an f-string regex where `\{flag}` emitted a literal backslash before
+the substitution, so the pattern raised `bad escape \E` — and a fix that turns a red test green
+reads as the fix having worked. A reviewer reading the step against the assertion is what
+found it.
+
+**The rule this leaves:** a guard on prose has to be scoped to the passage that *owns* the
+fact, not to the section containing it. The larger the scope, the likelier some neighbouring
+sentence already satisfies it for reasons that have nothing to do with the rule — and a
+document dense enough to be worth guarding is dense enough to contain one. Where the scope
+has to be wide to survive re-wording, the offsetting move is to prove the guard fails: mutate
+the passage, watch it go red, restore. `shipped_text()`'s docstring makes the opposite
+argument for *presence* checks — which file a sentence lives in should stay free to change —
+and that stands; this is about a check on a fact's one home, where the whole point is which
+passage carries it.
+
+Recorded in `docs/CONTRIBUTING.md` § "Rules with more than one copy" on the row itself, so
+the next person to widen that scope reads why it is narrow.
 
 ## Script defects
 
