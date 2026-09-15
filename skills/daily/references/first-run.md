@@ -6,11 +6,9 @@ Read this only when a prerequisite check fails (no workspace, missing `.context.
 
 The skill is **shareable across users**. Each user maintains their own `Timesheets/.context.md` describing *their* clients, colleagues, billing conventions, and preferences. The skill stays generic; `.context.md` carries the personal facts.
 
-## Screenshot grabber (one-time, per machine)
+## Screenshot capture
 
-**Standing the task up is the `setup` skill's step 5, and it is not restated here.** That step runs the same bundled `scripts/setup_screenshot_pipeline.ps1`, passes the configured capture directory through to it, and reads the registration back before it moves on — including the two-shell order that clears an `Access is denied` for good, which re-running elevated does not. A run that finds no screenshot task at all belongs there, not in this file.
-
-What is left below is the case that skill cannot reach, because it is not an install problem: a task that registered cleanly, has been capturing for weeks, and has stopped.
+**Standing a task up is the `setup` skill's step 5** — it runs the bundled `scripts/setup_screenshot_pipeline.ps1`, passes the configured capture directory through, and reads the registration back before it moves on. Go there for a machine with no screenshot task, and for a registration refused with `Access is denied`.
 
 ### Health check — captures stopped
 
