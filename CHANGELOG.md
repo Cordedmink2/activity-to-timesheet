@@ -5,13 +5,9 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.1] - 2026-09-28
+## [0.10.2] - 2026-09-28
 
 ### Fixed
-- **You see each entry's invoice note before it posts.** The proposed timesheet now shows
-  the note each block will post, where you review and edit it, and the posting confirmation
-  repeats it for every entry. Before, the confirmation left the note out, so the one field
-  that reaches the client on the invoice could be approved without being shown.
 - **A client you haven't worked for lately no longer blocks the category-rule rebuild.** A
   rule matching none of your recent window titles was refused, and one refusal wrote nothing,
   so the rules stayed stale until that client's work came back. It is now written and flagged
@@ -20,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suspect one once the day is done.
 - **`--inspect` no longer reports a client's managed rules as edited when it has several.**
   Each rule is now held against its own recorded pattern rather than one per client.
+
+## [0.10.1] - 2026-09-28
+
+### Fixed
+- **You see each entry's invoice note before it posts.** The proposed timesheet now shows
+  the note each block will post, where you review and edit it, and the posting confirmation
+  repeats it for every entry. Before, the confirmation left the note out, so the one field
+  that reaches the client on the invoice could be approved without being shown.
 - **A support tag in the entry note follows your own convention.** The skill said to tag "the
   description" `[Support]`, which left it unclear whether the tag reached the client's invoice.
   It now marks the note only as your `.context.md` says, and the template has a line for it.
