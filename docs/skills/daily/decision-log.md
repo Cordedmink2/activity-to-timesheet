@@ -1259,8 +1259,9 @@ so the note — the one field that reaches the client — was approved at neithe
 The documents disagreed on what the description was: `classification-rules.md` headed its
 note section "Writing the entry note (description)" while `output-format.md` keeps the
 description internal and the note separate. Step 6 now shows the note each block will post,
-Step 8 repeats it per entry, and the rubric heading lost "(description)", so only the
-timesheet file uses that word. A paragraph-scoped guard in `tests/test_daily_skill.py`
+Step 8 repeats it per entry, and the rubric's note section no longer calls itself the
+description. Whether `[Support]` belongs in the posted note or only in the timesheet file's
+description is still unsettled: Step 4 and the rubric say "tag the description". A paragraph-scoped guard in `tests/test_daily_skill.py`
 holds Step 8, watched going red with the note removed.
 
 Fictional day with an internal description and a composed note per block, three fresh
