@@ -2702,6 +2702,36 @@ into `parse_boundary()` and is pinned by
 `test_the_start_boundary_parses_on_python_310`, which simulates 3.10 the same way and needs
 neither Windows nor a UTC clock. Red in 0.10s on 3.14 before the swap, against both spellings.
 
+### One dormant client vetoed every category-rule rebuild — rung 1, observed, 2026-09-28
+
+Step 2 passes every declared client on a `STALE` rebuild, because a client left out is
+`DROPPED`. The gate refused any candidate matching none of the sampled titles, and one refusal
+wrote nothing. On a real workspace (6 clients, 17 candidates, `--days 30`, 2,709 titles), 10 of
+11 refusals were signals of clients with no work in the window, so the rules stayed `STALE`
+until those clients' work happened to come back — and could not be repaired meanwhile.
+
+**Fixed by writing a zero-match rule and flagging it `UNVERIFIED`**, `dormant` when none of the
+client's candidates matched and `suspect` when another did. A rule that matches nothing cannot
+take the label off another rule, so writing it costs the rule set nothing; the refusal protected
+nothing and blocked everything. The typo case the refusal was for survives as `suspect`, which
+Step 2 sends to the `setup` skill at Step 11 rather than mid-day.
+
+**Rejected:** refusing only the zero-match rule and writing the rest — the client's previous
+rule is then `DROPPED`, `--status` reads `CURRENT`, and nothing rebuilds it when the client
+returns. Carrying the previous rule forward — keeps stale signals and still blocks a client
+added before its first day of work. Refusing `suspect` while writing `dormant` — the same veto,
+narrower: on the observed run an active client's browser-profile signal would still have
+blocked the rebuild.
+
+**That active client's profile was not a composition bug.** In 30 days the only Edge profile
+name appearing in any window title was one other client's; the active client's browsing reached
+the sample only in the URL-in-title format, which carries no profile suffix. The anchored rule
+was correct and had nothing to match.
+
+**Same session, `--inspect`:** a client with three managed rules showed two as `EDITED`. The
+stamp was read into a dict keyed by client, so only the last rule's regex survived to be
+compared against. Now held as `(client, regex)` pairs.
+
 ## Rejected
 
 ### Requiring billable status in the Step 6 draft — rung 2, n=3, 2026-09-28

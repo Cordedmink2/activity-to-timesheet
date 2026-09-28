@@ -9,11 +9,12 @@ regex or a JSON body.
 holds prose, hints and free text, so no parser should be asked to read it — which is why
 this takes *candidate rules* rather than the file. What it does with them is deterministic:
 
-  1. **Gate.** A pattern that does not compile, one that matches none of the sampled window
-     titles, and one that matches an implausible share of them are all refused, and a
-     refusal anywhere writes nothing. The measured case for the third is a bare-word rule
-     matching 256 of 552 browser titles in one day: via first-match-wins that does not just
-     add noise, it takes the label off a correct rule.
+  1. **Gate.** A pattern that does not compile and one that matches an implausible share of
+     the sampled window titles are refused, and a refusal anywhere writes nothing. The
+     measured case for the second is a bare-word rule matching 256 of 552 browser titles in
+     one day: via first-match-wins that does not just add noise, it takes the label off a
+     correct rule. One that matches none of them is written and reported `UNVERIFIED`, as
+     dormant or suspect — see `unverified_as_dormant_or_suspect()`.
   2. **Order.** Imposed here by signal type, most specific first, with the profile tag
      deliberately last — so when two clients' rules both match a span, the more specific
      evidence wins. The candidates' own order is not consulted.
@@ -246,10 +247,8 @@ def judge(candidate: dict, sample: list[str], max_share: float) -> dict:
     out["share"] = out["matched"] / len(population) if population else 0.0
     if not out["matched"]:
         scope = SIGNAL_RANK[signal][1]
-        scoped = f", scoped to a {scope} window," if scope else ""
-        return verdict("refuse", f"matches none of the {len(population)} {called}{scoped} "
-                                 f"— a rule that matches nothing leaves that client's whole "
-                                 f"day uncategorized")
+        scoped = f", scoped to a {scope} window" if scope else ""
+        return verdict("unverified", f"matches none of the {len(population)} {called}{scoped}")
     if out["share"] > max_share:
         return verdict("refuse", f"matches {out['matched']} of {len(population)} {called} "
                                  f"({out['share']:.0%}), over the {max_share:.0%} ceiling. "
@@ -274,13 +273,41 @@ def _is_only_the_clients_name(pattern: str, client: str) -> bool:
         word.casefold() for word in client.split()}
 
 
+def unverified_as_dormant_or_suspect(judged: list[dict]) -> list[dict]:
+    """Each zero-match verdict named for what the rest of its client's evidence says.
+
+    Every declared client is passed on a rebuild, and one not worked on inside the window
+    matches nothing however right its signals are: **dormant**. A client whose other evidence
+    did match, and this signal did not, is the mistyped tag or the profile never browsed in
+    that a zero once refused: **suspect**. Neither is refused. A rule that matches nothing
+    cannot take the label off another, so writing it costs the rule set nothing, while a
+    refusal wrote nothing at all — one quiet client vetoed every rebuild until its work came
+    back.
+    """
+    active = {j["client"] for j in judged if j["verdict"] == "write"}
+    out = []
+    for j in judged:
+        if j["verdict"] == "unverified":
+            client = j["client"]
+            if client in active:
+                why = (f"suspect: {j['reason']}, though other evidence for {client} does. "
+                       f"Probably mistyped, or never used; written anyway, and that part of "
+                       f"{client}'s time stays uncategorized until the signal is fixed")
+            else:
+                why = (f"dormant: {j['reason']}, and nothing else declared for {client} does "
+                       f"either — most likely not worked on in the window. Written unchecked")
+            j = {**j, "reason": why}
+        out.append(j)
+    return out
+
+
 def in_rank_order(judged: list[dict]) -> list[dict]:
     """The rules to write, most specific signal type first, profile tags last.
 
     Sorted on the rank alone, so the order candidates arrive in decides nothing beyond
     ties inside one type — `sorted` is stable, which is the whole of what a tie deserves.
     """
-    return sorted([j for j in judged if j["verdict"] == "write"],
+    return sorted([j for j in judged if j["verdict"] in ("write", "unverified")],
                   key=lambda j: SIGNAL_RANK[j["signal"]][0])
 
 
@@ -480,7 +507,8 @@ def compile_rules(source: str, days: int, max_share: float, directory: Path) -> 
                       f"test a category rule against. Bucket read: {bucket}")
     print(f"SAMPLE {len(sample)} titles over {days} days ({bucket})")
 
-    judged = [judge(candidate, sample, max_share) for candidate in candidates]
+    judged = unverified_as_dormant_or_suspect(
+        [judge(candidate, sample, max_share) for candidate in candidates])
     for verdict in judged:
         if verdict["verdict"] != "write":
             print(f"{verdict['verdict'].upper()} {verdict['client'] or '?'} "
@@ -538,9 +566,9 @@ def _named_list(value) -> list[str]:
 def verify(writing: list[dict], sample: list[str]) -> int:
     """Read the rules back and re-match each against the sample.
 
-    The gate has already refused a rule that matches nothing, so a zero here is not a bad
-    rule — it is a write that did not land, and it is the difference between a configured
-    install and one that looks configured.
+    A rule missing from what reads back is a write that did not land, and it is the
+    difference between a configured install and one that looks configured. A zero match
+    count is not: the gate has already reported that rule as unverified.
     """
     landed = {}
     for entry in read_classes():
@@ -590,11 +618,14 @@ def inspect(days: int, max_share: float, directory: Path) -> int:
     if not classes:
         print("RULES none — the activity source holds no categories")
         return 0
-    written = {rule.get("client"): rule.get("regex")
-               for rule in (read_stamp(directory) or {}).get("rules", [])}
+    # Pairs rather than a dict keyed by client: a client can have several rules, and keyed by
+    # name all but the last read as edited.
+    rules = (read_stamp(directory) or {}).get("rules", [])
+    managed = {rule.get("client") for rule in rules}
+    written = {(rule.get("client"), rule.get("regex")) for rule in rules}
     for entry in classes:
         name = class_name(entry) or "(unnamed)"
-        held = "managed" if name in written else "unmanaged"
+        held = "managed" if name in managed else "unmanaged"
         regex = class_regex(entry)
         if not regex:
             print(f"RULE {name} [{held}] — no regex (a grouping category), matched against "
@@ -605,7 +636,7 @@ def inspect(days: int, max_share: float, directory: Path) -> int:
         # files and nothing over the wire — so this is where a rule damaged by hand surfaces,
         # and a recompile is what puts it back (#69 story 5).
         edited = " EDITED since it was written" if (
-            held == "managed" and written.get(name) != regex) else ""
+            held == "managed" and (name, regex) not in written) else ""
         try:
             hits = matching(regex, sample)
         except re.error as exc:

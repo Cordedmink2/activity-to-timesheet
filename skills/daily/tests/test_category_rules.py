@@ -141,14 +141,35 @@ def test_a_pattern_that_does_not_compile_is_refused_and_nothing_is_written(
     assert posted(server) == [], "a refusal anywhere has to write nothing at all"
 
 
-def test_a_pattern_matching_none_of_the_sample_is_refused(live_aw, workspace, tmp_path):
-    """A rule that matches nothing leaves that client's whole day uncategorized, and does
-    it silently — which is the failure the whole gate exists for."""
+def test_a_client_not_worked_on_in_the_window_does_not_block_the_rest(
+        live_aw, workspace, tmp_path):
+    """Every declared client is passed on a rebuild, and one with no work in the window
+    matches nothing however right its signals are. Refused, it vetoed every rebuild until its
+    work happened to come back; written, it mislabels nothing, since it matches nothing."""
     server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Gamma", "profile_tag", r"\[GAMMA\]")])
-    assert result.code == 1
+    result = compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
+        candidate("Gamma", "profile_tag", r"\[GAMMA\]"),
+    ])
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme", "Gamma"]
+    assert "UNVERIFIED Gamma profile_tag — dormant" in result.out
     assert "matches none of the 9 sampled browser titles" in result.out
-    assert posted(server) == []
+
+
+def test_a_silent_signal_of_a_client_that_was_worked_on_is_called_suspect(
+        live_aw, workspace, tmp_path):
+    """The case the zero-match refusal was for — a mistyped tag, a profile never browsed in —
+    shows as a client whose other evidence matched and this signal did not. It is written
+    rather than refused, for the same reason, and named so a run can send the user to fix it."""
+    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    result = compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
+        candidate("Acme", "profile_tag", r"\[ACMEE\]"),
+    ])
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme", "Acme"]
+    assert "UNVERIFIED Acme profile_tag — suspect" in result.out
 
 
 def test_a_pattern_matching_an_implausible_share_is_refused(live_aw, workspace, tmp_path):
@@ -294,7 +315,7 @@ def test_the_previous_rule_set_is_copied_into_the_workspace_before_the_write(
 def test_a_refused_run_leaves_no_backup_because_it_never_reached_a_write(
         live_aw, workspace, tmp_path):
     live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    compile_run(tmp_path, [candidate("Gamma", "profile_tag", r"\[GAMMA\]")])
+    compile_run(tmp_path, [candidate("Beta", "title_token", "Fabric(order")])
     assert backups(workspace) == []
 
 
@@ -360,9 +381,8 @@ def test_a_failed_verify_leaves_the_rules_stale_rather_than_recording_a_write(
 
 def test_a_write_the_server_accepted_and_did_not_keep_fails_the_verify(
         live_aw, workspace, tmp_path, monkeypatch):
-    """The gate has already refused a rule that matches nothing, so a rule missing at this
-    point is a write that did not land — which is the difference between a configured
-    install and one that only looks configured."""
+    """A rule missing at this point is a write that did not land — which is the difference
+    between a configured install and one that only looks configured."""
     live_aw(sample_day([ACME_ITEM, PERSONAL]))
     monkeypatch.setattr(cr, "post_setting", lambda key, value: None)
     result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
@@ -538,6 +558,22 @@ def test_a_managed_rule_edited_in_the_settings_dialog_is_reported_by_inspect(
     assert "EDITED since it was written" in run_cli(cr, ["--inspect"]).out
 
 
+def test_a_client_with_several_managed_rules_reads_back_unedited(
+        live_aw, workspace, tmp_path):
+    """Each rule is held against its own recorded regex. Held against one per client, every
+    rule but the last of a client with several read as hand-edited when none had been."""
+    server = live_aw(sample_day([ACME_ITEM, ACME_EDITOR, PERSONAL]))
+    assert compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
+        candidate("Acme", "editor_workspace", r"AcmePortal"),
+    ]).code == 0
+    live_aw(sample_day([ACME_ITEM, ACME_EDITOR, PERSONAL],
+                       classes=[(e["name"][0], e["rule"]["regex"]) for e in posted(server)]))
+    result = run_cli(cr, ["--inspect"])
+    assert result.out.count("RULE Acme [managed]") == 2
+    assert "EDITED" not in result.out
+
+
 def test_an_over_broad_rule_of_the_users_own_is_surfaced_for_correction(
         live_aw, workspace):
     """Adoption is where an over-broad rule gets fixed rather than merely reported: the
@@ -626,7 +662,7 @@ def test_a_rebuild_is_gated_exactly_as_the_first_write_was(live_aw, workspace, t
     compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
     result = compile_run(tmp_path, [
         candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Beta", "profile_tag", r"\[NOPE\]"),
+        candidate("Beta", "title_token", BROAD),
     ])
     assert result.code == 1
     assert len(server.sent("POST", "/settings/classes")) == 1, (
