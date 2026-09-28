@@ -2789,6 +2789,14 @@ read. The template gains a **Profile tag** field beside the client's name and pr
 extension writes it, at the end of the page part: `[Draft]` in a page's own title is not one.
 Only tags are listed — an untagged profile's name cannot be told from a page title ending ` - X`.
 
+**The `SEEN` lines carried the correction on their own; the Step 2 sentence had to say which.**
+Fresh no-tools agents at Step 11 of a fictional day (a stale `Acme Dana` profile name, a
+`suspect` rule, `SEEN [ACME]` in profile `Acme - Dana`), 3 reps per arm, read by hand. Old Step 2
+text: 3 of 3 found the mismatch from the `SEEN` line and proposed renaming the profile — none
+proposed the tag. A sentence saying the lines "usually name the correction": the same 3 of 3, a
+no-op. A sentence naming the tag as the fix and the **Profile tag** field as where it goes: 3 of
+3 proposed recording `[ACME]` there.
+
 **Rejected:** moving setup step 3's verify onto `--inspect`. That mode needs the settings
 endpoint, which step 3's builds may lack, and samples 7 days, which still hold the tag a
 migrating user is clearing in that same step — so the check would fail right after the fix.
