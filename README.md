@@ -292,7 +292,7 @@ rather than all at the end.
 > browser — one self-contained file, nothing to install. Its guided walkthroughs show a mismatched
 > tag silently categorising nothing, a bare code claiming incidental prose, a tag on a general
 > profile stealing a client's work, and a regex with spaces inside its alternation that only *looks*
-> like it works. These are the failures the gate exists to refuse.
+> like it works. These are the failures the gate exists to refuse or flag.
 
 ### 5. Install the skill on a harness that isn't Claude Code
 

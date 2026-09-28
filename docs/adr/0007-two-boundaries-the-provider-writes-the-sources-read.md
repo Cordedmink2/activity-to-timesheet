@@ -69,7 +69,8 @@ were a day with nothing in it.
   and no gate; ADR-0008 is the worked example.
 - A write on the cheap side is gated by something, just not by the user: the confirmation gate is
   the provider's, and `scripts/category_rules.py` judges each rule against the sampled window titles
-  instead — refusing one that matches nothing and one that matches an implausible share. That is the
+  instead — refusing one that matches an implausible share, and flagging one that matches nothing
+  rather than refusing it, since a rule that matches nothing cannot mislabel anything. That is the
   shape to copy if a second cheap-side write ever appears. It also means the user is not asked to
   approve a diff they would have to read a regex to understand, which is the whole point of #69.
 - Adding a second provider is a second writer behind the same command contract, not a second design;
