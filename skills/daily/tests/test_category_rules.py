@@ -499,6 +499,92 @@ def test_a_browser_profile_whose_name_is_not_in_the_titles_is_reported_not_guess
 
 
 # --------------------------------------------------------------------------------------
+# The profile tags the titles actually carry
+# --------------------------------------------------------------------------------------
+
+# Where the extension puts a profile tag: the end of the page part, before Edge's own
+# ` and N more pages` and the profile slot. Chrome prints no profile after it.
+ACME_TAGGED = ("msedge.exe",
+               f"Acme portal-acme.example.com/home - [ACME] and 12 more pages - Acme - Dana{EDGE}")
+ACME_TAGGED_ALONE = ("msedge.exe", f"Acme board-acme.example.com/board - [ACME] - Acme - Dana{EDGE}")
+ACME_TAG_IN_WORK = ("msedge.exe", f"Acme notes-notes.example.com - [ACME] - Work{EDGE}")
+BETA_TAGGED_CHROME = ("chrome.exe", "Beta orders-beta.example.com/orders - [BETA] - Google Chrome")
+DRAFT_PAGE = ("msedge.exe", f"[Draft] Plan-plans.example.com/x - Work{EDGE}")
+
+
+def test_inspect_lists_each_profile_tag_with_the_edge_profile_it_was_seen_in(
+        live_aw, workspace):
+    """A rebuild composed profile rules from profile names the titles no longer carried, and
+    only an ad-hoc scan showed which tags were really there. Printed before the rules are
+    read, so it shows on an install with no categories yet."""
+    live_aw(sample_day([ACME_TAGGED, ACME_TAGGED_ALONE, PERSONAL]))
+    result = run_cli(cr, ["--inspect"])
+    assert result.code == 0, result.err
+    assert 'SEEN [ACME] — 2 titles, in Edge profile "Acme - Dana"' in result.out
+    assert "RULES none" in result.out
+
+
+def test_a_profile_tag_seen_in_several_profiles_lists_each_of_them(live_aw, workspace):
+    """A tag on a second profile — the general one, usually — is the silent failure setup's
+    step 3 exists to prevent; which profile is general is the user's to say."""
+    live_aw(sample_day([ACME_TAGGED, ACME_TAG_IN_WORK, PERSONAL]))
+    result = run_cli(cr, ["--inspect"])
+    assert 'SEEN [ACME] — 2 titles, in several profiles: "Acme - Dana" (1), "Work" (1)' \
+        in result.out
+
+
+def test_a_profile_tag_in_chrome_is_listed_without_a_profile(live_aw, workspace):
+    live_aw(sample_day([BETA_TAGGED_CHROME, PERSONAL]))
+    result = run_cli(cr, ["--inspect"])
+    assert "SEEN [BETA] — 1 title, no profile in the title" in result.out
+
+
+def test_a_bracket_in_a_page_title_is_not_read_as_a_profile_tag(live_aw, workspace):
+    live_aw(sample_day([DRAFT_PAGE, PERSONAL]))
+    result = run_cli(cr, ["--inspect"])
+    assert "SEEN no profile tag in the sampled browser titles" in result.out
+    assert "[Draft]" not in result.out
+
+
+def test_a_bracket_inside_the_page_part_does_not_hide_the_tag_after_it(live_aw, workspace):
+    """The first ` - [X]` is the page's own; the extension's is the last one."""
+    sprint_tagged = ("msedge.exe",
+                     f"Sprint - [Q3] - Board-acme.example.com/b - [ACME] - Acme - Dana{EDGE}")
+    sprint_untagged = ("msedge.exe", f"Sprint - [Q3] - Board-acme.example.com/b - Work{EDGE}")
+    live_aw(sample_day([sprint_tagged, sprint_untagged, PERSONAL]))
+    result = run_cli(cr, ["--inspect"])
+    assert 'SEEN [ACME] — 1 title, in Edge profile "Acme - Dana"' in result.out
+    assert "[Q3]" not in result.out
+
+
+def test_the_profile_tags_are_listed_where_the_rules_cannot_be_read(live_aw, workspace):
+    live_aw(sample_day([ACME_TAGGED, PERSONAL]), settings_status=404)
+    result = run_cli(cr, ["--inspect"])
+    assert result.code == 1
+    assert "SEEN [ACME]" in result.out
+
+
+def test_a_suspect_profile_rule_is_shown_the_profile_tags_that_were_seen(
+        live_aw, workspace, tmp_path):
+    live_aw(sample_day([ACME_ITEM, ACME_TAGGED, PERSONAL]))
+    result = compile_run(tmp_path, [
+        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
+        candidate("Acme", "profile_tag", r"\[ACMEE\]"),
+    ])
+    assert result.code == 0, result.err
+    assert "UNVERIFIED Acme profile_tag — suspect" in result.out
+    assert "SEEN [ACME]" in result.out
+
+
+def test_a_rebuild_whose_profile_rules_all_matched_lists_no_profile_tags(
+        live_aw, workspace, tmp_path):
+    live_aw(sample_day([ACME_ITEM, ACME_TAGGED, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "profile_tag", r"\[ACME\]")])
+    assert result.code == 0, result.err
+    assert "SEEN" not in result.out
+
+
+# --------------------------------------------------------------------------------------
 # Adopting the rules a user already had (#73)
 # --------------------------------------------------------------------------------------
 

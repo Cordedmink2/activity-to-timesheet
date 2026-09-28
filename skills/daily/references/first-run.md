@@ -55,7 +55,7 @@ If the workspace is not the folder Claude Code starts in, set `TIMESHEET_WORKSPA
 If `Timesheets/.context.md` doesn't exist:
 
 1. Read `references/context.md.example` as the template.
-2. Walk the user through filling it in — interactively, one section at a time. Ask about: their internal colleagues, the clients they bill, the signal types each client has (Edge profile, codebase, ChatGPT project, etc.), known external contacts, and any personal-browsing patterns to exclude.
+2. Walk the user through filling it in — interactively, one section at a time. Ask about: their internal colleagues, the clients they bill, the profile tag of each client that has a browser profile to itself (the `setup` skill's hand-over names them), the signal types each client has (Edge profile, codebase, ChatGPT project, etc.), known external contacts, and any personal-browsing patterns to exclude.
 3. Save the result as `Timesheets/.context.md`.
 4. Tell the user they can always edit this file directly — the skill re-reads it every run.
 

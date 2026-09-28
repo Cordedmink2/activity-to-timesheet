@@ -2772,6 +2772,46 @@ single quotes or not. The script's stdin decoding is not involved. The setup ste
 candidates with the file-writing tool and passes the path; `-` stays accepted for anyone
 piping from a program.
 
+### A rebuild composed profile rules from profile names the titles no longer carried — rung 1, observed, 2026-09-28
+
+A `STALE` rebuild read the Edge profile names recorded in `.context.md` and composed
+`browser_profile` candidates from them. The profiles had since been tagged through URL-in-title,
+and the recorded names were stale; the gate reported them `suspect`, correctly, and nothing said
+what the titles did carry, so the session found the tags with an ad-hoc scan. The workspace
+template had no field for a profile tag at all, and the first run never asked for one, so a
+workspace built from it could only ever record the name.
+
+**Fixed with the evidence rather than a rule:** `print_seen()` lists each profile tag in the
+sampled browser titles with the Edge profile slot it appeared in — under any unverified profile
+rule in `--candidates`, from the sample it already holds, and in `--inspect` before the rules are
+read. The template gains a **Profile tag** field beside the client's name and project, not under
+`Signals:`, which `CONTEXT.md` keeps for evidence the work produces. A tag is read only where the
+extension writes it, at the end of the page part: `[Draft]` in a page's own title is not one.
+Only tags are listed — an untagged profile's name cannot be told from a page title ending ` - X`.
+The last ` - [X]` is the one read, with the profile slot bounded as `PROFILE_SLOT` bounds it: a
+review caught the first draft reading `Sprint - [Q3] - Board…` as tag `[Q3]` and losing the real
+one. **Residual, reasoned:** a page whose own title ends ` - [X]` in a browser without the
+extension still reads as a tag; with it, the extension's `-host/path` follows the page and closes
+that.
+
+**The `SEEN` lines carried the correction on their own; the Step 2 sentence had to say which.**
+Fresh no-tools agents at Step 11 of a fictional day (a stale `Acme Dana` profile name, a
+`suspect` rule, `SEEN [ACME]` in profile `Acme - Dana`), 3 reps per arm, read by hand. Old Step 2
+text: 3 of 3 found the mismatch from the `SEEN` line and proposed renaming the profile — none
+proposed the tag. A sentence saying the lines "usually name the correction": the same 3 of 3, a
+no-op. A sentence naming the tag as the fix and the **Profile tag** field as where it goes: 3 of
+3 proposed recording `[ACME]` there.
+
+**Rejected:** moving setup step 3's verify onto `--inspect`. That mode needs the settings
+endpoint, which step 3's builds may lack, and samples 7 days, which still hold the tag a
+migrating user is clearing in that same step — so the check would fail right after the fix.
+Running `--inspect` inside a daily `STALE` rebuild — a second 7-day read of a sample the rebuild
+already holds, and a new way for the run to stop when the source is down.
+
+**Deferred, one observation:** a Haiku subagent briefed per `references/disambiguation.md`
+misnamed editor workspaces and gave up on one monitor for a morning. One run is not a cause;
+tightening the brief waits for a second.
+
 ## Rejected
 
 ### Requiring billable status in the Step 6 draft — rung 2, n=3, 2026-09-28
