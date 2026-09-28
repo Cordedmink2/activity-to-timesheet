@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tag vs category rule — demo</title>
+<title>Category terms demo</title>
 <style>
   :root {
     --accent: #0f766e;
@@ -78,17 +78,19 @@
 <body>
 <main>
   <span class="demo-banner">INTERACTIVE DEMO — simulated data only; nothing reads your machine</span>
-  <h1>Does your browser tag match your ActivityWatch rule?</h1>
+  <h1>Do your category terms catch your work, and only your work?</h1>
   <p class="intro">
     Every browser profile stamps a client tag onto its window titles (via the URL-in-Title
     extension), and ActivityWatch classifies those titles with per-client regex rules.
     <strong>If the tag format and the rule disagree, nothing matches — silently.</strong>
     This demo lets you push realistic window titles through a tag convention and a set of
     rules, and see exactly which titles categorise where, which fall through, and which land
-    on the <em>wrong</em> client. The plugin now writes those rules for you and refuses one
-    that matches nothing or matches half your day — this is what it is refusing, and why a
-    profile tag belongs only on a browser profile dedicated to a single client. All clients
-    and URLs here are fictional.
+    on the <em>wrong</em> client. The plugin writes one rule per client from a few words you
+    choose — the client code, the client's own products, its name — and checks each against
+    your real window titles. This shows what those words have to get right: a code that is
+    also an ordinary word claims pages that have nothing to do with the client, and a profile
+    tag belongs only on a browser profile dedicated to a single client. All clients and URLs
+    here are fictional.
   </p>
 
   <h2>Current state</h2>
@@ -102,7 +104,7 @@
     <div id="event-buttons"></div>
     <div style="margin-top:.9rem"><strong>Reset</strong></div>
     <button id="clear-day">Clear the day</button>
-    <button id="reset-rules">Reset rules to repo defaults</button>
+    <button id="reset-rules">Reset rules to the terms the plugin writes</button>
   </div>
 
   <h2>Guided walkthroughs</h2>
@@ -135,12 +137,14 @@ const TagRuleModel = (() => {
 
   const initialState = {
     tagStyle: "brackets",                                // "brackets" | "bare"
-    // client rules exactly as AW stores them: name + regex + ignore_case
+    // client rules as the plugin writes them from each client's category terms: the code,
+    // and the client's name — except where the code is an ordinary word, which is written as
+    // its bracketed tag so incidental prose cannot match it (scenario 2)
     rules: [
-      { client: "ACME",     regex: "\\[ACME\\]",     ignoreCase: true },
-      { client: "BETA",     regex: "\\[BETA\\]",     ignoreCase: true },
-      { client: "Ledger",   regex: "\\[LEDGER\\]",   ignoreCase: true },
-      { client: "Nimbus",   regex: "\\[NIMBUS\\]",   ignoreCase: true },
+      { client: "ACME",     regex: "(?:ACME|Acme Trust)",  ignoreCase: true },
+      { client: "BETA",     regex: "(?:BETA)",             ignoreCase: true },
+      { client: "Ledger",   regex: "(?:\\[LEDGER\\])",     ignoreCase: true },
+      { client: "Nimbus",   regex: "(?:\\[NIMBUS\\])",     ignoreCase: true },
     ],
     // profile -> code the extension stamps; null = profile with no tag set up
     profiles: {
@@ -257,6 +261,10 @@ const ACTIONS = [
     events: [{ page: "Contracts - 5-02-011 - Sunnyfield Nursery Ltd - All Documents", url: "https://acmetrust.sharepoint.example.com/", profile: "ACME" }] },
   { id: "beta-dyn",  label: "Work in Dynamics (BETA profile)", profile: "BETA",
     events: [{ page: "Case Management - Dynamics 365", url: "https://beta-dev.crm.example.com/", profile: "BETA" }] },
+  { id: "ledger-work", label: "Work in the client portal (Ledger profile)", profile: "Ledger",
+    events: [{ page: "Matter intake - Client portal", url: "https://portal.ledgerlaw.example.com/", profile: "Ledger" }] },
+  { id: "nimbus-work", label: "Review a pull request (Nimbus profile)", profile: "Nimbus",
+    events: [{ page: "Pull request #412 - Repos", url: "https://dev.example.com/nimbuscloud/", profile: "Nimbus" }] },
   { id: "beta-contract", label: "Read an emailed ACME doc in the BETA profile", profile: "BETA",
     events: [{ page: "Contract 5-02-011 Sunnyfield - variation memo", url: "https://acmetrust.sharepoint.example.com/", profile: "BETA" }] },
   { id: "pers-ledger", label: "Read a fintech explainer (Personal profile)", profile: "Personal",
@@ -276,30 +284,29 @@ ACTIONS.forEach(a => { if (a.all) a.events = ACTIONS.filter(x => !x.all).flatMap
 const SCENARIOS = [
   {
     id: "mismatch",
-    title: "1 · The mismatch that bites",
-    blurb: "The classic: bare codes in the extension while the rules expect brackets. Everything looks configured. Watch the day land — every rule dead, every browser block uncategorised, and nothing ever told you. This is the one the plugin now refuses to ship: it writes the rules itself and tests each one against your real window titles first, so a rule matching none of them is rejected at setup with the reason, instead of surfacing a fortnight later as an empty timesheet. What you are looking at here is what that check is for.",
+    title: "1 · A tag term the titles don't carry",
+    blurb: "Ledger and Nimbus are ordinary words, so their terms are their bracketed tags, [LEDGER] and [NIMBUS]. Now set the extension up with bare codes. ACME and BETA keep working — a plain code catches the tag with or without brackets — but the Ledger and Nimbus rules match nothing, silently. The plugin writes a rule like that anyway and reports it UNVERIFIED, suspect, with SEEN lines listing the tags your titles really carry: this is the silence that report exists to break.",
     steps: [
-      { label: "Reset to repo defaults (bracketed rules)", actions: [{ type: "RESET" }] },
-      { label: "Extension gets set up with bare codes", note: "tag becomes “… ACME - Google Chrome”, rules still say \\[ACME\\]", actions: [{ type: "SET_TAG_STYLE", style: "bare" }] },
-      { label: "Simulate a full day", note: "watch the summary line and the DEAD column", actions: [{ type: "ADD_EVENTS", eventsFrom: "full-day" }] },
+      { label: "Reset to the terms the plugin writes", actions: [{ type: "RESET" }] },
+      { label: "Extension gets set up with bare codes", note: "tag becomes “… LEDGER - Google Chrome”, the rule still says \\[LEDGER\\]", actions: [{ type: "SET_TAG_STYLE", style: "bare" }] },
+      { label: "Simulate a full day", note: "watch the DEAD column: Ledger and Nimbus, and only them", actions: [{ type: "ADD_EVENTS", eventsFrom: "full-day" }] },
     ],
   },
   {
     id: "bare",
-    title: "2 · Bare codes match prose",
-    blurb: "Fix the mismatch the other way — drop the brackets from the rules to match bare tags. Now everything categorises… including things that shouldn't: a client's name in a page title claims the block even when the work has nothing to do with them.",
+    title: "2 · A code that is also a word",
+    blurb: "A client code is usually the best term there is: it is in the profile tag, in a profile named for the client, in the folder you keep for them. Unless it is also an ordinary word. Give every client its bare code and the lunch break lands on the books: a fintech explainer mentioning a ledger and a Nimbus stand-mixer review both bill to a client. The fix is the tag, not a different word — [LEDGER] never turns up in prose.",
     steps: [
-      { label: "Reset, tags bare", actions: [{ type: "RESET" }, { type: "SET_TAG_STYLE", style: "bare" }] },
-      { label: "Make every rule a bare code too", note: "ACME, BETA, LEDGER, NIMBUS — tag and rule agree now", actions: [{ type: "SET_ALL_RULES_BARE" }] },
-      { label: "Do real client work", actions: [{ type: "ADD_EVENTS", eventsFrom: "acme-dyn" }, { type: "ADD_EVENTS", eventsFrom: "beta-dyn" }] },
-      { label: "Read an emailed ACME doc in the BETA profile", note: "the bare ACME rule hits “acmetrust.sharepoint…” in the URL — a BETA block claimed by ACME as well", actions: [{ type: "ADD_EVENTS", eventsFrom: "beta-contract" }] },
+      { label: "Reset, then make every rule its bare code", note: "ACME, BETA, LEDGER, NIMBUS", actions: [{ type: "RESET" }, { type: "SET_ALL_RULES_BARE" }] },
+      { label: "Do real client work", actions: [{ type: "ADD_EVENTS", eventsFrom: "acme-dyn" }, { type: "ADD_EVENTS", eventsFrom: "beta-dyn" }, { type: "ADD_EVENTS", eventsFrom: "ledger-work" }, { type: "ADD_EVENTS", eventsFrom: "nimbus-work" }] },
       { label: "Lunch break: a fintech explainer and a stand-mixer video", note: "the Ledger and Nimbus rules claim both", actions: [{ type: "ADD_EVENTS", eventsFrom: "pers-ledger" }, { type: "ADD_EVENTS", eventsFrom: "pers-nimbus" }] },
+      { label: "Use the tag as the term for the two ordinary words", note: "the lunch break is off the books again", actions: [{ type: "SET_RULE", client: "Ledger", regex: "(?:\\[LEDGER\\])" }, { type: "SET_RULE", client: "Nimbus", regex: "(?:\\[NIMBUS\\])" }] },
     ],
   },
   {
     id: "spaces",
-    title: "3 · Spaces inside the alternation",
-    blurb: "A rule shaped like one seen on a real machine (names changed): “Contract | ACME | Acme Trust  ”. The spaces around each | are part of the pattern — it can only match “ ACME ” with a space on both sides. Browser titles happen to provide those spaces, so the rule LOOKS like it works… and quietly drops every window whose title ends in the code.",
+    title: "3 · Spaces inside a hand-typed alternation",
+    blurb: "Where ActivityWatch will not take the plugin's write, setup has you type each client's terms in by hand, joined with |. A rule shaped like one seen on a real machine (names changed): “Contract | ACME | Acme Trust  ”. The spaces around each | are part of the pattern — it can only match “ ACME ” with a space on both sides. Browser titles happen to provide those spaces, so the rule LOOKS like it works… and quietly drops every window whose title ends in the code.",
     steps: [
       { label: "Reset, tags bare, rules bare", actions: [{ type: "RESET" }, { type: "SET_TAG_STYLE", style: "bare" }, { type: "SET_ALL_RULES_BARE" }] },
       { label: "Paste the spaced rule", note: "watch the smell warnings appear under the rule", actions: [{ type: "SET_RULE", client: "ACME", regex: "Contract | ACME | Acme Trust  " }] },
@@ -309,24 +316,23 @@ const SCENARIOS = [
     ],
   },
   {
-    id: "brackets",
-    title: "4 · Brackets end-to-end",
-    blurb: "The repo's recommendation: bracketed tags AND bracketed rules. Same day of browsing — real work categorises, and the fintech explainer and the stand mixer stay off the clients' books entirely, because “[ACME]” never appears in incidental prose. The trade: untagged windows (terminal, File Explorer) stay grey and the skill classifies those from other signals — brackets buy precision, not total recall.",
+    id: "terms",
+    title: "4 · The terms the plugin writes",
+    blurb: "One rule per client, from its category terms: the code where the code is its own word, the tag where it is an ordinary one, and the client's name. Same day of browsing — real work categorises, the ACME folder in File Explorer is caught by the code too, and the fintech explainer and the stand mixer stay off the clients' books. One row still matches two clients: an ACME contract read in the BETA profile carries ACME's address and BETA's tag. In ActivityWatch the first rule decides, and the day's review is where that hour gets settled.",
     steps: [
-      { label: "Reset to repo defaults", note: "bracketed tags, bracketed rules", actions: [{ type: "RESET" }] },
+      { label: "Reset to the terms the plugin writes", actions: [{ type: "RESET" }] },
       { label: "Simulate a full day", note: "compare the summary with scenario 2's", actions: [{ type: "ADD_EVENTS", eventsFrom: "full-day" }] },
     ],
   },
   {
     id: "general",
     title: "5 · A tag on the profile you use for everything",
-    blurb: "Brackets end to end, every rule healthy — and still wrong. Tagging the profile you use for everything looks like more coverage; it is the opposite. That profile's tag matches every page opened in it, including the ones whose own address names a different client — and in ActivityWatch the first matching rule is the one that labels the block, so which client the hour bills to comes down to rule order rather than to evidence. Untag it and only the page's own address matches, so the page decides. This is why a profile tag belongs on a profile dedicated to one client and nowhere else, and why the plugin writes tags below every other rule — including rules it did not write itself.",
+    blurb: "Every rule healthy — and still wrong. Tagging the profile you use for everything looks like more coverage; it is the opposite. That profile's tag matches every page opened in it, including the ones whose own address names a different client — and in ActivityWatch the first matching rule is the one that labels the block, so which client the hour bills to comes down to rule order rather than to evidence. Untag it and only the page's own address matches, so the page decides. This is why a profile tag belongs on a profile dedicated to one client and nowhere else.",
     steps: [
-      { label: "Reset to repo defaults", actions: [{ type: "RESET" }] },
-      { label: "Give ACME the rule the plugin actually writes", note: "the SharePoint address their work lives at — a signal, not a tag", actions: [{ type: "SET_RULE", client: "ACME", regex: "acmetrust\\.sharepoint" }] },
-      { label: "Do ACME work in the Personal profile", note: "untagged so far: the address alone attributes it, correctly", actions: [{ type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
+      { label: "Reset to the terms the plugin writes", actions: [{ type: "RESET" }] },
+      { label: "Do ACME work in the Personal profile", note: "untagged so far: ACME's code in the address attributes it, correctly", actions: [{ type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
       { label: "Now tag the Personal profile too", note: "the old advice — a code on every profile", actions: [{ type: "SET_PROFILE_CODE", profile: "Personal", code: "PERSONAL" }, { type: "SET_RULE", client: "Personal", regex: "\\[PERSONAL\\]" }] },
-      { label: "Re-run that same hour of ACME work", note: "two rules match one window now: the client's own address, and the profile's tag — the hour is no longer unambiguously ACME's", actions: [{ type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
+      { label: "Re-run that same hour of ACME work", note: "two rules match one window now: the client's own code, and the profile's tag — the hour is no longer unambiguously ACME's", actions: [{ type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
       { label: "Untag the general profile", note: "the fix: clear its title format. The page's own evidence decides again", actions: [{ type: "SET_PROFILE_CODE", profile: "Personal", code: null }, { type: "CLEAR_EVENTS" }, { type: "ADD_EVENTS", eventsFrom: "pers-acme" }] },
     ],
   },
@@ -431,7 +437,7 @@ document.addEventListener("click", e => {
   if (t.dataset.style) dispatch({ type: "SET_TAG_STYLE", style: t.dataset.style }, `tag convention set to ${t.dataset.style}`);
   if (t.dataset.action) dispatch({ eventsFrom: t.dataset.action }, t.textContent);
   if (t.id === "clear-day") dispatch({ type: "CLEAR_EVENTS" }, "cleared the day");
-  if (t.id === "reset-rules") dispatch({ type: "RESET_RULES" }, "rules reset to repo defaults");
+  if (t.id === "reset-rules") dispatch({ type: "RESET_RULES" }, "rules reset to the terms the plugin writes");
   if (t.dataset.tab) { activeTab = t.dataset.tab; stepIndex = 0; state = TagRuleModel.reducer(state, { type: "RESET" }); lastChange = "walkthrough reset the demo"; render(); }
   if (t.dataset.step !== undefined && activeTab) {
     const sc = SCENARIOS.find(s => s.id === activeTab);

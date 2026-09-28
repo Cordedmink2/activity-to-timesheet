@@ -128,7 +128,7 @@ This step is yours, not the user's. Each client gets **one** category rule, made
 
    What they skip is left exactly as it is and goes on working, below the rules you write. **A rule the inspect marked `OVER the … ceiling` is worth raising by name** while you have their attention: it matches a large share of everything they do, and since the first matching rule wins it is taking the label off whichever rule should have won.
 3. **Choose each client's terms with the user — up to five, and usually two or three.** In this order:
-   - **the client code** — `ACME`. It is in the profile tag, in the name of a browser profile kept for the client, and usually in the workspace or folder the user opened for them, so one term catches all three;
+   - **the client code** — `ACME`. It is in the profile tag, in the name of a browser profile kept for the client, and usually in the workspace or folder the user opened for them, so one term catches all three. Where the code is also an ordinary word — `LEDGER`, `NIMBUS` — use its tag, `[LEDGER]`, instead: the bare word turns up in pages that have nothing to do with the client;
    - **the names of the client's own products or apps** — the system you build for them, the name their app goes by (`AcmePortal`);
    - **the client's full name**, where it differs from the code.
 
