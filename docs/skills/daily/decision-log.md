@@ -2732,6 +2732,44 @@ was correct and had nothing to match.
 stamp was read into a dict keyed by client, so only the last rule's regex survived to be
 compared against. Now held as `(client, regex)` pairs.
 
+### A browser-profile rule matched the client's name anywhere in a browser title — rung 1, observed, 2026-09-28
+
+`browser_profile` is exempt from the name-only refusal, because the user named the profile for
+the client. But `compose()` anchored it on the browser and then took `.*(?:name)`, so the
+exemption let through exactly what the refusal stops. On a real rebuild the same run refused
+one client's `editor_workspace` name as name-only and wrote the same name as its
+`browser_profile`, which matched 3 titles from the untagged general `Work` profile: a SharePoint URL containing the
+client's name, and a DevOps project path.
+
+**Fixed by anchoring the name on the profile slot**: `… - <name>[ - <account>] - Microsoft\W*Edge$`.
+The shape was read off 7 days of real titles (2,289 Edge events): every one ends
+` - <profile>[ - <account>] - Microsoft​ Edge`, zero-width space included, with a bare
+`Work` and two-part `<client> - <account>` names. On that sample the first client's rule went
+from 3 matches to 0, and a second client's from 290 to 266 — the 24 lost were other profiles'
+pages naming that client.
+Chrome never carries a profile (§ "Chrome does not put the profile name in the window title"),
+so a Chrome user's rule reports `UNVERIFIED` rather than matching somewhere else.
+
+**Rejected:** applying the name-only refusal to `browser_profile` — refuses the ordinary case,
+and a refusal writes nothing. A lookahead for the account segment — the activity source's own UI
+evaluates these rules too; `[^-]+` is portable, at the cost of an account name with a hyphen
+reporting `suspect`.
+
+**Residual, reasoned:** a general-profile page whose title ends ` - <name>` with no URL-in-title
+suffix after it reads as profile `<name>` with the general profile as its account. The setup
+walkthrough puts the extension on every profile, which appends `-host/path` and closes it; a user
+without the extension keeps the hole. macOS Edge's title shape is unmeasured.
+
+### The documented heredoc for `--candidates -` could not carry a JSON escape — rung 1, observed, 2026-09-28
+
+Following the `setup` step 4 form, `category_rules.py --candidates - <<'JSON'` with
+`"acme\\.crm6"` failed `Invalid \escape`; the same JSON from a file worked. Isolated in
+Claude Code's Bash tool on Windows: `printf '%s\n' 'a\\b' | od -c` prints one backslash inline and
+two from a script file, so the harness halves `\\` in the command text before bash runs,
+single quotes or not. The script's stdin decoding is not involved. The setup step now writes the
+candidates with the file-writing tool and passes the path; `-` stays accepted for anyone
+piping from a program.
+
 ## Rejected
 
 ### Requiring billable status in the Step 6 draft — rung 2, n=3, 2026-09-28
