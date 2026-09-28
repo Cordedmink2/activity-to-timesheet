@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.3] - 2026-09-28
+
+### Fixed
+- **A browser-profile rule no longer claims pages that merely mention the client.** It matched
+  the profile's name anywhere in a browser title, so a general profile's page with the client
+  in its address or title was labelled theirs. It now matches only where Edge prints the
+  profile, at the end of the title. A profile rule in Chrome, whose titles carry no profile,
+  now reports `UNVERIFIED` instead of matching elsewhere.
+- **Writing the category rules no longer fails with `Invalid \escape`.** The setup step fed the
+  candidates through a shell heredoc, and a harness can halve the backslashes in a command
+  before the shell sees them. The candidates now go in a file.
+
+### Upgrading
+- If you have a browser-profile rule, re-run the `setup` skill's category step once. The rules
+  are rebuilt only when `Timesheets/.context.md` changes, so an update alone leaves the old,
+  unanchored rule in place.
+
 ## [0.10.2] - 2026-09-28
 
 ### Fixed

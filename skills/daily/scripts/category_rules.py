@@ -123,6 +123,15 @@ SCOPES = {
     "meeting": r"teams|ms-teams|microsoft teams|zoom|slack|webex",
 }
 
+# Where a profile's name sits in a browser title, and the only place a `browser_profile`
+# rule may match it. Edge ends every window title `… - <profile>[ - <account>] - Microsoft
+# Edge`, with a zero-width space before `Edge` — hence `\W*`. The name is the client's by
+# construction, so matched anywhere it labels every page of a general profile that mentions
+# the client. Chrome carries no profile in its title at all (decision log, #66), so there a
+# rule of this type matches nothing and is reported unverified. `[^-]` rather than a
+# lookahead: the activity source's own UI evaluates these rules too.
+PROFILE_SLOT = r" - (?:{pattern})(?: - [^-]+)? - Microsoft\W*Edge$"
+
 # Where the backup and the stamp live under the workspace. `.mcp/` already holds the cached
 # catalogs — machine state the user does not hand-edit — which is what both of these are.
 STATE_DIR = ".mcp"
@@ -172,10 +181,13 @@ def compose(pattern: str, signal: str) -> str:
     A scoped signal type is anchored on its application family; an unscoped one is written
     through unchanged. The user's pattern is always wrapped in `(?:…)`, so a top-level
     alternation in it stays one alternative of this rule rather than swallowing the anchor.
+    A profile name is anchored at the other end as well, on `PROFILE_SLOT`.
     """
     scope = SIGNAL_RANK[signal][1]
     if not scope:
         return pattern
+    if signal == "browser_profile":
+        return f"^(?:{SCOPES[scope]}).*" + PROFILE_SLOT.format(pattern=pattern)
     return f"^(?:{SCOPES[scope]}).*(?:{pattern})"
 
 

@@ -456,6 +456,48 @@ def test_a_browser_profile_named_for_its_client_is_not_refused_as_the_clients_na
     assert names(posted(server)) == ["Acme"]
 
 
+# Edge's real title shape, zero-width space and all: the profile's name, then the account's
+# display name when the profile has one, then the browser. A general profile's page can
+# mention the client anywhere before that.
+EDGE = " - Microsoft​ Edge"
+ACME_PROFILE = ("msedge.exe", f"Acme portal-acme.example.com/home - Acme - Dana{EDGE}")
+ACME_BARE_PROFILE = ("msedge.exe", f"Acme portal-acme.example.com/home - Acme{EDGE}")
+WORK_PAGE_NAMING_ACME = ("msedge.exe",
+                         f"All Documents-intranet.example.com/sites/Acme%20Asia - Work{EDGE}")
+WORK_URL_NAMING_ACME = ("msedge.exe",
+                        f"devops.example.com/Acme and 13 more pages - Work{EDGE}")
+WORK_PAGE_ENDING_ACME = ("msedge.exe", f"Board - Acme-devops.example.com - Work{EDGE}")
+
+
+def test_a_browser_profile_rule_matches_the_profile_not_a_page_that_names_the_client(
+        live_aw, workspace, tmp_path):
+    """A browser_profile pattern is the client's name, and the name-only refusal exempts it
+    because the user chose that name for a profile. Matched anywhere in the title, the
+    exemption let through exactly what the refusal exists to stop: every page of a general
+    profile that mentioned the client was labelled theirs."""
+    server = live_aw(sample_day([ACME_PROFILE, ACME_BARE_PROFILE, WORK_PAGE_NAMING_ACME,
+                                 WORK_URL_NAMING_ACME, WORK_PAGE_ENDING_ACME, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "browser_profile", r"Acme")])
+    assert result.code == 0, result.err
+    (written,) = posted(server)
+    hits = cr.matching(written["rule"]["regex"], [
+        " ".join(row) for row in (ACME_PROFILE, ACME_BARE_PROFILE, WORK_PAGE_NAMING_ACME,
+                                  WORK_URL_NAMING_ACME, WORK_PAGE_ENDING_ACME)])
+    assert hits == [" ".join(ACME_PROFILE), " ".join(ACME_BARE_PROFILE)]
+
+
+def test_a_browser_profile_whose_name_is_not_in_the_titles_is_reported_not_guessed_at(
+        live_aw, workspace, tmp_path):
+    """Chrome never puts a profile in its title (decision log, #66), and a profile named
+    differently from its client matches nothing: both surface as unverified rather than
+    falling back to wherever the word appears."""
+    live_aw(sample_day([WORK_PAGE_NAMING_ACME, WORK_URL_NAMING_ACME,
+                        ("chrome.exe", "Acme portal - Google Chrome"), PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "browser_profile", r"Acme")])
+    assert result.code == 0, result.err
+    assert "UNVERIFIED Acme browser_profile" in result.out
+
+
 # --------------------------------------------------------------------------------------
 # Adopting the rules a user already had (#73)
 # --------------------------------------------------------------------------------------
