@@ -161,7 +161,7 @@ Cumulative short AFKs are real: several 5–15 min chunks in an hour add up. `ac
 - **A `block` span that starts before `work_start` is flagged 🔸 and put to the user.** The wrapper never moves a start, so a meeting scheduled from 08:00 whose window evidence only begins at 08:40 proposes a block from 08:00 — minutes before the machine saw anything at all. The event is corroborated and the minutes are not; the user is the only one who knows whether they were in the call before the laptop opened. Flag a span ending after `work_end` the same way **when the `evidence` stops earlier than it does** — the listening-only tail that happens to fall at the end of the day. Guard 2 lets both stand; `work_end` and the calendar genuinely disagree there, and it is the user who settles it, not you. Where the evidence itself runs that late, there is nothing to flag: the machine watched it.
 - **It replaces what it covers rather than doubling it.** Where the block covers a stretch you would otherwise bill on its own — the active span before the break, a meeting inside a longer working stretch per "Soft boundaries" above — that stretch is *this* block, and the blocks either side tile up to its edges. Two entries over one meeting is double-billing, however each was arrived at.
 
-**An uncorroborated event is never drafted as a block.** No meeting window intersected it, and the calendar's word alone does not bill: a meeting skipped, declined in practice, or taken from the car in front of a client's office all look identical from here, and only the user can tell them apart. Leave it out of the draft and out of the coverage check. Step 6 puts it to the user as a **calendar question** instead, and becomes a block only on the user's answer.
+**An uncorroborated event is never drafted as a block.** No meeting window intersected it, and the calendar's word alone does not bill: a meeting skipped, declined in practice, or taken from the car in front of a client's office all look identical from here, and only the user can tell them apart. Leave it out of the draft and out of the coverage check. Step 6 puts it to the user as a **calendar question** instead; it becomes a block only on the user's answer.
 
 Aim for 15-min granularity (0.25 hr); fold blocks shorter than 0.25 hr into a neighbour.
 
@@ -184,7 +184,7 @@ Load it on any day with a 🔸 in it — **and on any day that shows more than o
 
 ### Step 6 — Present the proposed timesheet
 
-The draft is what the user reviews: for every block, its time range, duration, client and a description carrying the work-item number where there is one. What this step fixes is the content the user sees; the layout is yours — present it in whatever form this harness shows best.
+The draft is what the user reviews: for every block, its time range, duration, client and a description carrying the work-item number where there is one. What this step fixes is the content the user sees; the layout is yours — present it in whatever form this harness shows best, unless the user has asked for a particular one.
 
 Flag uncertain blocks 🔸, set apart from the blocks themselves. End-of-day and breaks are deterministic; *which client / billable / where to split* is judgment — flag it rather than committing silently. The user's review is what makes the sheet accurate, so make uncertain calls easy to see.
 

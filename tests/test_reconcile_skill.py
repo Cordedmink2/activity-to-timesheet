@@ -194,7 +194,7 @@ def test_the_short_day_floor_is_a_preference_the_user_can_set():
 def test_today_is_not_swept_as_a_gap():
     """A day still being worked is not a day billed short, and the `daily` skill says so in
     as many words ("Today is always 'in progress' on a no-date run"). A sweep that puts
-    today in the table sends the user to bill a day that is not over."""
+    today in the worklist sends the user to bill a day that is not over."""
     assert re.search(r"today is in progress|today — in progress|in progress",
                      shipped_text(), re.I), (
         "nothing in the skill says today is in progress rather than unbilled")

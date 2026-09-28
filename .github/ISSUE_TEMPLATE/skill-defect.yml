@@ -87,7 +87,7 @@ body:
       label: Relevant output
       description: >
         Whatever shows the problem - a script's printed lines (`--json` output where the
-        script has it), the table or worklist the skill drafted, the check a setup step
+        script has it), the draft or worklist the skill produced, the check a setup step
         reported, or the error text. Redacted. Leave blank if none applies.
       render: text
 

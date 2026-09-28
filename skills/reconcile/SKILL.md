@@ -62,9 +62,9 @@ Every date in the range gets one of five verdicts, decided from the two reads al
 | any | date named by the user as leave, a holiday or a day off | **Not worked** — out of scope, for the reason the user gave |
 | none | lists the date, or the user says they worked it | **Gap** — investigate |
 | under the floor | lists the date, or the user says they worked it | **Short** — investigate |
-| none or under the floor | silent, and unnamed either way | **Unexplained** — one line in the worklist, not a dispatch |
+| none or under the floor | silent, and unnamed either way | **Unexplained** — named in the worklist, not a dispatch |
 
-**Unexplained is a real verdict, not a rounding error.** It is where a weekend, an evening, a second machine and every non-Windows install land, and there is nothing to investigate on it because there is no evidence that anything happened. Never fold it into "not worked": the index being silent is not the machine being idle. List those dates in one line and let the user answer — a "yes, I worked that Saturday" turns one of them into a gap, and *then* it is worth a subagent. The counts have to add up to the days in the range, which is what stops a date falling between the rows.
+**Unexplained is a real verdict, not a rounding error.** It is where a weekend, an evening, a second machine and every non-Windows install land, and there is nothing to investigate on it because there is no evidence that anything happened. Never fold it into "not worked": the index being silent is not the machine being idle. Name those dates and let the user answer — a "yes, I worked that Saturday" turns one of them into a gap, and *then* it is worth a subagent. The counts have to add up to the days in the range, which is what stops a date falling between the rows.
 
 The **short-day floor** is a preference, not a fact about anyone's day: `## Preferences` in `Timesheets/.context.md` sets it, defaulting to `6.0 hrs`. It decides only *who gets investigated*. Whether a day was genuinely billed short is a comparison of its billed hours against its own active minutes, and that happens in Step 3 with the day skeleton in hand — a four-hour day that was a four-hour day is not short, and the floor cannot know that.
 
@@ -106,7 +106,7 @@ Oldest date first, the order the `daily` skill takes them in. For each date: the
 
 After the dates, in this order: the **Unexplained** dates, named, with a question asking which of them were worked; a day whose investigation came back `Unclear`, with what would resolve it; any maintenance finding from Step 2; and today, if the month asked for is the current one, as a day still in progress rather than a gap.
 
-Close by saying plainly that nothing was recorded and nothing was changed, and that each row is billed by invoking `/billables:daily <date>` for one date at a time.
+Close by saying plainly that nothing was recorded and nothing was changed, and that each date is billed by invoking `/billables:daily <date>` for one date at a time.
 
 **A day the user explains — leave, a holiday, a client that bills elsewhere — is worth keeping.** Propose it for `Timesheets/.context.md` as one line under the exclusions, showing the exact diff, so next month's sweep does not ask the same question again. That file is the user's, so propose; never write it silently.
 

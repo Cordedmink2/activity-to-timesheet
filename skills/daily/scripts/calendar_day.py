@@ -81,7 +81,7 @@ the end of the evidence when that runs later. An overrun the machine saw is bill
 after the scheduled end with no meeting window is not, whatever the AFK watcher made of it.
 An uncorroborated event carries neither. Both verdicts are arithmetic here so the rules read
 them and never re-derive them; what each verdict *means* for the day — a block drafted over
-a break, a question under the table — is the rules' to say.
+a break, a question apart from the draft — is the rules' to say.
 
 ## Output
 

@@ -4,7 +4,7 @@ The `Timesheets/<date>_timesheet.md` is an *optional* internal-audit artefact. G
 
 It holds, for the date:
 
-- the total billable hours, the total break time, and when it was generated, with the zone
+- the total billable hours, the total break time (short interstitial breaks aside), and when it was generated, with the zone
 - every block with its time range, duration, client and description, and every break row
 - the hours per client, with the day's total
 - a Notes section of judgment calls and splits worth reviewing, blocks the user's input changed, and time excluded as personal
@@ -29,7 +29,7 @@ What the file holds is fixed; how it is laid out is yours. Where `Timesheets/` a
 
   Everywhere else the marker is absent, including every `--utc-offset` run, so there is nothing to do about it on the other 364 days. Splitting only arises for work that actually runs through the change; a day whose blocks sit either side of it, like a break across the hour, needs none of this.
 - **Duration**: decimal hours rounded to 0.25 (`0.25`, `0.5`, `0.75`, `1.0`, …).
-- **Break rows**: *only* for breaks ≥17.5 min (or the user's overridden threshold), marked as a break with no client. Shorter AFK gaps fold silently into the surrounding work block. A break a **calendar** block covers keeps its row — the AFK watcher recorded it and this file records what the instruments said — and the entry over it is declared in the Notes section, naming the event, the same way Step 6 declares it with the draft. Both kinds: a **corroborated** event drafted over the break (`SKILL.md` Step 3), and an **uncorroborated** one the user accepted at review (Step 6), where their answer is the evidence the Notes bullet names. Deleting the row instead would leave the file agreeing with the blocks and disagreeing with the skeleton, which is the one thing the reader of an audit trail needs to be able to see.
+- **Break rows**: *only* for breaks ≥17.5 min (or the user's overridden threshold), marked as a break with no client, and its reason or its length. Shorter AFK gaps fold silently into the surrounding work block. A break a **calendar** block covers keeps its row — the AFK watcher recorded it and this file records what the instruments said — and the entry over it is declared in the Notes section, naming the event, the same way Step 6 declares it with the draft. Both kinds: a **corroborated** event drafted over the break (`SKILL.md` Step 3), and an **uncorroborated** one the user accepted at review (Step 6), where their answer is the evidence the Notes bullet names. Deleting the row instead would leave the file agreeing with the blocks and disagreeing with the skeleton, which is the one thing the reader of an audit trail needs to be able to see.
 - **Client**: short canonical name as defined in `.context.md`, not the long client name the provider carries.
 - **Description**: 1 sentence, concrete, internal-audit style. The markdown file stays local — so it can mention tools, work items, file names, participants if useful for review. Match the user's own tone (read existing files in `Timesheets/` or their posted entries for examples).
 - **An entry's `notes` field is different.** Those get sent to clients with invoices — follow `classification-rules.md` "Writing the entry note"; the user's own examples are in `.context.md` "How I bill".

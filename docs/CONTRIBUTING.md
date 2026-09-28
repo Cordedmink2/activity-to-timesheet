@@ -45,8 +45,8 @@ Four gates a doc edit can trip; the command that runs them, and where from, is i
   has to speak of them too, which holds the offer beside the questions and *not* the
   sentence excluding them; and the paragraph stating what the review question says has to
   count them. It is asserted on separately because it is what the step puts to the user;
-  the step names the question's content and leaves its wording and layout to the harness. What none of
-  the three reaches is anything that happens after a yes.
+  the step names the question's content and leaves its wording and layout to the harness.
+  What none of the three reaches is anything that happens after a yes.
 - A `.context.md` under the Step 11 size budget after any change that proposes writing
   to one.
 
