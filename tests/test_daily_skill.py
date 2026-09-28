@@ -106,7 +106,7 @@ def glossary_calendar_terms() -> list[str]:
 
 
 def test_the_workflow_checks_the_category_rules_before_it_reads_the_timeline():
-    """#74: the rules are a derived copy of the signals in `.context.md`, and the timeline
+    """#74: the rules are a derived copy of the category terms in `.context.md`, and the timeline
     labels every span with them.
 
     The order is the assertion. A staleness check that runs *after* the timeline reads the
@@ -129,18 +129,18 @@ def test_the_workflow_checks_the_category_rules_before_it_reads_the_timeline():
         "current, so a run with stale rules mislabels the day it has already read")
 
 
-def test_step_2_carries_the_two_words_the_staleness_check_answers_with():
-    """Both verdicts exit 0, so the exit code separates nothing — the words are the whole
+def test_step_2_carries_the_three_words_the_staleness_check_answers_with():
+    """Every verdict exits 0, so the exit code separates nothing — the words are the whole
     difference, exactly as the calendar wrapper's two refusals are.
 
-    Read out of `status()`'s own source, so re-wording either one fails here and names the
+    Read out of `status()`'s own source, so re-wording any of them fails here and names the
     step that has to move with it, rather than leaving Step 2 branching on a word no run
     will ever see.
     """
     source = RULE_COMPILER.read_text(encoding="utf-8")
     status = source.split("def status(", 1)[-1].split("\ndef ", 1)[0]
     text = workflow()
-    for verdict in ("CURRENT", "STALE"):
+    for verdict in ("CURRENT", "STALE", "BROKEN"):
         assert f'"{verdict}' in status or f"'{verdict}" in status, (
             f"`status()` no longer answers {verdict} — Step 2 branches on that word")
         assert verdict in text, (
@@ -148,14 +148,14 @@ def test_step_2_carries_the_two_words_the_staleness_check_answers_with():
             "branch on when the check comes back")
 
 
-def test_step_2_reads_the_profile_tags_printed_under_a_suspect_profile_rule():
-    """The `SEEN` lines under a suspect profile rule usually name the correction; a Step 2
+def test_step_2_reads_the_profile_tags_printed_under_an_unverified_term():
+    """The `SEEN` lines under an unverified term usually name the correction; a Step 2
     that never mentions them leaves a run to scan the titles by hand, as one did."""
     source = RULE_COMPILER.read_text(encoding="utf-8")
     printer = source.split("def print_seen(", 1)[-1].split("\ndef ", 1)[0]
     assert 'f"SEEN ' in printer, "`print_seen()` no longer prints `SEEN` lines"
     assert "`SEEN`" in workflow(), (
-        "the workflow never says what the `SEEN` lines under a suspect profile rule are for")
+        "the workflow never says what the `SEEN` lines under an unverified term are for")
 
 
 def test_the_workflow_names_the_calendar_wrapper_it_ships():

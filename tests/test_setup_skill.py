@@ -13,6 +13,7 @@ somewhere else in the tree — which is the only kind of prose worth a test.
 """
 
 import ast
+import json
 import re
 
 import pytest
@@ -172,62 +173,55 @@ def test_the_category_step_writes_the_rules_with_the_compiler_the_plugin_ships()
         "anywhere else")
 
 
-def test_the_category_step_composes_profile_rules_from_the_tags_the_titles_carry():
-    """A profile rule composed from a name the user remembers matches nothing once the
-    profile is renamed or tagged; the compiler's `SEEN` lines are what is really there.
-    Read out of `print_seen()`, so renaming the word fails here."""
+def test_the_category_step_chooses_client_codes_from_the_tags_the_titles_carry():
+    """A client code the user remembers matches nothing once the profile is retagged; the
+    compiler's `SEEN` lines are what is really there. Read out of `print_seen()`, so
+    renaming the word fails here."""
     source = RULE_COMPILER.read_text(encoding="utf-8")
     printer = source.split("def print_seen(", 1)[-1].split("\ndef ", 1)[0]
     assert 'print("SEEN ' in printer and 'print(f"SEEN ' in printer, (
         "`print_seen()` no longer prints `SEEN` lines — step 4 composes from them")
     heading, body = one_step_about(r"categor")
     assert "`SEEN`" in body, (
-        f"step '{heading.strip()}' never points at the `SEEN` lines, so profile rules are "
-        "composed from memory rather than from the tags the titles carry")
+        f"step '{heading.strip()}' never points at the `SEEN` lines, so client codes are "
+        "chosen from memory rather than from the tags the titles carry")
 
 
-def compiler_signal_types() -> set[str]:
-    """The signal types the compiler will accept, read out of its source.
+def compiler_max_terms() -> int:
+    """How many terms the compiler takes for one client, read out of its source.
 
     Read rather than imported: `tests/` does not put the skill's `scripts/` on `sys.path`,
-    and the question is a property of the text either way. Both tables count — a type that
-    never reaches a window title is still one the step may legitimately offer, because the
-    script skips it with the reason instead of refusing the run.
+    and the question is a property of the text either way.
     """
     tree = ast.parse(RULE_COMPILER.read_text(encoding="utf-8"))
-    found = set()
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        names = {t.id for t in node.targets if isinstance(t, ast.Name)}
-        if names & {"SIGNAL_RANK", "NOT_IN_A_TITLE"} and isinstance(node.value, ast.Dict):
-            found |= {k.value for k in node.value.keys
-                      if isinstance(k, ast.Constant) and isinstance(k.value, str)}
-    assert found, "no signal-type table found in the compiler — the check has nothing to read"
-    return found
+        if (isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "MAX_TERMS" for t in node.targets)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, int)):
+            return node.value.value
+    raise AssertionError("no MAX_TERMS in the compiler — the check has nothing to read")
 
 
-# A signal type as the walkthrough writes one: backticked, lower case, and containing an
-# underscore. The underscore is what tells a type name from the rest of the step's inline
-# code — `--inspect`, `[managed]`, a filename — without a list of exclusions to keep current.
-SIGNAL_TYPE_IN_PROSE = re.compile(r"`([a-z]+(?:_[a-z]+)+)`")
+def test_the_category_step_hands_the_compiler_the_candidate_shape_it_reads():
+    """The step shows a run the file it writes; the script decides what the file means.
 
-
-def test_the_category_step_offers_only_signal_types_the_compiler_accepts():
-    """The step tells a run which types to choose from; the script decides what they mean.
-
-    A type renamed in the table and left in the prose is a candidate refused as unknown on
-    every install, and the run's recourse — recompose and try again — cannot fix a name the
-    step keeps handing back. This is the same class as the `daily` skill's flag inventory,
-    which had lost eleven flags before anything compared it to the source.
+    The walkthrough once offered signal types the compiler had renamed, and a candidate
+    refused on every install is a step whose recourse — recompose and try again — keeps
+    handing back the same refusal. So the step's own example is parsed and held to the keys
+    the compiler reads, and the cap it states is the compiler's.
     """
     _, body = one_step_about(r"categor")
-    offered = set(SIGNAL_TYPE_IN_PROSE.findall(body))
-    assert offered, "the category step names no signal types, so a run has to invent them"
-    unknown = sorted(offered - compiler_signal_types())
-    assert not unknown, (
-        f"the category step offers signal types the compiler does not accept: {unknown}. "
-        f"It accepts {sorted(compiler_signal_types())}.")
+    example = re.search(r"```json\n(.*?)```", body, re.S)
+    assert example, "the category step shows no candidates file, so a run has to invent one"
+    candidates = json.loads(example.group(1))
+    assert candidates and all(set(c) <= {"client", "terms", "adopts"} and "terms" in c
+                              for c in candidates), (
+        f"the category step's example is not the {{client, terms, adopts}} shape the "
+        f"compiler reads: {candidates}")
+    assert all(len(c["terms"]) <= compiler_max_terms() for c in candidates)
+    assert f"up to {['zero', 'one', 'two', 'three', 'four', 'five', 'six'][compiler_max_terms()]}" \
+        in body, "the category step does not state the compiler's cap on a client's terms"
 
 
 def test_the_category_step_keeps_a_loud_fallback_for_a_source_that_will_not_take_the_write():

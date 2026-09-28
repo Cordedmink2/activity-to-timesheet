@@ -10,6 +10,8 @@ are the one copy of what they both treat as noise.
 
 Reading is most of it, and `post_setting()` is the exception: `category_rules.py` writes the
 category rules the timeline then reads. Configuration, never data — see that function.
+`query()` is a POST too, but it only reads: it is how that script asks the server what a
+written rule actually labels.
 
 It also owns the one fact about *where* a day is read — the server's address — because
 every reader needs it and none should answer it its own way. It resolves through
@@ -150,6 +152,28 @@ def post_setting(key, value):
         e.close()
         raise
     return json.loads(raw) if raw.strip() else None
+
+
+def query(timeperiods, lines):
+    """Run a query through the activity source's own query engine: `POST /query/`, one
+    result list per time period.
+
+    What `category_rules.py` verifies a written rule with, because the server's `categorize`
+    is the one that labels the user's day in its own UI — a copy of its matching in this
+    plugin agreed with itself once about rules the server never matched. Read-only, like
+    every request here except `post_setting()`.
+    """
+    body = json.dumps({"timeperiods": timeperiods, "query": lines}).encode("utf-8")
+    request = urllib.request.Request(f"{resolve_base()}/query/", data=body,
+                                     headers={"Content-Type": "application/json"},
+                                     method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=60) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        # As in `get()`: an HTTPError never reaches the `with`, so its body is left open.
+        e.close()
+        raise
 
 
 def pick_bucket(buckets, prefix):

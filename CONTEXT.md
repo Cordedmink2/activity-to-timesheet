@@ -73,7 +73,8 @@ verbatim.
 **Signal** — an observable in the activity data that points at a client, and one that occurs
 naturally in the work: a work-item number, an environment URL, an editor workspace, a repo path, a
 meeting participant, a calendar event's subject or attendees. The user declares theirs per client in
-`.context.md`, and a **category rule** is compiled from them.
+`.context.md`, where classification reads them. A **category rule** is made from a client's
+**category terms** instead, not from its signals.
 
 **Client code** — the short name the user picks for a client, two to twelve characters: `ACME`.
 Theirs, not the provider's client name and not a project code.
@@ -81,15 +82,20 @@ Theirs, not the provider's client name and not a project code.
 **Profile tag** — the client code in brackets, `[ACME]`, injected into every window title by the
 browser extension in one browser profile. Not a signal: nothing about the work puts it there, the
 user configured it, and it says only which profile the window belonged to. It belongs on a profile
-dedicated to a single client and nowhere else, and it is the lowest-ranked evidence a rule is
-compiled from — a general profile carrying one absorbs every page whose own content names a
-different client, because the first matching rule wins.
+dedicated to a single client and nowhere else: its code is that client's first **category term**, so
+a general profile carrying one absorbs every page whose own content names a different client,
+because the first matching rule wins.
 
 **Category rule** — the regex the activity source matches a window against to label it with a
-client. Derived: the plugin compiles them from the signals in `.context.md` and writes them, and
-nothing reads them back as authority. What a wrong one costs is a mislabelled span, seen at review —
-which is why the activity source's *configuration* is written to while its data is only read
-(ADR-0007).
+client, one per client. The activity source matches it against the app name and the title each on
+its own, never the two joined. Derived: the plugin writes it from the client's **category terms** in
+`.context.md`, and nothing reads it back as authority. What a wrong one costs is a mislabelled
+span, seen at review — which is why the activity source's *configuration* is written to while its
+data is only read (ADR-0007).
+
+**Category terms** — the few literal words, up to five, that only one client's work puts in a window
+title: the client code, the names of the client's own products or apps, the client's full name.
+Chosen with the user, never generated; a domain word any client's work produces is not one.
 
 **Work item** — the identifier the work is tracked under in the user's own **work-item source**: a
 ticket, case, story or bug. The highest-confidence signal there is, and what an entry's note should

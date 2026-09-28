@@ -74,9 +74,12 @@ def load_classes():
 
 
 def categorize(app, title, classes):
-    """Labels of every class whose regex matches 'app title'. [] if none."""
-    hay = f"{app} {title}"
-    return [label for label, rx in classes if rx.search(hay)]
+    """Labels of every class whose regex matches the app or the title. [] if none.
+
+    Each field on its own, as ActivityWatch's own `categorize` matches them: a rule that
+    only matched the two joined would label a span here that the activity source leaves
+    uncategorized."""
+    return [label for label, rx in classes if rx.search(app) or rx.search(title)]
 
 
 def build_window_spans(events, classes, noise_floor: float = NOISE_FLOOR,

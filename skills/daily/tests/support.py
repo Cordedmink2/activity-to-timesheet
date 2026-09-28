@@ -28,6 +28,7 @@ import datetime as dt
 import gc
 import io
 import json
+import re
 import sys
 import threading
 import urllib.parse
@@ -457,11 +458,58 @@ def _overlaps(event: dict, start: str | None, end: str | None) -> bool:
     return e > lo and s < hi
 
 
+def aw_rule_matches(rule: dict, data: dict) -> bool:
+    """Whether ActivityWatch's own `categorize` puts an event under `rule`.
+
+    It tests the regex against each string in the event's data *on its own* — never `app`
+    and `title` joined. Measured on 0.13.2: rules anchored on the app name and matching a
+    host in the title labelled 0.01h of 12.23h in three days, and the plugin's joined-string
+    matcher had reported them all good. This is the fake's copy of the real semantics, kept
+    apart from the scripts' so a script repeating the mistake cannot agree with itself.
+    """
+    if rule.get("type") != "regex" or not rule.get("regex"):
+        return False
+    rx = re.compile(rule["regex"], re.IGNORECASE if rule.get("ignore_case") else 0)
+    return any(isinstance(value, str) and rx.search(value) for value in data.values())
+
+
+# The two lines of a categorize query the fake reads: which bucket, and which classes.
+_QUERY_BUCKET = re.compile(r"""query_bucket\(["']([^"']+)["']\)""")
+_QUERY_CLASSES = re.compile(r"categorize\(events, (.*)\);$")
+
+
+def _answer_query(buckets: dict[str, list[dict]], body: dict) -> list[list[dict]]:
+    """`POST /api/0/query/` for the one query shape the scripts send: a bucket, categorized,
+    merged by `$category`. Everything else is a 400, as an unparseable query is there."""
+    lines = body["query"]
+    bid = next(m.group(1) for line in lines if (m := _QUERY_BUCKET.search(line)))
+    # The query language's string literal un-escapes `\"` and nothing else, so a backslash
+    # reaches the regex as written: double every one before reading the text as JSON, then
+    # give `\"` back. A client sending JSON-escaped `\\.` gets the two backslashes it sent.
+    raw = next(m.group(1) for line in lines if (m := _QUERY_CLASSES.search(line)))
+    classes = json.loads(raw.replace("\\", "\\\\").replace('\\\\"', '\\"'))
+    answers = []
+    for period in body["timeperiods"]:
+        start, end = period.split("/")
+        merged: dict[tuple, float] = {}
+        for event in buckets.get(bid, []):
+            if not _overlaps(event, start, end):
+                continue
+            label = next((name for name, rule in classes
+                          if aw_rule_matches(rule, event["data"])), ["Uncategorized"])
+            merged[tuple(label)] = merged.get(tuple(label), 0.0) + event["duration"]
+        answers.append([{"data": {"$category": list(label)}, "duration": seconds}
+                        for label, seconds in merged.items()])
+    return answers
+
+
 def aw_server(buckets: dict[str, list[dict]], settings: dict | None = None,
               last_updated: dict[str, str] | None = None,
-              settings_status: int = 200, write_status: int = 200) -> FakeServer:
-    """A fake ActivityWatch exposing `/api/0/buckets/`, `.../events` and `/api/0/settings`,
-    the last of which is written to as well as read.
+              settings_status: int = 200, write_status: int = 200,
+              query_status: int = 200) -> FakeServer:
+    """A fake ActivityWatch exposing `/api/0/buckets/`, `.../events`, `/api/0/settings`,
+    the last of which is written to as well as read, and `/api/0/query/`, answered with
+    `aw_rule_matches()`'s field-by-field semantics.
 
     `settings_status` != 200 simulates an AW build whose settings endpoint is absent, which
     is the real-world reason `load_classes()` has to survive an exception — and, since #70,
@@ -502,6 +550,10 @@ def aw_server(buckets: dict[str, list[dict]], settings: dict | None = None,
                 settings[key] = body
                 return 200, body
             return 200, settings.get(key)
+        if path == "/api/0/query/" and method == "POST":
+            if query_status != 200:
+                return query_status, {"error": "not found"}
+            return 200, _answer_query(buckets, body)
         if path.startswith("/api/0/buckets/") and path.endswith("/events"):
             bid = path[len("/api/0/buckets/"):-len("/events")]
             if bid not in buckets:
