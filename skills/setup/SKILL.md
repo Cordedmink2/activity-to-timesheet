@@ -136,7 +136,7 @@ This step is yours, not the user's. They name their clients and what identifies 
     {"client": "Acme", "signal": "profile_tag", "pattern": "\\[ACME\\]"}]
    ```
 
-   and pass its path: `python "<daily>/scripts/category_rules.py" --candidates <file>`. **Not a heredoc or an `echo`**: a harness can halve every `\\` in a command before the shell sees it, even inside single quotes, and the JSON then fails with `Invalid \escape`. Run it in the **Bash** tool, like every other configured read in this skill. The script backs the existing rules up into the workspace before it writes a thing, so there is nothing to confirm and no diff to show.
+   and pass its path: `python "<daily>/scripts/category_rules.py" --candidates <file>`. **The file is what keeps the backslashes intact**: a harness can halve every `\\` in a command's own text before the shell sees it, single quotes or not, and the JSON then fails with `Invalid \escape`. Run it in the **Bash** tool, like every other configured read in this skill. The script backs the existing rules up into the workspace before it writes a thing, so there is nothing to confirm and no diff to show.
 
 **The user's own internal work gets no category and no client.** Leave it uncategorized: internal time is carried at review by an exclusion and the internal-admin task, and inventing a client name for the user's own firm puts a name in the client field that their timesheet provider does not have.
 
