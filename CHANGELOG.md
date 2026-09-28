@@ -5,6 +5,38 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-09-29
+
+### Fixed
+- **The category rules the plugin wrote labelled nothing in ActivityWatch.** Each rule was
+  anchored on the application's name and matched a signal in the window title, and ActivityWatch
+  matches a rule against the app name and the title separately, so no rule of that shape could
+  ever match. The check before the write and the verify after it both matched against the two
+  joined, so every run reported the rules working. Measured on one machine: 0.01h of 12.23h
+  labelled over three days.
+- **The verify now asks ActivityWatch itself.** After the write, each rule is run through
+  ActivityWatch's own query engine, and a rule it labels nothing with fails the run instead of
+  passing.
+- **The timeline matches the same way ActivityWatch does**, so a span the daily run labels is one
+  ActivityWatch labels too.
+
+### Changed
+- **One rule per client, made from a few words you choose.** Each client's rule is its
+  **Category terms**: up to five literal words only that client's work puts in a title — its
+  code, the names of its own products or apps, its full name. Setup agrees them with you in one
+  line per client before writing. The client code is allowed now: on a real week, its matches
+  outside the client's own browser profile were all that client's work. Signal types, the
+  app-name anchoring and the rule ranking are gone, and so is the one-rule-per-signal set they
+  produced.
+- **A term two clients share is reported as `OVERLAP`**, and a term matching too much of your
+  day is still refused.
+
+### Upgrading
+- Your next daily run says `BROKEN` if an earlier version wrote your category rules, and stops
+  before drafting the day. Run `/billables:setup`: its category step agrees each client's terms
+  with you, replaces the old rules, and writes a ``**Category terms**:`` line under each client
+  in `Timesheets/.context.md`, which is what later rebuilds read.
+
 ## [0.10.4] - 2026-09-28
 
 ### Changed

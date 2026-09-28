@@ -81,9 +81,9 @@ told.
 2. The **"URL in Title" browser extension** stamps a short **client code** into every tab's title
    in a browser profile you use for one client (e.g. `… - [ACME]`), so browsing that carries no
    other clue still says who it was for.
-3. **ActivityWatch category rules**, which the plugin writes and keeps current from the signals you
-   declare, label activity per client — the work-item prefixes, environment addresses and workspace
-   names your work actually contains, with that profile tag as the fallback.
+3. **ActivityWatch category rules**, which the plugin writes and keeps current from a few words you
+   choose per client, label activity per client — the client code the profile tag carries, the names
+   of that client's own products, the client's name.
 4. A small **screenshot grabber** takes a periodic screenshot during work hours, used only to
    disambiguate activity that the window title alone can't pin to a client.
 5. The **skill** reads all of the above, drafts a timesheet, shows it to you, and posts confirmed
@@ -249,9 +249,8 @@ general profile under an earlier version of this walkthrough, clear its format s
 `{title}-{hostname}{path}{args}{hash}`.
 
 The result: every tab in your "Acme" profile ends ` - [ACME]`, your "Beta" profile ` - [BETA]`, and
-the shared one carries nothing. That tag is the **fallback** signal — it is what identifies browsing
-that carries no other clue — which is why the next step ranks it below every other signal rather
-than first.
+the shared one carries nothing. The code inside the tag is then the first word the next step
+writes into that client's category rule.
 
 > Tip: keep the bracketed code distinct and unlikely to appear by accident (the brackets help).
 > You do not have to make it agree with anything by hand: the next step writes the matching rule
@@ -259,25 +258,24 @@ than first.
 
 ### 4. The category rules (the plugin writes these)
 
-This step is not yours to type. `/billables:setup` asks which clients you work for and what shows up
-in a window title when you are working on each — a work-item prefix like `ACM1234S`, the address of
-an environment or site, the name of an editor workspace, the profile tag from step 3 — and then
-compiles, checks and writes the ActivityWatch category rules for you. You never see a regular
+This step is not yours to type. `/billables:setup` agrees a few words per client with you — the
+client code from step 3, the names of that client's own products or apps, the client's full name —
+and writes one ActivityWatch category rule per client from them. You see the words, never a regular
 expression.
 
-Every candidate is gated against your own recent window titles before anything is written, because
-a bad rule fails silently rather than loudly — one matching nothing leaves that client's day
-uncategorized, and one matching too much takes the label off the rule that should have won. The
-demo below runs each failure live, and `/billables:setup` step 4 answers them in the words the gate
-prints.
+Every word is checked against your own recent window titles before anything is written, because a
+bad rule fails silently rather than loudly — one matching nothing leaves that client's day
+uncategorized, and one matching too much takes the label off the rule that should have won. After
+the write, setup asks ActivityWatch itself what each rule labels, and fails loudly if the answer is
+nothing. `/billables:setup` step 4 answers each failure in the words the check prints.
 
 It also copies your existing rules into your workspace before it writes, keeps every category you
 made yourself, and offers once to adopt those into the set it manages. Each category it writes is
 flat and named for the client — ActivityWatch joins a category's name path with `>`, so a `Work >`
 parent would change the label everything downstream matches on.
 
-After that the rules stay current on their own: they are compiled from the signals in your
-`Timesheets/.context.md`, and a run rebuilds them when that file changes, so a client you added last
+After that the rules stay current on their own: they are rebuilt from each client's
+**Category terms** in your `Timesheets/.context.md` when that file changes, so a client you added last
 week is matching this week. That file is the source of truth, so a category you edit in the settings
 dialog for a client the plugin manages is replaced at the next rebuild — change the file, not the
 dialog. Drop a client from the file and its rule goes with it.
@@ -285,14 +283,16 @@ dialog. Drop a client from the file and its rule goes with it.
 **If your ActivityWatch is too old to take the write** — some builds have no settings endpoint at
 all — setup says so out loud and walks you through the same rules by hand instead, then verifies
 them the same way: **Settings → Categories**, **add a category** named for the client, give it a
-**Regex** rule matching that client's bracketed code (`\[ACME\]`), and **save each one as you go**
+**Regex** rule matching that client's code (`ACME`), and **save each one as you go**
 rather than all at the end.
 
 > **What that machinery is for:** open [`demo/tag-rule-demo.html`](./demo/tag-rule-demo.html) in a
 > browser — one self-contained file, nothing to install. Its guided walkthroughs show a mismatched
 > tag silently categorising nothing, a bare code claiming incidental prose, a tag on a general
 > profile stealing a client's work, and a regex with spaces inside its alternation that only *looks*
-> like it works. These are the failures the gate exists to refuse or flag.
+> like it works. The bare code is now the first category term by design — measured on a real week,
+> its matches outside the client's own profile were that client's work — but the demo still shows
+> why a term must be one only that client's work produces.
 
 ### 5. Install the skill on a harness that isn't Claude Code
 
@@ -521,7 +521,7 @@ activity-to-timesheet/
 │   ├── references/           # classification rules, first-run, context template, formats
 │   └── scripts/              # Harvest + ActivityWatch + screenshot helpers (stdlib Python)
 │       ├── activity_timeline.py  # categorized window timeline from AW category rules
-│       ├── category_rules.py     # compiles, gates, writes and verifies those rules
+│       ├── category_rules.py     # gates, writes and verifies those rules
 │       ├── afk_blocks.py         # AFK-anchored day skeleton (work_start/end, breaks)
 │       ├── aw_client.py          # shared ActivityWatch REST helpers for every script that reads a day
 │       ├── harvest_lookup.py     # project_id/task_id lookup by code, name or client
@@ -542,8 +542,8 @@ Two things worth knowing before you do:
 
 - **Not everything is a defect.** If the skill didn't know one of *your* clients, signals or
   machine facts, that belongs in your own `Timesheets/.context.md`. If a window title comes back
-  `uncategorized`, the plugin has no signal for that client yet — add one to your `.context.md` and
-  the next run compiles a rule from it, which `references/first-run.md` covers. Neither is fixed by
+  `uncategorized`, the plugin has no category term for that client yet — add one to your
+  `.context.md` and the next run writes a rule from it, which `references/first-run.md` covers. Neither is fixed by
   a change here.
 - **Redact before you paste.** This tool reads window titles, screenshots and Harvest entries, so
   its output carries client names, project codes and file paths. Issues are public.

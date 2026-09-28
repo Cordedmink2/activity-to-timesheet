@@ -2812,6 +2812,61 @@ already holds, and a new way for the run to stop when the source is down.
 misnamed editor workspaces and gave up on one monitor for a morning. One run is not a cause;
 tightening the brief waits for a second.
 
+### The category rules labelled nothing — rung 2, measured, 2026-09-29
+
+After setup step 4 on 0.10.4, the maintainer's ActivityWatch showed almost no client time. The
+activity source's own engine was asked directly (`POST /api/0/query/`, `categorize` with the live
+rules, the window bucket over three days): **12.22h Uncategorized, 0.01h labelled.** The same
+rules under the plugin's matcher put about 1.5h into the busiest client from the same events.
+
+**Cause, confirmed against that engine:** ActivityWatch tests a rule's regex against each string
+in an event's data *on its own* — `app`, then `title`. Every scoped rule was
+`^(?:msedge|…).*(?:<signal>)`: the app anchor and the signal sat in different fields, so no event
+could satisfy both. `category_rules.matching()` and `activity_timeline.categorize()` both searched
+`"<app> <title>"` joined, so the gate, the `VERIFY` lines and `--inspect` all agreed with each
+other about a rule set the activity source could not use. The verify read the rules back and then
+judged them with the same code that had gated them — a check that could not fail on this bug.
+**Rule since:** a written rule is confirmed by the activity source's own `categorize`, one rule
+alone per query, and the plugin's matchers test each field on its own. **Found in review, then
+measured:** the query language's string literal un-escapes `\"` and nothing else, so the first
+verify — which put the rule in the query through `json.dumps` — sent `\\.` for `\.`, and a term
+with a dot in it (an `acme.crm6`-shaped host, 109 titles in the gate) was labelled 0h. Written by hand
+with only `"` escaped, the same term labels what the bare word does. The fake's `/query/` now
+un-escapes the same way, so the suite goes red on the doubled form.
+
+**The name-only refusal did not survive the data either.** It was what pushed composition into
+app-anchored host fragments and editor alternations: 23 classes for about seven clients, none of
+them words the user would have chosen. Measured over seven days on the same machine (1181
+distinct titles): the busiest client's bare code matched 310 (26%, under the ceiling). The 38
+matches outside that client's Edge profile were every one that client's work — a VS Code
+workspace named for it, a ChatGPT project named for it, a vault search for the code. The broad
+term in the user's own old rule was a domain word (132 titles), not the name. The 256-of-552 case the ceiling was calibrated on is a share
+problem, and the share gate still refuses it; a ban on the name added nothing the gate did not
+already catch. **Replaced by:** one rule per client from at most five literal **category terms**
+chosen with the user — code, the client's own products, its name. Signal types, scopes and rank
+are gone; the candidates' order decides a title two clients match, reported as `OVERLAP` rather
+than refused, since one shared title refusing would veto every rebuild (the lesson of the
+zero-match refusal, above).
+
+**The step 4 wording, watched.** Fresh no-tools agents given a fictional `--inspect` (two
+clients with `SEEN` tags, three dead app-anchored managed rules, an unmanaged `Globex|Invoice`
+also catching personal Xero invoices, a personal rule) and the user's own words ("building their
+harbourmaster app on dynamics 365 … sharepoint intranet which they call globe hub, lots of invoice
+automation"), read by hand. With the new step: 3 of 3 wrote `NWT, Harbourmaster, Northwind
+Trading` and `GBX, Globe Hub, Globex`, adopted `Work>Globex`, put no `adopts` on the managed
+rules, and named Invoice, Dynamics and SharePoint as left out. The control, sent without the step
+text by mistake: host addresses and bracketed tags as terms, no `adopts`, an invented file shape.
+Against the maintainer's real week, the same kind of terms gate clean and the activity source's
+own engine labels the two busiest clients 5.59h and 2.12h with them.
+
+**Existing installs:** a stamp whose rules carry a `signal` is `BROKEN` at `--status`, and Step 2
+stops and sends the user to setup rather than rebuilding, because the terms have to be chosen with
+the user and `.context.md` holds signals, not terms.
+
+**Open:** `demo/tag-rule-demo.html` still presents a bare code in a rule as a failure (its
+"drop the brackets" scenario). The measurement above says that is the ordinary case now; the demo
+waits on a decision about what it should teach instead.
+
 ## Rejected
 
 ### Requiring billable status in the Step 6 draft — rung 2, n=3, 2026-09-28

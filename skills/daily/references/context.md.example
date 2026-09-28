@@ -39,7 +39,7 @@ is why it lives with your facts rather than in a shipped script.
   <!-- activity_timeline --gap-fold -->
 - **Smallest span the timeline prints**: `3.0 min` — shorter ones are hidden from the text
   view but still counted in the rollup  <!-- activity_timeline --min-span -->
-- **Category-rule breadth ceiling**: `0.35` — a rule matching more than this share of your
+- **Category-rule breadth ceiling**: `0.35` — a category term matching more than this share of your
   recent window titles is refused as over-broad. Raise it if you work for one client most
   of the time  <!-- category_rules --max-share -->
 - **Minimum billable block**: `0.25 hr` — nothing shorter is posted as its own entry
@@ -100,6 +100,7 @@ One section per client. Include every signal that would let the skill identify
 **Client name**: `<exact name as your timesheet provider shows it>`
 **Default project**: `<project code>` `<project name>`
 **Profile tag**: `[<CODE>]` — only for a browser profile used for this client alone; else delete this line
+**Category terms**: `<CODE>`, `<the client's own product or app name>`, `<the client's full name>` — up to five words only this client's work puts in a title; the plugin's category rule for this client is these and nothing else
 
 Signals:
 - Work-item prefixes: `<PREFIX>` (e.g. numbers like `<PREFIX>1234` are this client's)

@@ -3,13 +3,18 @@
 Every assertion here is about what crossed a boundary: what reached the fake activity
 source, what the gate refused, what the verify reported, what landed in the workspace.
 Nothing asserts on the shape of a rule object in flight — the point of splitting
-composition from enforcement is that the enforcement is observable, and a test that read
-the internals would go on passing after the write stopped happening.
+the choice of terms from enforcement is that the enforcement is observable, and a test that
+read the internals would go on passing after the write stopped happening.
+
+Whether a written rule labels anything is asked of the fake's `/query/`, which matches the
+way ActivityWatch does — each field on its own (`support.aw_rule_matches`). The compiler's
+own matcher once agreed with itself about rules the real server never matched, so no test
+here takes the compiler's word for it.
 
 The sample is read over a rolling window ending *now*, so a day built on the suite's usual
-fixed date would fall outside it and every rule would be refused for matching nothing.
-`SAMPLE_DAY` is two days back instead: comfortably inside the seven-day window at any hour
-the suite runs, and comfortably in the past, which the fake's own range filter requires.
+fixed date would fall outside it and every rule would match nothing. `SAMPLE_DAY` is two
+days back instead: comfortably inside the seven-day window at any hour the suite runs, and
+comfortably in the past, which the fake's own range filter requires.
 """
 from __future__ import annotations
 
@@ -26,28 +31,26 @@ import pytest
 SCRIPTS = os.path.join(os.path.dirname(__file__), "..", "scripts")
 sys.path.insert(0, SCRIPTS)
 import category_rules as cr
-from support import CliResult, Day, day, run_cli
+from support import CliResult, Day, aw_rule_matches, day, run_cli
 
 SAMPLE_DAY = dt.date.today() - dt.timedelta(days=2)
 
-# A day of browser and editor windows, written in UTC because the sample is a rolling
+# A day of browser, editor and Teams windows, written in UTC because the sample is a rolling
 # window in UTC and an offset would only put a conversion between the fixture and the range.
-ACME_ITEM = ("msedge.exe", "ACM1234S Acme portal - acme.crm6.dynamics.com - [ACME]")
+EDGE = " - Microsoft​ Edge"
+ACME_PAGE = ("msedge.exe", f"Acme portal-acme.crm6.dynamics.com/main - [ACME] - Acme - Dana{EDGE}")
 ACME_EDITOR = ("Code.exe", "compile.py - AcmePortal - Visual Studio Code")
-BETA_TAG = ("msedge.exe", "Fabric order form - beta.example.com - [BETA]")
-PERSONAL = ("msedge.exe", "Weather for Wellington - metservice.com")
-TEAMS = ("Teams.exe", "Chat | Ana Client | Microsoft Teams")
+BETA_PAGE = ("msedge.exe", f"Fabric order form-beta.example.com - [BETA] - Work{EDGE}")
+PERSONAL = ("msedge.exe", f"Weather for Wellington-metservice.com - Personal{EDGE}")
+TEAMS = ("ms-teams.exe", "Chat | Ana Client | Microsoft Teams")
 
 # Every sample day carries these as well as whatever the test names, because a share is a
-# fraction and a two-title day makes one match 50% — every good rule would be refused as
-# over-broad, and the suite would be measuring its own fixture. They are split by
-# application on purpose: a scoped rule's share is measured against the titles of the
-# application it is scoped to, so a day with three browser titles in it would refuse every
-# browser rule however narrow. They share the word `filler`, which is what the over-broad
-# tests below match deliberately rather than by accident.
-FILLER = ([("msedge.exe", f"Downloads filler {n}") for n in range(7)]
+# fraction and a two-title day makes one match 50% — every good term would be refused as
+# over-broad, and the suite would be measuring its own fixture. They share the word
+# `filler`, which is what the over-broad tests below match deliberately.
+FILLER = ([("msedge.exe", f"Downloads filler {n}{EDGE}") for n in range(7)]
           + [("Code.exe", f"filler{n}.py - Scratch - Visual Studio Code") for n in range(3)])
-BROAD = r"filler"
+BROAD = "filler"
 
 
 def sample_day(rows: list[tuple[str, str]],
@@ -67,8 +70,12 @@ def sampled(rows: list[tuple[str, str]]) -> int:
     return len(rows) + len(FILLER)
 
 
-def candidate(client: str, signal: str, pattern: str) -> dict:
-    return {"client": client, "signal": signal, "pattern": pattern}
+def candidate(client: str, *terms: str) -> dict:
+    return {"client": client, "terms": list(terms)}
+
+
+ACME = candidate("Acme", "ACME", "AcmePortal")
+BETA = candidate("Beta", "BETA")
 
 
 def compile_run(tmp_path: Path, candidates: list[dict], *args) -> CliResult:
@@ -89,192 +96,169 @@ def names(classes: list[dict]) -> list[str]:
     return [">".join(entry["name"]) for entry in classes]
 
 
+def labels(entry: dict, window: tuple[str, str]) -> bool:
+    """Whether ActivityWatch would put this window under this class."""
+    return aw_rule_matches(entry["rule"], {"app": window[0], "title": window[1]})
+
+
 # --------------------------------------------------------------------------------------
 # The clean run
 # --------------------------------------------------------------------------------------
 
-def test_a_clean_run_writes_one_rule_per_candidate(live_aw, workspace, tmp_path):
-    server = live_aw(sample_day([ACME_ITEM, ACME_EDITOR, BETA_TAG, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Beta", "profile_tag", r"\[BETA\]"),
-    ])
+def test_a_clean_run_writes_one_rule_per_client(live_aw, workspace, tmp_path):
+    server = live_aw(sample_day([ACME_PAGE, ACME_EDITOR, BETA_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [ACME, BETA])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme", "Beta"]
 
 
-def test_the_rule_written_for_a_scoped_signal_is_confined_to_that_application(
+def test_a_written_rule_labels_its_windows_the_way_activitywatch_matches_them(
         live_aw, workspace, tmp_path):
-    """#69 story 11. The timeline matches a rule against the window's app name *and* its
-    title, so a signal that only means something in a browser is anchored on one — a
-    client's name in an editor's window title is about the code, not about the page."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "url_host", r"acme\.crm6\.dynamics\.com")])
+    """The regression. Rules anchored on the app name and matching a term in the title were
+    gated and verified against the two fields joined, so every check passed — and
+    ActivityWatch, which matches each field on its own, labelled 0.01h of 12.23h with them."""
+    server = live_aw(sample_day([ACME_PAGE, ACME_EDITOR, TEAMS, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "ACME", "AcmePortal", "Ana Client")])
     assert result.code == 0, result.err
     (written,) = posted(server)
-    assert written["rule"]["regex"].startswith("^(?:msedge|microsoft edge|chrome")
-    assert r"acme\.crm6\.dynamics\.com" in written["rule"]["regex"]
+    assert all(labels(written, window) for window in (ACME_PAGE, ACME_EDITOR, TEAMS))
+    assert not labels(written, PERSONAL)
     assert written["rule"]["ignore_case"] is True
+
+
+def test_the_clients_own_name_is_a_term_and_is_written(live_aw, workspace, tmp_path):
+    """The client code is the best evidence there is: the profile tag carries it, a profile
+    named for the client carries it, and so does the workspace the user opened for them.
+    Refusing it forced the run to invent weaker evidence instead."""
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "Acme")])
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme"]
+
+
+def test_a_term_is_literal_so_its_punctuation_matches_itself(live_aw, workspace, tmp_path):
+    """A term is a word the user uses, not a pattern: `acme.crm6` must not match `acmeXcrm6`."""
+    lookalike = ("msedge.exe", f"acmeXcrm6 notes - Work{EDGE}")
+    server = live_aw(sample_day([ACME_PAGE, lookalike, PERSONAL]))
+    assert compile_run(tmp_path, [candidate("Acme", "acme.crm6")]).code == 0
+    (written,) = posted(server)
+    assert labels(written, ACME_PAGE) and not labels(written, lookalike)
 
 
 def test_the_run_reports_the_sample_it_gated_against(live_aw, workspace, tmp_path):
     """A run that refused a rule and never said what it was judged against leaves the user
     arguing with a number they cannot see."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL, TEAMS]))
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
-    assert f"SAMPLE {sampled([ACME_ITEM, PERSONAL, TEAMS])} titles" in result.out
+    live_aw(sample_day([ACME_PAGE, PERSONAL, TEAMS]))
+    result = compile_run(tmp_path, [ACME])
+    assert f"SAMPLE {sampled([ACME_PAGE, PERSONAL, TEAMS])} titles" in result.out
 
 
 # --------------------------------------------------------------------------------------
 # The gate
 # --------------------------------------------------------------------------------------
 
-def test_a_pattern_that_does_not_compile_is_refused_and_nothing_is_written(
-        live_aw, workspace, tmp_path):
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Beta", "title_token", "Fabric(order"),
-    ])
+def test_a_client_with_more_terms_than_a_curated_list_is_refused(live_aw, workspace, tmp_path):
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", *[f"acme{n}" for n in range(6)])])
     assert result.code == 1
-    assert "does not compile" in result.out
+    assert "over the 5 a client's rule takes" in result.out
     assert posted(server) == [], "a refusal anywhere has to write nothing at all"
+
+
+@pytest.mark.parametrize("bad", [{"client": "Acme"}, {"client": "Acme", "terms": []},
+                                 {"client": "Acme", "terms": ["ACME", " "]},
+                                 {"client": "Acme", "terms": "ACME"},
+                                 {"client": "", "terms": ["ACME"]}])
+def test_a_candidate_without_usable_terms_is_refused(live_aw, workspace, tmp_path, bad):
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [bad])
+    assert result.code == 1
+    assert "REFUSE" in result.out
+    assert posted(server) == []
+
+
+def test_a_client_named_twice_is_refused_because_its_terms_are_one_rule(
+        live_aw, workspace, tmp_path):
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "ACME"), candidate("Acme", "AcmePortal")])
+    assert result.code == 1
+    assert "one candidate per client" in result.err
 
 
 def test_a_client_not_worked_on_in_the_window_does_not_block_the_rest(
         live_aw, workspace, tmp_path):
     """Every declared client is passed on a rebuild, and one with no work in the window
-    matches nothing however right its signals are. Refused, it vetoed every rebuild until its
+    matches nothing however right its terms are. Refused, it vetoed every rebuild until its
     work happened to come back; written, it mislabels nothing, since it matches nothing."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Gamma", "profile_tag", r"\[GAMMA\]"),
-    ])
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [ACME, candidate("Gamma", "GAMMA")])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme", "Gamma"]
-    assert "UNVERIFIED Gamma profile_tag — dormant" in result.out
-    assert "matches none of the 9 sampled browser titles" in result.out
+    assert "UNVERIFIED Gamma 'GAMMA' — dormant" in result.out
 
 
-def test_a_silent_signal_of_a_client_that_was_worked_on_is_called_suspect(
+def test_a_silent_term_of_a_client_that_was_worked_on_is_called_suspect(
         live_aw, workspace, tmp_path):
-    """The case the zero-match refusal was for — a mistyped tag, a profile never browsed in —
-    shows as a client whose other evidence matched and this signal did not. It is written
-    rather than refused, for the same reason, and named so a run can send the user to fix it."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Acme", "profile_tag", r"\[ACMEE\]"),
-    ])
+    """The case the zero-match refusal was for — a mistyped code, a product never opened —
+    shows as a client whose other terms matched and this one did not. Written rather than
+    refused, and named so a run can send the user to fix it, with the tags really seen."""
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "ACME", "ACMEE-X")])
     assert result.code == 0, result.err
-    assert names(posted(server)) == ["Acme", "Acme"]
-    assert "UNVERIFIED Acme profile_tag — suspect" in result.out
+    assert names(posted(server)) == ["Acme"]
+    assert "UNVERIFIED Acme 'ACMEE-X' — suspect" in result.out
+    assert "SEEN [ACME]" in result.out
 
 
-def test_a_pattern_matching_an_implausible_share_is_refused(live_aw, workspace, tmp_path):
+def test_a_run_whose_terms_all_matched_lists_no_profile_tags(live_aw, workspace, tmp_path):
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "ACME")])
+    assert result.code == 0, result.err
+    assert "SEEN" not in result.out
+
+
+def test_a_term_matching_an_implausible_share_is_refused(live_aw, workspace, tmp_path):
     """The measured case: a bare-word rule matching 256 of 552 browser titles in a day.
     First-match-wins makes that worse than noise — it takes the label off a correct rule."""
-    server = live_aw(sample_day([ACME_ITEM, BETA_TAG, PERSONAL, TEAMS]))
-    result = compile_run(tmp_path, [candidate("Acme", "title_token", BROAD)])
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE, PERSONAL, TEAMS]))
+    result = compile_run(tmp_path, [candidate("Acme", "ACME", BROAD)])
     assert result.code == 1
-    assert "over the 35% ceiling" in result.out
+    assert f"'{BROAD}' matches" in result.out and "over the 35% ceiling" in result.out
     assert posted(server) == []
 
 
 def test_the_ceiling_is_a_flag_because_it_is_a_judgement(live_aw, workspace, tmp_path):
     """A one-client consultant legitimately runs hotter than a five-client one, so the
     share that is implausible is theirs to say — the gate stays, the number moves."""
-    server = live_aw(sample_day([ACME_ITEM, BETA_TAG, PERSONAL, TEAMS]))
-    result = compile_run(tmp_path, [candidate("Acme", "title_token", BROAD)],
-                         "--max-share", "0.99")
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE, PERSONAL, TEAMS]))
+    result = compile_run(tmp_path, [candidate("Acme", BROAD)], "--max-share", "0.99")
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme"]
 
 
-def test_a_rule_that_is_only_the_clients_name_is_refused(live_aw, workspace, tmp_path):
-    """#69: "a rule that is only the client's name is never produced". Enforced here rather
-    than asked for in prose, because composition is the varying part of this feature."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "title_token", r"\bAcme\b")])
-    assert result.code == 1
-    assert "only the client's name" in result.out
-    assert posted(server) == []
-
-
-def test_an_unknown_signal_type_is_refused_by_name(live_aw, workspace, tmp_path):
-    live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "vibes", r"ACM\d{3,}")])
-    assert result.code == 1
-    assert "unknown signal type 'vibes'" in result.out
-
-
-def test_a_signal_that_cannot_reach_a_window_title_is_skipped_not_refused(
+def test_two_clients_matching_the_same_titles_are_reported_and_the_first_takes_them(
         live_aw, workspace, tmp_path):
-    """A repo path is a real signal and a legitimate `.context.md` entry; it just never
-    reaches a title. Refusing it would send a run back to rewrite something that is right,
-    so it is dropped with the reason said out loud — and the client's other rule still
-    lands."""
-    server = live_aw(sample_day([ACME_ITEM, ACME_EDITOR, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "repo_path", r"C:\\src\\acme-portal"),
-        candidate("Acme", "editor_workspace", r"AcmePortal"),
-    ])
+    """A term two clients share gives one client's time to the other. Named so a run can
+    drop it; written, because one title mentioning both must not veto every rebuild."""
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [candidate("Acme", "ACME", "Fabric"), BETA])
     assert result.code == 0, result.err
-    assert "SKIP Acme repo_path" in result.out
-    assert len(posted(server)) == 1, "only the title-visible signal compiles"
-
-
-# --------------------------------------------------------------------------------------
-# The order
-# --------------------------------------------------------------------------------------
-
-def test_rules_are_written_in_signal_rank_order_however_the_candidates_arrive(
-        live_aw, workspace, tmp_path):
-    """The profile tag is deliberately last: it is the fallback for browser time carrying
-    no other evidence, and the first matching rule wins."""
-    server = live_aw(sample_day([ACME_ITEM, ACME_EDITOR, BETA_TAG, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "profile_tag", r"\[ACME\]"),
-        candidate("Beta", "editor_workspace", r"AcmePortal"),
-        candidate("Gamma", "work_item_prefix", r"ACM\d{3,}S?"),
-    ])
-    assert result.code == 0, result.err
-    assert names(posted(server)) == ["Gamma", "Beta", "Acme"]
-
-
-def test_a_managed_fallback_rule_is_written_below_the_rules_the_plugin_did_not_author(
-        live_aw, workspace, tmp_path):
-    """The other half of "the more specific evidence wins", and the half that was wrong.
-
-    A profile tag identifies browser time carrying no other evidence — so it must lose to
-    anything more specific, *including* a rule the user made themselves. Written above one,
-    a managed tag takes the label off the user's own work-item rule: the same theft the tag
-    was narrowed to single-client profiles to prevent, arriving by another route, and worst
-    for the user who declined adoption and kept their rules.
-    """
-    server = live_aw(sample_day([ACME_ITEM, BETA_TAG, PERSONAL],
-                                classes=[("Theirs", r"ACM\d{3,}")]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Beta", "profile_tag", r"\[BETA\]"),
-    ])
-    assert result.code == 0, result.err
-    assert names(posted(server)) == ["Acme", "Theirs", "Beta"]
+    assert "OVERLAP Acme and Beta — both match 1 title, which go to Acme" in result.out
+    assert names(posted(server)) == ["Acme", "Beta"]
 
 
 # --------------------------------------------------------------------------------------
 # What the write does to what was already there
 # --------------------------------------------------------------------------------------
 
-def test_rules_the_plugin_did_not_author_survive_a_write(live_aw, workspace, tmp_path):
+def test_rules_the_plugin_did_not_author_survive_a_write_below_the_clients(
+        live_aw, workspace, tmp_path):
     """Trusting the plugin with configuration it did not create is the whole of #69's
-    story 7. A user's own category is kept verbatim, and after the rules this run wrote —
-    so the specific evidence still outranks it."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL],
+    story 7. A user's own category is kept verbatim, after the clients' curated rules."""
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL],
                                 classes=[("Personal", r"metservice"),
                                          ("Grouping", r"")]))
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme", "Personal", "Grouping"]
     assert "2 rules left as they were" in result.out
@@ -284,9 +268,8 @@ def test_a_rebuild_replaces_this_plugins_own_rule_rather_than_adding_a_second(
         live_aw, workspace, tmp_path):
     """The context file is the source of truth and the rules are a derived copy, so writing
     them twice has to leave one copy — otherwise every rebuild doubles the rule set."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL],
-                                classes=[("Acme", r"\[ACME\]")]))
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Acme", r"\[ACME\]")]))
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme"]
 
@@ -303,8 +286,8 @@ def test_the_previous_rule_set_is_copied_into_the_workspace_before_the_write(
         live_aw, workspace, tmp_path):
     """The recovery path, and what makes the write safe to perform without showing the user
     a diff. It holds what was there *before*, which is the only version worth having."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Personal", r"metservice")]))
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Personal", r"metservice")]))
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 0, result.err
     (backup,) = backups(workspace)
     assert names(json.loads(backup.read_text(encoding="utf-8"))["classes"]) == ["Personal"]
@@ -314,8 +297,8 @@ def test_the_previous_rule_set_is_copied_into_the_workspace_before_the_write(
 
 def test_a_refused_run_leaves_no_backup_because_it_never_reached_a_write(
         live_aw, workspace, tmp_path):
-    live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    compile_run(tmp_path, [candidate("Beta", "title_token", "Fabric(order")])
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    compile_run(tmp_path, [candidate("Beta")])
     assert backups(workspace) == []
 
 
@@ -327,8 +310,8 @@ def test_an_absent_settings_endpoint_is_refused_in_words_rather_than_a_traceback
         live_aw, workspace, tmp_path):
     """The older build the `setup` skill has a manual fallback for. A traceback here sends
     a run debugging the script instead of taking the route that works."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL]), settings_status=404)
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    live_aw(sample_day([ACME_PAGE, PERSONAL]), settings_status=404)
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 1
     assert "ERR" in result.err and "by hand" in result.err
     assert "Traceback" not in result.err
@@ -338,8 +321,8 @@ def test_an_error_on_the_write_is_reported_and_names_the_backup(
         live_aw, workspace, tmp_path):
     """Swallowed, this is the worst outcome in the feature: a run that reports the rules
     configured when nothing landed."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL]), write_status=500)
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    live_aw(sample_day([ACME_PAGE, PERSONAL]), write_status=500)
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 1
     assert "refused the write" in result.err
     (backup,) = backups(workspace)
@@ -350,19 +333,44 @@ def test_an_error_on_the_write_is_reported_and_names_the_backup(
 # The verify
 # --------------------------------------------------------------------------------------
 
-def test_the_run_reads_the_rules_back_and_says_what_each_matched(
+def test_the_run_asks_the_activity_source_what_each_rule_labels(
         live_aw, workspace, tmp_path):
-    server = live_aw(sample_day([ACME_ITEM, ACME_EDITOR, BETA_TAG, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Beta", "profile_tag", r"\[BETA\]"),
-    ])
+    server = live_aw(sample_day([ACME_PAGE, ACME_EDITOR, BETA_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [ACME, BETA])
     assert result.code == 0, result.err
-    total = sampled([ACME_ITEM, ACME_EDITOR, BETA_TAG, PERSONAL])
-    assert f"VERIFY Acme work_item_prefix — 1 of {total} sampled titles" in result.out
-    assert "VERIFY Beta profile_tag — 1 of 10 sampled browser titles" in result.out
+    assert "VERIFY Acme — 2 sampled titles; the activity source labels 0.0h" in result.out
+    assert "VERIFY Beta — 1 sampled titles" in result.out
     assert len(server.sent("GET", "/settings")) >= 2, (
         "the rules have to be read *back* after the write, not assumed from what was sent")
+    assert len(server.sent("POST", "/query/")) == 2, "one question per rule, each alone"
+
+
+def test_a_rule_the_activity_source_does_not_match_fails_the_run(
+        live_aw, workspace, tmp_path, monkeypatch):
+    """What the verify exists for: the gate and the activity source disagreeing. Recreated
+    as 0.10 had it — rules anchored on the app name, gated against the app and the title
+    joined — which is a gate that passes a rule ActivityWatch never matches."""
+    import re
+    context_file(workspace)
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    real = cr.rule_for
+    monkeypatch.setattr(cr, "rule_for", lambda terms: "^(?:msedge).*" + real(terms))
+    monkeypatch.setattr(cr, "matching", lambda regex, sample: [
+        w for w in sample if re.search(regex, f"{w[0]} {w[1]}", re.IGNORECASE)])
+    result = compile_run(tmp_path, [candidate("Acme", "ACME")])
+    assert result.code == 1
+    assert "labels none of them" in result.err
+    assert run_cli(cr, ["--status"]).out.startswith("STALE"), "no stamp for a failed verify"
+
+
+def test_a_query_endpoint_that_does_not_answer_leaves_the_write_unconfirmed(
+        live_aw, workspace, tmp_path):
+    context_file(workspace)
+    live_aw(sample_day([ACME_PAGE, PERSONAL]), query_status=404)
+    result = compile_run(tmp_path, [ACME])
+    assert result.code == 1
+    assert "unconfirmed" in result.err
+    assert run_cli(cr, ["--status"]).out.startswith("STALE")
 
 
 def test_a_failed_verify_leaves_the_rules_stale_rather_than_recording_a_write(
@@ -372,10 +380,9 @@ def test_a_failed_verify_leaves_the_rules_stale_rather_than_recording_a_write(
     the rebuild, and labels the whole day against rules the activity source does not hold —
     which is the exact failure the verify exists to catch, one day later and silent."""
     context_file(workspace)
-    live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
     monkeypatch.setattr(cr, "post_setting", lambda key, value: None)
-    assert compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 1
+    assert compile_run(tmp_path, [ACME]).code == 1
     assert run_cli(cr, ["--status"]).out.startswith("STALE")
 
 
@@ -383,9 +390,9 @@ def test_a_write_the_server_accepted_and_did_not_keep_fails_the_verify(
         live_aw, workspace, tmp_path, monkeypatch):
     """A rule missing at this point is a write that did not land — which is the difference
     between a configured install and one that only looks configured."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL]))
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
     monkeypatch.setattr(cr, "post_setting", lambda key, value: None)
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 1
     assert "did not land" in result.err
 
@@ -395,107 +402,41 @@ def test_a_write_the_server_accepted_and_did_not_keep_fails_the_verify(
 # --------------------------------------------------------------------------------------
 
 def test_inspect_reports_every_rule_with_the_share_it_matches(live_aw, workspace):
-    server = live_aw(sample_day([ACME_ITEM, BETA_TAG, PERSONAL, TEAMS],
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE, PERSONAL, TEAMS],
                                 classes=[("Acme", r"\[ACME\]"), ("Everything", BROAD)]))
     result = run_cli(cr, ["--inspect"])
     assert result.code == 0, result.err
-    total = sampled([ACME_ITEM, BETA_TAG, PERSONAL, TEAMS])
+    total = sampled([ACME_PAGE, BETA_PAGE, PERSONAL, TEAMS])
     assert f"RULE Acme [unmanaged] — 1 of {total} titles" in result.out
     assert "OVER the 35% ceiling" in result.out
     assert posted(server) == [], "--inspect writes nothing"
 
 
+def test_inspect_matches_each_field_on_its_own_as_the_activity_source_does(
+        live_aw, workspace):
+    """A rule spanning the app and the title matches nothing in ActivityWatch, so inspect
+    must not report it matching — that report is what adoption is decided on."""
+    live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Old", r"^(?:msedge).*\[ACME\]")]))
+    assert "RULE Old [unmanaged] — 0 of" in run_cli(cr, ["--inspect"]).out
+
+
 def test_inspect_shows_an_example_of_what_a_rule_matched(live_aw, workspace):
     """What makes a rule mappable to a client by a reader: the name usually says it, and
     where it does not, the titles it caught do."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Legacy", r"\[ACME\]")]))
+    live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Legacy", r"\[ACME\]")]))
     result = run_cli(cr, ["--inspect"])
-    assert "e.g. msedge.exe ACM1234S Acme portal" in result.out
+    assert "e.g. msedge.exe Acme portal-acme.crm6" in result.out
 
 
 def test_inspect_names_a_grouping_category_rather_than_erroring_on_it(live_aw, workspace):
     """A parent category carries `{"type": "none"}` and no regex at all — reaching for a
     field that is not there is what turns a healthy configuration into an error."""
-    built = sample_day([ACME_ITEM, PERSONAL])
+    built = sample_day([ACME_PAGE, PERSONAL])
     built.classes.append({"name": ["Work"], "rule": {"type": "none"}})
     live_aw(built)
     result = run_cli(cr, ["--inspect"])
     assert result.code == 0, result.err
     assert "RULE Work [unmanaged] — no regex" in result.out
-
-
-def test_a_rule_broad_within_its_own_application_is_refused_however_quiet_the_rest_of_the_day(
-        live_aw, workspace, tmp_path):
-    """The calibration case, and the one a whole-sample denominator lets through.
-
-    The ceiling was set from a rule matching 256 of 552 *browser* titles. Measured against
-    every window title that machine saw — Explorer, the editor, Teams — the same rule scores
-    well under it and is written. Here the day is mostly editor titles and the rule matches
-    most of the browsing: a browser-scoped rule can only ever match browser titles, so
-    browser titles are the population it is broad within.
-    """
-    browsing = [("msedge.exe", f"Acme news roundup {n} - news.example.com") for n in range(5)]
-    editing = [("Code.exe", f"module{n}.py - Other - Visual Studio Code") for n in range(30)]
-    server = live_aw(sample_day(browsing + editing))
-    result = compile_run(tmp_path, [candidate("Acme", "url_host", r"news\.example\.com")])
-    assert result.code == 1
-    assert "sampled browser titles" in result.out and "ceiling" in result.out
-    assert posted(server) == []
-
-
-def test_a_browser_profile_named_for_its_client_is_not_refused_as_the_clients_name(
-        live_aw, workspace, tmp_path):
-    """The two markers the *user* chose as a name for the client — the bracketed code and a
-    browser profile's name — are the client's name by construction. Refusing them would
-    refuse the ordinary case of the signal type the walkthrough offers, and a refusal
-    anywhere writes nothing at all."""
-    profile = ("msedge.exe", "Acme portal - acme.example.com - Acme - Dana - Microsoft Edge")
-    server = live_aw(sample_day([profile, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "browser_profile", r"Acme")])
-    assert result.code == 0, result.err
-    assert names(posted(server)) == ["Acme"]
-
-
-# Edge's real title shape, zero-width space and all: the profile's name, then the account's
-# display name when the profile has one, then the browser. A general profile's page can
-# mention the client anywhere before that.
-EDGE = " - Microsoft​ Edge"
-ACME_PROFILE = ("msedge.exe", f"Acme portal-acme.example.com/home - Acme - Dana{EDGE}")
-ACME_BARE_PROFILE = ("msedge.exe", f"Acme portal-acme.example.com/home - Acme{EDGE}")
-WORK_PAGE_NAMING_ACME = ("msedge.exe",
-                         f"All Documents-intranet.example.com/sites/Acme%20Asia - Work{EDGE}")
-WORK_URL_NAMING_ACME = ("msedge.exe",
-                        f"devops.example.com/Acme and 13 more pages - Work{EDGE}")
-WORK_PAGE_ENDING_ACME = ("msedge.exe", f"Board - Acme-devops.example.com - Work{EDGE}")
-
-
-def test_a_browser_profile_rule_matches_the_profile_not_a_page_that_names_the_client(
-        live_aw, workspace, tmp_path):
-    """A browser_profile pattern is the client's name, and the name-only refusal exempts it
-    because the user chose that name for a profile. Matched anywhere in the title, the
-    exemption let through exactly what the refusal exists to stop: every page of a general
-    profile that mentioned the client was labelled theirs."""
-    server = live_aw(sample_day([ACME_PROFILE, ACME_BARE_PROFILE, WORK_PAGE_NAMING_ACME,
-                                 WORK_URL_NAMING_ACME, WORK_PAGE_ENDING_ACME, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "browser_profile", r"Acme")])
-    assert result.code == 0, result.err
-    (written,) = posted(server)
-    hits = cr.matching(written["rule"]["regex"], [
-        " ".join(row) for row in (ACME_PROFILE, ACME_BARE_PROFILE, WORK_PAGE_NAMING_ACME,
-                                  WORK_URL_NAMING_ACME, WORK_PAGE_ENDING_ACME)])
-    assert hits == [" ".join(ACME_PROFILE), " ".join(ACME_BARE_PROFILE)]
-
-
-def test_a_browser_profile_whose_name_is_not_in_the_titles_is_reported_not_guessed_at(
-        live_aw, workspace, tmp_path):
-    """Chrome never puts a profile in its title (decision log, #66), and a profile named
-    differently from its client matches nothing: both surface as unverified rather than
-    falling back to wherever the word appears."""
-    live_aw(sample_day([WORK_PAGE_NAMING_ACME, WORK_URL_NAMING_ACME,
-                        ("chrome.exe", "Acme portal - Google Chrome"), PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "browser_profile", r"Acme")])
-    assert result.code == 0, result.err
-    assert "UNVERIFIED Acme browser_profile" in result.out
 
 
 # --------------------------------------------------------------------------------------
@@ -514,9 +455,8 @@ DRAFT_PAGE = ("msedge.exe", f"[Draft] Plan-plans.example.com/x - Work{EDGE}")
 
 def test_inspect_lists_each_profile_tag_with_the_edge_profile_it_was_seen_in(
         live_aw, workspace):
-    """A rebuild composed profile rules from profile names the titles no longer carried, and
-    only an ad-hoc scan showed which tags were really there. Printed before the rules are
-    read, so it shows on an install with no categories yet."""
+    """Which client codes the titles really carry, so the terms are chosen from what is
+    there. Printed before the rules are read, so it shows on an install with no categories."""
     live_aw(sample_day([ACME_TAGGED, ACME_TAGGED_ALONE, PERSONAL]))
     result = run_cli(cr, ["--inspect"])
     assert result.code == 0, result.err
@@ -542,7 +482,7 @@ def test_a_profile_tag_in_chrome_is_listed_without_a_profile(live_aw, workspace)
 def test_a_bracket_in_a_page_title_is_not_read_as_a_profile_tag(live_aw, workspace):
     live_aw(sample_day([DRAFT_PAGE, PERSONAL]))
     result = run_cli(cr, ["--inspect"])
-    assert "SEEN no profile tag in the sampled browser titles" in result.out
+    assert "SEEN no profile tag in the sampled titles" in result.out
     assert "[Draft]" not in result.out
 
 
@@ -564,26 +504,6 @@ def test_the_profile_tags_are_listed_where_the_rules_cannot_be_read(live_aw, wor
     assert "SEEN [ACME]" in result.out
 
 
-def test_a_suspect_profile_rule_is_shown_the_profile_tags_that_were_seen(
-        live_aw, workspace, tmp_path):
-    live_aw(sample_day([ACME_ITEM, ACME_TAGGED, PERSONAL]))
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Acme", "profile_tag", r"\[ACMEE\]"),
-    ])
-    assert result.code == 0, result.err
-    assert "UNVERIFIED Acme profile_tag — suspect" in result.out
-    assert "SEEN [ACME]" in result.out
-
-
-def test_a_rebuild_whose_profile_rules_all_matched_lists_no_profile_tags(
-        live_aw, workspace, tmp_path):
-    live_aw(sample_day([ACME_ITEM, ACME_TAGGED, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "profile_tag", r"\[ACME\]")])
-    assert result.code == 0, result.err
-    assert "SEEN" not in result.out
-
-
 # --------------------------------------------------------------------------------------
 # Adopting the rules a user already had (#73)
 # --------------------------------------------------------------------------------------
@@ -593,21 +513,20 @@ def test_a_rule_this_plugin_wrote_reads_back_as_managed_and_the_users_own_does_n
     """Which rules are up for adoption is a mechanical question, not a judgement — the run
     that writes a rule records the client it wrote it for, and everything else the activity
     source holds is the user's own."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Personal", r"metservice")]))
-    assert compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 0
+    live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Personal", r"metservice")]))
+    assert compile_run(tmp_path, [ACME]).code == 0
     result = run_cli(cr, ["--inspect"])
     assert "RULE Acme [managed]" in result.out
     assert "RULE Personal [unmanaged]" in result.out
 
 
 def test_adopting_a_rule_makes_it_managed_and_leaves_one_copy(live_aw, workspace, tmp_path):
-    """The user accepts the mapping, the rule is compiled from the signals behind it like
-    any other, and from then on a rebuild regenerates it rather than leaving it beside the
+    """The user accepts the mapping, the rule is rebuilt from the terms behind it like any
+    other, and from then on a rebuild regenerates it rather than leaving it beside the
     managed set."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL],
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL],
                                 classes=[("Acme", r"acme"), ("Personal", r"metservice")]))
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme", "Personal"], "one Acme rule, not two"
     assert "RULE Acme [managed]" in run_cli(cr, ["--inspect"]).out
@@ -620,21 +539,21 @@ def test_skipping_adoption_leaves_an_unmanaged_rule_byte_for_byte(
     settings dialog they made it in is keyed on that."""
     theirs = {"id": 12, "name": ["Personal"],
               "rule": {"type": "regex", "regex": "metservice", "ignore_case": False}}
-    built = sample_day([ACME_ITEM, PERSONAL])
+    built = sample_day([ACME_PAGE, PERSONAL])
     built.classes.append(theirs)
     server = live_aw(built)
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 0, result.err
     assert theirs in posted(server)
 
 
 def test_a_new_rule_does_not_take_an_id_an_unmanaged_rule_is_already_using(
         live_aw, workspace, tmp_path):
-    built = sample_day([ACME_ITEM, PERSONAL])
+    built = sample_day([ACME_PAGE, PERSONAL])
     built.classes.append({"id": 12, "name": ["Personal"],
                           "rule": {"type": "regex", "regex": "metservice"}})
     server = live_aw(built)
-    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    compile_run(tmp_path, [ACME])
     written = posted(server)
     assert len({entry["id"] for entry in written}) == len(written)
 
@@ -643,12 +562,10 @@ def test_adopting_a_rule_whose_name_is_not_the_clients_leaves_one_copy(
         live_aw, workspace, tmp_path):
     """The README told users to make `Work > Acme` for years, so the rule being adopted
     usually is not named for the client alone. Replacing on the client's name only would
-    write a second flat `Acme` and leave the nested one above it forever — "adopted" in
+    write a second flat `Acme` and leave the nested one beside it forever — "adopted" in
     words, doubled in fact. The candidate names what it takes over."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL],
-                                classes=[("Work>Acme", r"\[ACME\]")]))
-    adopts = dict(candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"), adopts="Work>Acme")
-    result = compile_run(tmp_path, [adopts])
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Work>Acme", r"\[ACME\]")]))
+    result = compile_run(tmp_path, [dict(ACME, adopts="Work>Acme")])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme"]
 
@@ -659,15 +576,12 @@ def test_a_client_no_longer_declared_loses_its_rule_rather_than_being_orphaned(
     a dropped client's rule goes on labelling spans *and* reads back as the user's own at
     the next inspect — so adoption would offer them their own leftover as something they
     made."""
-    server = live_aw(sample_day([ACME_ITEM, BETA_TAG, PERSONAL]))
-    assert compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Beta", "profile_tag", r"\[BETA\]"),
-    ]).code == 0
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE, PERSONAL]))
+    assert compile_run(tmp_path, [ACME, BETA]).code == 0
     # The same server, so the second run reads back what the first one wrote — which is the
     # whole scenario. A second fake would start empty and the assertion would pass on a run
     # that had nothing to drop.
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    result = compile_run(tmp_path, [ACME])
     assert result.code == 0, result.err
     writes = server.sent("POST", "/settings/classes")
     assert len(writes) == 2
@@ -679,34 +593,17 @@ def test_a_managed_rule_edited_in_the_settings_dialog_is_reported_by_inspect(
         live_aw, workspace, tmp_path):
     """#69 story 5: a rule damaged by hand is recoverable. The staleness check cannot see
     it — two local file reads — so this is where it surfaces, and a recompile is the fix."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    assert compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 0
-    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Acme", r"something else")]))
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    assert compile_run(tmp_path, [ACME]).code == 0
+    live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Acme", r"something else")]))
     assert "EDITED since it was written" in run_cli(cr, ["--inspect"]).out
-
-
-def test_a_client_with_several_managed_rules_reads_back_unedited(
-        live_aw, workspace, tmp_path):
-    """Each rule is held against its own recorded regex. Held against one per client, every
-    rule but the last of a client with several read as hand-edited when none had been."""
-    server = live_aw(sample_day([ACME_ITEM, ACME_EDITOR, PERSONAL]))
-    assert compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Acme", "editor_workspace", r"AcmePortal"),
-    ]).code == 0
-    live_aw(sample_day([ACME_ITEM, ACME_EDITOR, PERSONAL],
-                       classes=[(e["name"][0], e["rule"]["regex"]) for e in posted(server)]))
-    result = run_cli(cr, ["--inspect"])
-    assert result.out.count("RULE Acme [managed]") == 2
-    assert "EDITED" not in result.out
 
 
 def test_an_over_broad_rule_of_the_users_own_is_surfaced_for_correction(
         live_aw, workspace):
     """Adoption is where an over-broad rule gets fixed rather than merely reported: the
     measured case takes the label off a correct rule, so it is worth the one question."""
-    live_aw(sample_day([ACME_ITEM, PERSONAL], classes=[("Everything", BROAD)]))
+    live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Everything", BROAD)]))
     result = run_cli(cr, ["--inspect"])
     assert "RULE Everything [unmanaged]" in result.out
     assert "OVER the 35% ceiling" in result.out
@@ -716,7 +613,7 @@ def test_an_over_broad_rule_of_the_users_own_is_surfaced_for_correction(
 # Staleness: the rules are a derived copy, so the copy is rebuilt when the source moves (#74)
 # --------------------------------------------------------------------------------------
 
-def context_file(workspace: Path, text: str = "### Acme\n- `ACM` in a title\n") -> Path:
+def context_file(workspace: Path, text: str = "### Acme\n- `ACME`\n") -> Path:
     path = workspace / "Timesheets" / ".context.md"
     path.write_text(text, encoding="utf-8")
     return path
@@ -731,10 +628,28 @@ def test_status_is_stale_before_this_plugin_has_ever_written_the_rules(workspace
 
 def test_status_is_current_straight_after_a_write(live_aw, workspace, tmp_path):
     context_file(workspace)
-    live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    assert compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")]).code == 0
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    assert compile_run(tmp_path, [ACME]).code == 0
     assert run_cli(cr, ["--status"]).out.startswith("CURRENT")
+
+
+def test_rules_written_before_terms_are_broken_and_send_the_user_to_setup(workspace):
+    """Every stamp from before 0.11.0 records rules anchored on the app name, which the
+    activity source never matches — however current the context file. A quiet recompile
+    from `.context.md` would compose the same signals again; choosing terms is setup's."""
+    path = context_file(workspace)
+    state = workspace / ".mcp"
+    state.mkdir(exist_ok=True)
+    (state / cr.STAMP).write_text(json.dumps({
+        "written": "2026-09-28T04:38:26+00:00",
+        "context_sha256": cr.context_fingerprint(path.parent.parent)[0],
+        "rules": [{"client": "Acme", "signal": "url_host",
+                   "regex": r"^(?:msedge|chrome).*(?:acme\.crm6)"}],
+    }), encoding="utf-8")
+    result = run_cli(cr, ["--status"])
+    assert result.code == 0
+    assert result.out.startswith("BROKEN")
+    assert "`setup` skill's category step" in result.out
 
 
 def test_a_hand_edit_to_the_context_file_makes_the_rules_stale(
@@ -743,9 +658,9 @@ def test_a_hand_edit_to_the_context_file_makes_the_rules_stale(
     client on Friday and Monday's timesheet is drafted against rules that never heard of
     them."""
     context_file(workspace)
-    live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
-    context_file(workspace, "### Acme\n- `ACM` in a title\n\n### Beta\n- `BET` in a title\n")
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    compile_run(tmp_path, [ACME])
+    context_file(workspace, "### Acme\n- `ACME`\n\n### Beta\n- `BETA`\n")
     result = run_cli(cr, ["--status"])
     assert result.out.startswith("STALE")
     assert "has changed since the rules were written" in result.out
@@ -756,8 +671,8 @@ def test_status_reads_no_activity_source_at_all(live_aw, workspace, tmp_path):
     It is also what keeps the rule "a run whose context file has not changed does not write"
     true without anything having to remember it."""
     context_file(workspace)
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    compile_run(tmp_path, [ACME])
     before = len(server.requests)
     assert run_cli(cr, ["--status"]).out.startswith("CURRENT")
     assert len(server.requests) == before, "--status touched the activity source"
@@ -784,14 +699,11 @@ def test_a_workspace_with_no_context_file_is_stale_rather_than_current(workspace
 
 def test_a_rebuild_is_gated_exactly_as_the_first_write_was(live_aw, workspace, tmp_path):
     """The rebuild rides inside an approval the user has already given, so the only thing
-    standing between a mistyped signal and their timesheet is this gate."""
+    standing between a mistyped term and their timesheet is this gate."""
     context_file(workspace)
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])
-    result = compile_run(tmp_path, [
-        candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?"),
-        candidate("Beta", "title_token", BROAD),
-    ])
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    compile_run(tmp_path, [ACME])
+    result = compile_run(tmp_path, [ACME, candidate("Beta", BROAD)])
     assert result.code == 1
     assert len(server.sent("POST", "/settings/classes")) == 1, (
         "the refused rebuild wrote anyway — the first write is the only one that landed")
@@ -804,10 +716,8 @@ def test_a_rebuild_is_gated_exactly_as_the_first_write_was(live_aw, workspace, t
 def test_the_candidates_can_arrive_on_stdin(live_aw, workspace, monkeypatch):
     """A run composing candidates has them in hand, not in a file; making it write one
     first is a step that can fail on a read-only or unexpected working directory."""
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    monkeypatch.setattr(
-        sys, "stdin",
-        io.StringIO(json.dumps([candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")])))
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps([ACME])))
     result = run_cli(cr, ["--candidates", "-"])
     assert result.code == 0, result.err
     assert names(posted(server)) == ["Acme"]
@@ -829,9 +739,8 @@ def test_a_workspace_that_cannot_hold_the_backup_is_refused_as_itself(live_aw, t
     root = tmp_path / "ws"
     root.mkdir()
     (root / ".mcp").write_text("a file where the state directory goes", encoding="utf-8")
-    server = live_aw(sample_day([ACME_ITEM, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")],
-                         "--workspace", str(root))
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    result = compile_run(tmp_path, [ACME], "--workspace", str(root))
     assert result.code == 1
     assert "cannot keep the backup" in result.err
     assert "unreachable" not in result.err
@@ -842,7 +751,6 @@ def test_a_sample_with_nothing_in_it_refuses_rather_than_writing_unjudged_rules(
         live_aw, workspace, tmp_path):
     """A day with no window events is not a day on which every rule is fine."""
     live_aw(day(date=SAMPLE_DAY, offset=0).window("09:00", "09:01", "x", "y"))
-    result = compile_run(tmp_path, [candidate("Acme", "work_item_prefix", r"ACM\d{3,}S?")],
-                         "--days", "0")
+    result = compile_run(tmp_path, [ACME], "--days", "0")
     assert result.code == 1
     assert "nothing to test a category rule against" in result.err

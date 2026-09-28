@@ -34,7 +34,7 @@ boundary of its own.
 **Direction is how that usually reads, and it is not the rule.** The first draft of this ADR said
 "the provider writes, the sources read", because at the time the two lines coincided. #69 separated
 them: the plugin now writes the activity source's **category rules** through
-`POST /api/0/settings/classes`, having compiled them from the signals the user declared. That write
+`POST /api/0/settings/classes`, having built them from the category terms the user chose. That write
 belongs on the cheap side, and the argument is the one this ADR's Context already makes. A wrong
 category rule mislabels a span; the label is a first-pass client signal that the classification and
 disambiguation steps check anyway, it is shown to the user at review before anything is billed, and
