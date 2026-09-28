@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-09-29
+
+### Changed
+- **The interactive demo runs the category terms the plugin writes.** It used to present a bare
+  client code as a failure and bracketed rules as the recommendation. Its walkthroughs now show a
+  tag term the titles do not carry, a client code that is also an ordinary word, a hand-typed rule
+  with spaces in it, and a tag on a general profile.
+- **Setup uses the tag for a client code that is also an ordinary word.** A code like `LEDGER`
+  turns up in unrelated pages, so its term is `[LEDGER]` instead.
+
 ## [0.11.0] - 2026-09-29
 
 ### Fixed

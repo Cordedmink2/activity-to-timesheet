@@ -287,12 +287,11 @@ them the same way: **Settings → Categories**, **add a category** named for the
 rather than all at the end.
 
 > **What that machinery is for:** open [`demo/tag-rule-demo.html`](./demo/tag-rule-demo.html) in a
-> browser — one self-contained file, nothing to install. Its guided walkthroughs show a mismatched
-> tag silently categorising nothing, a bare code claiming incidental prose, a tag on a general
-> profile stealing a client's work, and a regex with spaces inside its alternation that only *looks*
-> like it works. The bare code is now the first category term by design — measured on a real week,
-> its matches outside the client's own profile were that client's work — but the demo still shows
-> why a term must be one only that client's work produces.
+> browser — one self-contained file, nothing to install. It runs the terms the plugin writes over a
+> simulated day, and its guided walkthroughs show a tag term the titles do not carry matching
+> nothing, a client code that is also an ordinary word claiming unrelated pages, a hand-typed rule
+> with spaces inside its alternation that only *looks* like it works, and a tag on a general profile
+> stealing a client's work.
 
 ### 5. Install the skill on a harness that isn't Claude Code
 

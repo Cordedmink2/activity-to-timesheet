@@ -2863,9 +2863,12 @@ own engine labels the two busiest clients 5.59h and 2.12h with them.
 stops and sends the user to setup rather than rebuilding, because the terms have to be chosen with
 the user and `.context.md` holds signals, not terms.
 
-**Open:** `demo/tag-rule-demo.html` still presents a bare code in a rule as a failure (its
-"drop the brackets" scenario). The measurement above says that is the ordinary case now; the demo
-waits on a decision about what it should teach instead.
+**The demo, 0.11.1.** `demo/tag-rule-demo.html` presented a bare code in a rule as a failure and
+bracketed rules as the recommendation. It now runs the terms the plugin writes, and its "bare
+codes" scenario became the one case the measurement above does not cover: a code that is also an
+ordinary word (`LEDGER`, `NIMBUS`) claims unrelated pages, and its tag is the term instead — which
+setup step 3 now says. Each scenario was run headless through the page's own model and does what
+its text claims.
 
 ## Rejected
 
