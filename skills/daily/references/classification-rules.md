@@ -21,12 +21,12 @@ If any window title, URL, or terminal task name within the block contains a stri
 
 1. Look up the prefix under `.context.md` § "Active client projects" — each client's signal list carries its work-item prefixes — to identify the client. A prefix that resolves to more than one client there is settled by grouping the assignment catalog on `project.code` prefix → `client.name`, not by picking the first match.
 2. Look up the same string against `project.code` in the assignment catalog (`.mcp/harvest_assignments*.json`) to get `project.id` and `task_assignments[]`.
-3. If the user maintains a work-item catalog file (e.g. a dump of active incidents), look up the title there for the description.
+3. If the user maintains a work-item catalog file (e.g. a dump of active incidents), look up the title there for the entry note.
 4. Direct hit → HIGH confidence.
 
 **Caveat — a work item existing ≠ today's billing target.** A work-item catalog lists *all* known items; thematic match isn't billing match. The user may be supporting a colleague's work item, doing release-level work that bills to a different project, or working on something not yet tracked. When the work item isn't named explicitly in window/URL titles, ask — don't pick the most "thematically matching" row from the catalog.
 
-A trailing `S` (or other suffix) on a work-item number often indicates **Support work** — check `.context.md` for the user's convention. If so, tag the description as `[Support]` but use the same `project_id` / `task_id`.
+A trailing `S` (or other suffix) on a work-item number often indicates **Support work** — check `.context.md` for the user's convention. If so, tag the entry note `[Support]` but use the same `project_id` / `task_id`.
 
 ### 2. Edge profile in window title (HIGH confidence for browser activity)
 
