@@ -2738,15 +2738,17 @@ compared against. Now held as `(client, regex)` pairs.
 the client. But `compose()` anchored it on the browser and then took `.*(?:name)`, so the
 exemption let through exactly what the refusal stops. On a real rebuild the same run refused
 one client's `editor_workspace` name as name-only and wrote the same name as its
-`browser_profile`, which matched 3 titles from the untagged general `Work` profile: a SharePoint URL containing the
-client's name, and a DevOps project path.
+`browser_profile`, which matched 3 titles from the untagged general `Work` profile: a SharePoint
+URL containing the client's name, and a DevOps project path.
 
 **Fixed by anchoring the name on the profile slot**: `… - <name>[ - <account>] - Microsoft\W*Edge$`.
-The shape was read off 7 days of real titles (2,289 Edge events): every one ends
-` - <profile>[ - <account>] - Microsoft​ Edge`, zero-width space included, with a bare
-`Work` and two-part `<client> - <account>` names. On that sample the first client's rule went
-from 3 matches to 0, and a second client's from 290 to 266 — the 24 lost were other profiles'
-pages naming that client.
+The shape was read off 7 days of real titles (2,289 Edge events): they end
+` - <profile>[ - <account>] - Microsoft Edge` with a zero-width space (U+200B) before `Edge`,
+with a bare `Work` and two-part `<client> - <account>` names. On that sample the first client's
+rule went from 3 matches to 0, and a second client's from 290 to 266. Of the 24 it lost, 17 were
+`Work`-profile pages naming that client; the other 7 were sign-in redirects whose titles Windows
+cut at 511 characters, before the profile slot — 31 of 974 Edge titles were cut that way, and a
+cut title loses its bracketed tag as well, so neither fallback signal can see those pages.
 Chrome never carries a profile (§ "Chrome does not put the profile name in the window title"),
 so a Chrome user's rule reports `UNVERIFIED` rather than matching somewhere else.
 
