@@ -111,7 +111,7 @@ Resolution order:
 - **Never silently bill an abandoned-task block.** Setup/sign-in/install work that ended without a client deliverable and a pivot elsewhere → surface it; default to internal-admin non-billable unless the user says otherwise. This is a billing default, not a disambiguation step: such a block is often attributed confidently — you know whose tenant you signed into — so it never gets flagged, and a rule that waited for a flag would never be read.
 - **A matching work item older than ~1 week → make a NEW one, don't reuse it.** The old one is likely closed or already invoiced. Create a fresh one (`references/new-client-work.md`) and bill to that; only reuse a genuinely recent / still-open item.
 
-## Writing the entry note (description)
+## Writing the entry note
 
 Notes go to clients on invoices — `SKILL.md` carries the hard rule (client-readable, SOW test). Style defaults:
 

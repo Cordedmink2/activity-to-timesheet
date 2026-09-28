@@ -242,6 +242,23 @@ def test_the_review_question_states_how_many_calendar_questions_are_pending():
         "answer to.")
 
 
+def test_the_posting_question_shows_each_entry_s_note():
+    """The note is the one field that reaches the client, on the invoice, and Step 8 is the
+    last thing the user sees before a write that cannot be taken back. Scoped to the
+    paragraph that states the posting question: the self-check line above it also says
+    "note", and would keep a step-wide check green with the note gone from the question.
+    """
+    confirm = [s for s in steps() if s.splitlines()[0].endswith("Confirmation gate before Harvest")]
+    assert len(confirm) == 1, "no single `### Step N — Confirmation gate before Harvest`"
+    asks = [p for p in confirm[0].split("\n\n") if p.startswith("Then put the posting question")]
+    assert len(asks) == 1, (
+        "Step 8 has no single `Then put the posting question…` paragraph saying what the "
+        "user is asked before anything posts.")
+    assert says(asks[0], "note"), (
+        "Step 8's posting question lists each entry without its note, so the text that goes "
+        "out on the client's invoice is approved unseen.")
+
+
 def test_the_workflow_uses_the_glossarys_calendar_vocabulary():
     """The positive half of the vocabulary guard — the denylist in
     `test_provider_neutrality.py` says what the rules stopped saying, not that what they

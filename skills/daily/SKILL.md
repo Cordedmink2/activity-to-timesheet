@@ -184,7 +184,7 @@ Load it on any day with a 🔸 in it — **and on any day that shows more than o
 
 ### Step 6 — Present the proposed timesheet
 
-The draft is what the user reviews: for every block, its time range, duration, client and a description carrying the work-item number where there is one. What this step fixes is the content the user sees; the layout is yours — present it in whatever form this harness shows best, unless the user has asked for a particular one.
+The draft is what the user reviews: for every block, its time range, duration, client and the note it will post — the client-readable text that goes out on the invoice, carrying the work-item number where there is one. Showing the note here is what lets the user correct it before Step 8. What this step fixes is the content the user sees; the layout is yours — present it in whatever form this harness shows best, unless the user has asked for a particular one.
 
 Flag uncertain blocks 🔸, set apart from the blocks themselves. End-of-day and breaks are deterministic; *which client / billable / where to split* is judgment — flag it rather than committing silently. The user's review is what makes the sheet accurate, so make uncertain calls easy to see.
 
@@ -230,7 +230,7 @@ First self-check every line of the proposal:
 - [ ] `.context.md` exclusions applied (personal browsing, recurring internal items)
 - [ ] **The date isn't already billed** — re-confirm Step 1's Harvest check still holds. Every other line above compares the proposal against ActivityWatch; this line is the checklist's comparison against Harvest, and the cost of skipping it is double-billing a client
 
-Then put the posting question: how many time entries this will create, and for each one its hours, client, project and task, with `[Support]` where it applies. When the skeleton's header read `derived from this machine`, add the zone — times in that zone, derived from this machine, and that setting `TIMESHEET_TIMEZONE` pins it. Close on the three answers: yes, no, or edit a named block.
+Then put the posting question: how many time entries this will create, and for each one its hours, client, project and task, with `[Support]` where it applies, and its note exactly as it will post. When the skeleton's header read `derived from this machine`, add the zone — times in that zone, derived from this machine, and that setting `TIMESHEET_TIMEZONE` pins it. Close on the three answers: yes, no, or edit a named block.
 
 The zone is there only on a derived zone — a configured zone is the user's own choice and is not announced. It is the last moment the user sees the zone before anything reaches the provider, and a wrong one dates every entry above it.
 

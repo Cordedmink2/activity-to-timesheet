@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-09-28
+
+### Fixed
+- **You see each entry's invoice note before it posts.** The proposed timesheet now shows
+  the note each block will post, where you review and edit it, and the posting confirmation
+  repeats it for every entry. Before, the confirmation left the note out, so the one field
+  that reaches the client on the invoice could be approved without being shown.
+
 ## [0.10.0] - 2026-09-28
 
 ### Changed

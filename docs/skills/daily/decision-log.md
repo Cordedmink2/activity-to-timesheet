@@ -1253,6 +1253,20 @@ and every script's `OK` / `ERR` / `WOULD POST` line. The review-question guard i
 `tests/test_daily_skill.py` now reads the `**Then ask…**` paragraph instead of a blockquote,
 and was watched going red with its calendar count deleted.
 
+### The invoice note is shown in the draft and at the posting question — 2026-09-28
+**Rung 2.** Step 6 showed "a description" and Step 8 listed hours, client, project and task,
+so the note — the one field that reaches the client — was approved at neither by name.
+The documents disagreed on what the description was: `classification-rules.md` headed its
+note section "Writing the entry note (description)" while `output-format.md` keeps the
+description internal and the note separate. Step 6 now shows the note each block will post,
+Step 8 repeats it per entry, and the rubric heading lost "(description)", so only the
+timesheet file uses that word. A paragraph-scoped guard in `tests/test_daily_skill.py`
+holds Step 8, watched going red with the note removed.
+
+Fictional day with an internal description and a composed note per block, three fresh
+no-tool agents per arm. **Before:** notes in the draft 3/3, in the posting question 1/3.
+**After:** 3/3 at both.
+
 ## Script defects
 
 Found while building the scenario/contract suite, 2026-08-14. All **rung 1** — each was
@@ -2685,6 +2699,13 @@ into `parse_boundary()` and is pinned by
 neither Windows nor a UTC clock. Red in 0.10s on 3.14 before the swap, against both spellings.
 
 ## Rejected
+
+### Requiring billable status in the Step 6 draft — rung 2, n=3, 2026-09-28
+Proposed after 0.10.0 because a non-billable block is where client time goes missing
+quietly. Measured as a no-op: under the content-list Step 6, billable status appeared in
+the draft in 3/3 runs, and again 3/3 in the note-fix runs, without being asked. The only
+skips were under the old table template (2/3), which no longer exists. Revisit on a real
+run that drops it.
 
 ### Setting the per-profile title format by policy — rung 1, observed, 2026-09-09
 
