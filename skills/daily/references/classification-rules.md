@@ -26,7 +26,7 @@ If any window title, URL, or terminal task name within the block contains a stri
 
 **Caveat — a work item existing ≠ today's billing target.** A work-item catalog lists *all* known items; thematic match isn't billing match. The user may be supporting a colleague's work item, doing release-level work that bills to a different project, or working on something not yet tracked. When the work item isn't named explicitly in window/URL titles, ask — don't pick the most "thematically matching" row from the catalog.
 
-A trailing `S` (or other suffix) on a work-item number often indicates **Support work** — check `.context.md` for the user's convention. If so, tag the entry note `[Support]` but use the same `project_id` / `task_id`.
+A trailing `S` (or other suffix) on a work-item number often indicates **Support work** — check `.context.md` for the user's convention. Whether a support item is marked in the entry note, and how, is that convention too, because the note reaches the client: mark it exactly as `.context.md` says (`[Support]` is the common form), and leave the note unmarked where it says nothing. Either way use the same `project_id` / `task_id`.
 
 ### 2. Edge profile in window title (HIGH confidence for browser activity)
 

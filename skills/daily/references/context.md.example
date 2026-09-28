@@ -176,6 +176,8 @@ Per-project conventions:
 - **Codebase `<repo path>`** serves multiple projects (`<code>`, `<code>`) — pick by work item
 - **Shared prefix**: `<PREFIX>` spans several clients — resolve it from the assignment catalog,
   not from the prefix alone
+- **Support work**: `<marker, e.g. a trailing S on the work item>` means support; tag its
+  entry note `<e.g. [Support]>` — delete this line if your notes carry no such tag
 
 ---
 

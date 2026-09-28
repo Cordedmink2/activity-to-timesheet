@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the note each block will post, where you review and edit it, and the posting confirmation
   repeats it for every entry. Before, the confirmation left the note out, so the one field
   that reaches the client on the invoice could be approved without being shown.
-- **`[Support]` is a tag on the posted note.** The skill said to tag "the description", which
-  left it unclear whether the tag reached Harvest; it does, as your posted entries already show.
+- **A support tag in the entry note follows your own convention.** The skill said to tag "the
+  description" `[Support]`, which left it unclear whether the tag reached the client's invoice.
+  It now marks the note only as your `.context.md` says, and the template has a line for it.
 
 ### Changed
 - The daily skill's file inventory is shorter: the entries for the category-rule, Harvest and
