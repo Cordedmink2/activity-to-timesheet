@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.4] - 2026-09-28
+
+### Changed
+- **A profile rule that matches nothing now shows which profile tags your titles really
+  carry.** When a rule built from a profile tag or an Edge profile name comes back
+  `UNVERIFIED`, the rebuild lists each profile tag seen in your browser titles and the Edge
+  profile it appeared in, which is usually the correction. `--inspect` lists them too, even
+  before any category exists.
+- **The workspace template has a `**Profile tag**` field per client**, and the first run asks
+  for it. Before, a workspace recorded only the Edge profile's name, so a rebuild composed the
+  weaker rule from a name that could change.
+
+### Upgrading
+- For each client with a browser profile of its own, add a ``**Profile tag**: `[CODE]` ``
+  line under its `**Default project**` in `Timesheets/.context.md`. The next run rebuilds the rules
+  from it.
+
 ## [0.10.3] - 2026-09-28
 
 ### Fixed

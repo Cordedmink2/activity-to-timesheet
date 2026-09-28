@@ -172,6 +172,20 @@ def test_the_category_step_writes_the_rules_with_the_compiler_the_plugin_ships()
         "anywhere else")
 
 
+def test_the_category_step_composes_profile_rules_from_the_tags_the_titles_carry():
+    """A profile rule composed from a name the user remembers matches nothing once the
+    profile is renamed or tagged; the compiler's `SEEN` lines are what is really there.
+    Read out of `print_seen()`, so renaming the word fails here."""
+    source = RULE_COMPILER.read_text(encoding="utf-8")
+    printer = source.split("def print_seen(", 1)[-1].split("\ndef ", 1)[0]
+    assert 'print("SEEN ' in printer and 'print(f"SEEN ' in printer, (
+        "`print_seen()` no longer prints `SEEN` lines — step 4 composes from them")
+    heading, body = one_step_about(r"categor")
+    assert "`SEEN`" in body, (
+        f"step '{heading.strip()}' never points at the `SEEN` lines, so profile rules are "
+        "composed from memory rather than from the tags the titles carry")
+
+
 def compiler_signal_types() -> set[str]:
     """The signal types the compiler will accept, read out of its source.
 

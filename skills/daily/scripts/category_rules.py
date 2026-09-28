@@ -36,7 +36,8 @@ Three modes:
   * `--candidates <file|->`  compile, gate, back up, write, verify
   * `--inspect`              what the activity source holds now, each rule marked managed
                              or not and carrying the share of the sample it matches — the
-                             read behind adopting rules the plugin did not author
+                             read behind adopting rules the plugin did not author — and,
+                             as `SEEN` lines, the profile tags the titles really carry
   * `--status`               whether the rules are still current for the workspace context
                              file. Reads two local files and nothing over the wire
 
@@ -48,6 +49,7 @@ Usage:
   python scripts/category_rules.py --status
 """
 import argparse
+import collections
 import datetime as dt
 import hashlib
 import io
@@ -131,6 +133,13 @@ SCOPES = {
 # rule of this type matches nothing and is reported unverified. `[^-]` rather than a
 # lookahead: the activity source's own UI evaluates these rules too.
 PROFILE_SLOT = r" - (?:{pattern})(?: - [^-]+)? - Microsoft\W*Edge$"
+
+# A profile tag where the extension writes it — the end of the page part, before Edge's own
+# ` and N more pages` and the profile slot — so a page titled `[Draft] …` is not read as one.
+# The code shape is `CONTEXT.md`'s client code. Group 1 is the tag, group 2 Edge's profile
+# slot, absent in Chrome, which prints no profile.
+TAGGED_TITLE = re.compile(r" - (\[[A-Za-z0-9-]{2,12}\])(?: and \d+ more pages?)?"
+                          r"(?: - (.+?) - Microsoft\W*Edge| - Google Chrome)?$", re.IGNORECASE)
 
 # Where the backup and the stamp live under the workspace. `.mcp/` already holds the cached
 # catalogs — machine state the user does not hand-edit — which is what both of these are.
@@ -283,6 +292,47 @@ def _is_only_the_clients_name(pattern: str, client: str) -> bool:
     bare = re.sub(r"[\\^$()\[\]{}?*+|]", "", bare).strip()
     return bare.casefold() == client.casefold() or bare.casefold() in {
         word.casefold() for word in client.split()}
+
+
+def seen_profile_tags(sample: list[str]) -> dict[str, collections.Counter]:
+    """Each profile tag in the sampled browser titles, counted per Edge profile slot it was
+    seen in — `None` for a title that names no profile."""
+    population, _ = denominator("profile_tag", sample)
+    seen: dict[str, collections.Counter] = {}
+    for haystack in population:
+        found = TAGGED_TITLE.search(haystack)
+        if found:
+            seen.setdefault(found.group(1), collections.Counter())[found.group(2)] += 1
+    return seen
+
+
+def print_seen(sample: list[str]) -> None:
+    """One `SEEN` line per profile tag, most-seen first.
+
+    What the titles carry, so a profile rule composed from a name the user remembers can be
+    held against what is really there. No verdict on a tag seen in several profiles: which
+    one is general is the user's to say. The slot is printed whole, account and all, because
+    `PROFILE_SLOT` matches it as it stands.
+    """
+    seen = seen_profile_tags(sample)
+    if not seen:
+        print("SEEN no profile tag in the sampled browser titles")
+        return
+    for tag, slots in sorted(seen.items(), key=lambda item: (-sum(item[1].values()), item[0])):
+        total = sum(slots.values())
+        titles = f"{total} title{'' if total == 1 else 's'}"
+        if len(slots) == 1:
+            (slot,) = slots
+            where = f'in Edge profile "{slot}"' if slot else "no profile in the title"
+        else:
+            where = "in several profiles: " + ", ".join(
+                f"{_named(slot)} ({n})" for slot, n in
+                sorted(slots.items(), key=lambda item: (-item[1], item[0] or "")))
+        print(f"SEEN {tag} — {titles}, {where}")
+
+
+def _named(slot: str | None) -> str:
+    return f'"{slot}"' if slot else "no profile"
 
 
 def unverified_as_dormant_or_suspect(judged: list[dict]) -> list[dict]:
@@ -525,6 +575,9 @@ def compile_rules(source: str, days: int, max_share: float, directory: Path) -> 
         if verdict["verdict"] != "write":
             print(f"{verdict['verdict'].upper()} {verdict['client'] or '?'} "
                   f"{verdict['signal'] or '?'} — {verdict['reason']}")
+    if any(v["verdict"] == "unverified" and v["signal"] in NAMED_BY_THE_USER
+           for v in judged):
+        print_seen(sample)
     if any(v["verdict"] == "refuse" for v in judged):
         print("ERR nothing written: the refusals above have to be answered first, because "
               "a rule set is written whole and a bad rule in it would outrank a good one",
@@ -626,6 +679,9 @@ def inspect(days: int, max_share: float, directory: Path) -> int:
     """
     bucket, sample = sample_titles(days)
     print(f"SAMPLE {len(sample)} titles over {days} days ({bucket})")
+    # Before the rules: a build with no settings endpoint refuses below, and the tags are
+    # read from the sample alone.
+    print_seen(sample)
     classes = read_classes()
     if not classes:
         print("RULES none — the activity source holds no categories")

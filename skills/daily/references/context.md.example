@@ -99,6 +99,8 @@ One section per client. Include every signal that would let the skill identify
 
 **Client name**: `<exact name as your timesheet provider shows it>`
 **Default project**: `<project code>` `<project name>`
+**Profile tag**: `[<CODE>]` — only for a browser profile used for this client alone; delete
+this line otherwise
 
 Signals:
 - Work-item prefixes: `<PREFIX>` (e.g. numbers like `<PREFIX>1234` are this client's)

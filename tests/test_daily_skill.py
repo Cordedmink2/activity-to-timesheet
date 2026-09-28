@@ -148,6 +148,16 @@ def test_step_2_carries_the_two_words_the_staleness_check_answers_with():
             "branch on when the check comes back")
 
 
+def test_step_2_reads_the_profile_tags_printed_under_a_suspect_profile_rule():
+    """The `SEEN` lines under a suspect profile rule usually name the correction; a Step 2
+    that never mentions them leaves a run to scan the titles by hand, as one did."""
+    source = RULE_COMPILER.read_text(encoding="utf-8")
+    printer = source.split("def print_seen(", 1)[-1].split("\ndef ", 1)[0]
+    assert 'f"SEEN ' in printer, "`print_seen()` no longer prints `SEEN` lines"
+    assert "`SEEN`" in workflow(), (
+        "the workflow never says what the `SEEN` lines under a suspect profile rule are for")
+
+
 def test_the_workflow_names_the_calendar_wrapper_it_ships():
     """A source a run never runs is a source the user configured and did not get.
 
