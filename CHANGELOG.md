@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repeats it for every entry. Before, the confirmation left the note out, so the one field
   that reaches the client on the invoice could be approved without being shown.
 
+### Changed
+- The daily skill's file inventory is shorter: the entries for the category-rule, Harvest and
+  calendar scripts keep every flag and trap a run needs, and leave the reasoning to the
+  scripts' own docstrings.
+
 ## [0.10.0] - 2026-09-28
 
 ### Changed
