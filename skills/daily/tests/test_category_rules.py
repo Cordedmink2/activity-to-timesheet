@@ -546,6 +546,17 @@ def test_a_bracket_in_a_page_title_is_not_read_as_a_profile_tag(live_aw, workspa
     assert "[Draft]" not in result.out
 
 
+def test_a_bracket_inside_the_page_part_does_not_hide_the_tag_after_it(live_aw, workspace):
+    """The first ` - [X]` is the page's own; the extension's is the last one."""
+    sprint_tagged = ("msedge.exe",
+                     f"Sprint - [Q3] - Board-acme.example.com/b - [ACME] - Acme - Dana{EDGE}")
+    sprint_untagged = ("msedge.exe", f"Sprint - [Q3] - Board-acme.example.com/b - Work{EDGE}")
+    live_aw(sample_day([sprint_tagged, sprint_untagged, PERSONAL]))
+    result = run_cli(cr, ["--inspect"])
+    assert 'SEEN [ACME] — 1 title, in Edge profile "Acme - Dana"' in result.out
+    assert "[Q3]" not in result.out
+
+
 def test_the_profile_tags_are_listed_where_the_rules_cannot_be_read(live_aw, workspace):
     live_aw(sample_day([ACME_TAGGED, PERSONAL]), settings_status=404)
     result = run_cli(cr, ["--inspect"])

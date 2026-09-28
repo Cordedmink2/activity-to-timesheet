@@ -135,11 +135,14 @@ SCOPES = {
 PROFILE_SLOT = r" - (?:{pattern})(?: - [^-]+)? - Microsoft\W*Edge$"
 
 # A profile tag where the extension writes it — the end of the page part, before Edge's own
-# ` and N more pages` and the profile slot — so a page titled `[Draft] …` is not read as one.
-# The code shape is `CONTEXT.md`'s client code. Group 1 is the tag, group 2 Edge's profile
-# slot, absent in Chrome, which prints no profile.
-TAGGED_TITLE = re.compile(r" - (\[[A-Za-z0-9-]{2,12}\])(?: and \d+ more pages?)?"
-                          r"(?: - (.+?) - Microsoft\W*Edge| - Google Chrome)?$", re.IGNORECASE)
+# ` and N more pages` and the profile slot — so a page's own `[Draft]` is not read as one. The
+# greedy prefix takes the last tag, which is the extension's; the slot is bounded as in
+# `PROFILE_SLOT`, so the page part cannot pass for a profile. The code shape is `CONTEXT.md`'s
+# client code. Group 1 is the tag, group 2 Edge's profile slot, absent in Chrome, which prints
+# no profile.
+TAGGED_TITLE = re.compile(r"^.* - (\[[A-Za-z0-9-]{2,12}\])(?: and \d+ more pages?)?"
+                          r"(?: - ([^-]+(?: - [^-]+)?) - Microsoft\W*Edge| - Google Chrome)?$",
+                          re.IGNORECASE)
 
 # Where the backup and the stamp live under the workspace. `.mcp/` already holds the cached
 # catalogs — machine state the user does not hand-edit — which is what both of these are.

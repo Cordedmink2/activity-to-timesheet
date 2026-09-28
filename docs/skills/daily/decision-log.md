@@ -2788,6 +2788,11 @@ read. The template gains a **Profile tag** field beside the client's name and pr
 `Signals:`, which `CONTEXT.md` keeps for evidence the work produces. A tag is read only where the
 extension writes it, at the end of the page part: `[Draft]` in a page's own title is not one.
 Only tags are listed — an untagged profile's name cannot be told from a page title ending ` - X`.
+The last ` - [X]` is the one read, with the profile slot bounded as `PROFILE_SLOT` bounds it: a
+review caught the first draft reading `Sprint - [Q3] - Board…` as tag `[Q3]` and losing the real
+one. **Residual, reasoned:** a page whose own title ends ` - [X]` in a browser without the
+extension still reads as a tag; with it, the extension's `-host/path` follows the page and closes
+that.
 
 **The `SEEN` lines carried the correction on their own; the Step 2 sentence had to say which.**
 Fresh no-tools agents at Step 11 of a fictional day (a stale `Acme Dana` profile name, a
