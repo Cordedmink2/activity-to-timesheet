@@ -1230,6 +1230,29 @@ passage carries it.
 Recorded in `docs/CONTRIBUTING.md` § "Rules with more than one copy" on the row itself, so
 the next person to widen that scope reads why it is narrow.
 
+### What the user is shown is named as content, not quoted as a template — 2026-09-28
+**Rung 2.** Steps 6, 8 and 9, reconcile Step 4 and `references/output-format.md` carried
+literal templates: a markdown table, quoted review and posting questions, a `✓ Posted:` line,
+a worklist table and a whole file skeleton. Each now names what the user must be shown and
+leaves the layout to the agent, so a new harness feature, a stronger model or a port to
+another client presents it however suits that harness. This reverses #54's reason for giving
+the calendar-question line a literal example ("because every other thing the step shows the
+user has one") — none of them has one now.
+
+Measured on a fictional day (five blocks, one 🔸, one uncorroborated event, a derived zone),
+three fresh no-tool agents per arm, the Steps 6–8 excerpt only, graded by hand against a
+16-item content inventory. **Before:** every Step 6 item in all three; `[Support]` missing
+from the Step 8 entries in all three — it was only in the quoted example, and the example's
+entries were not the day's. **After:** all 16 in all three, `[Support]` included, with three
+different layouts (numbered list, bold-headed sections, inline lines). The layouts diverging
+is the point; the content converging is the check.
+
+Kept as fixed shapes, because something reads them back: reconcile's Step 3 subagent report
+(the worklist is assembled from it), Step 10's `harvest_responses.json` (Step 1 reads it),
+and every script's `OK` / `ERR` / `WOULD POST` line. The review-question guard in
+`tests/test_daily_skill.py` now reads the `**Then ask…**` paragraph instead of a blockquote,
+and was watched going red with its calendar count deleted.
+
 ## Script defects
 
 Found while building the scenario/contract suite, 2026-08-14. All **rung 1** — each was

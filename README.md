@@ -465,7 +465,7 @@ uncertain, and asks before posting anything to Harvest.
 - **`Timesheets/.context.md`** (in your workspace) — all your per-user facts. Edit any time.
 - **`skills/daily/references/classification-rules.md`** — the generic rubric the skill uses
   to turn signals into a `(client, project, task, billable)` decision.
-- **`skills/daily/references/output-format.md`** — the markdown timesheet template.
+- **`skills/daily/references/output-format.md`** — what the markdown timesheet holds, and its conventions.
 - **`skills/daily/references/first-run.md`** — first-run setup the skill walks you through.
 - **`skills/daily/references/activitywatch.md`** — what the skill reads out of ActivityWatch.
 - **`skills/daily/references/new-client-work.md`** — raising a new ticket for unmatched work.

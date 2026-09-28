@@ -29,7 +29,7 @@ The month listing needs the configured Harvest credentials. A run that stops nam
 
 ## Step 1 — Sweep the month in two cheap reads
 
-Resolve the month first. "August", "last month", "this month" convert using today's date in the user's timezone. The range is the first of the month to the last, **and it stops at yesterday** — today is in progress, so its billed total is not short, it is unfinished, and sweeping it produces a worklist row for a day that is still being worked. Where today falls inside the month asked for, say so in one line at the end rather than putting it in the table.
+Resolve the month first. "August", "last month", "this month" convert using today's date in the user's timezone. The range is the first of the month to the last, **and it stops at yesterday** — today is in progress, so its billed total is not short, it is unfinished, and sweeping it produces a worklist row for a day that is still being worked. Where today falls inside the month asked for, say so at the end rather than listing it as a worklist date.
 
 **On the first of a month there is no range left.** "This month", asked on the 1st, ends the day before it starts; so does a month that has not begun. Say there is nothing in it to reconcile yet and offer the month before — do not hand the reversed range to the listing, which refuses it with an error that reads like a broken install.
 
@@ -70,7 +70,7 @@ The **short-day floor** is a preference, not a fact about anyone's day: `## Pref
 
 **A run of capture-less days is one finding, not many.** When the index stops on a date and never resumes, that is a capture task that stopped firing — the failure that arrives silently and looks exactly like a month of not working. Every date after it is *Unexplained* by the rule above, so the sweep already declines to call them idle; what it owes the user is the maintenance finding, once. `references/first-run.md` in the `daily` skill owns the diagnosis; the health check is `Get-ScheduledTaskInfo -TaskName WorkScreenshots`, where `LastTaskResult` of `0` is a task that last ran cleanly and `0x80070002` is the interpreter having moved.
 
-State the split in one line before going further — `30 dates: 16 billed, 3 gaps, 2 short, 1 not worked, 8 unexplained` — so the user can see the shape of the month and stop an investigation that is about to be pointless. **If more than about eight days are candidates, ask before dispatching.** A month nobody billed is usually explained by a fact this run does not have — leave, a contract that started mid-month, a second timesheet — and eight investigations are an expensive way to be told that.
+State the split before going further — how many dates the month holds and how many fall in each group — so the user can see the shape of the month and stop an investigation that is about to be pointless. **If more than about eight days are candidates, ask before dispatching.** A month nobody billed is usually explained by a fact this run does not have — leave, a contract that started mid-month, a second timesheet — and eight investigations are an expensive way to be told that.
 
 ## Step 3 — Investigate each candidate day, one subagent per day
 
@@ -102,16 +102,9 @@ Unclear: <what could not be resolved, and what would resolve it>
 
 ## Step 4 — The worklist
 
-Oldest date first, the order the `daily` skill takes them in:
+Oldest date first, the order the `daily` skill takes them in. For each date: the date and weekday, its active hours, what is already billed (none, where nothing is), what was happening in a phrase built from the investigation's evidence, and the command that bills it — `/billables:daily <date>` — plus the zone label on any date whose skeleton was read in a derived zone. The content is fixed; how it is laid out is yours, in whatever form this harness shows best.
 
-```markdown
-| Date | Active | Billed | What was happening | Next |
-|---|---|---|---|---|
-| 2026-08-11 Tue | 6.7h | — | ACM2231S and ACM2245S all morning, one meeting 10:00–10:30 | `/billables:daily 2026-08-11` |
-| 2026-08-19 Wed | 7.9h | 1.5h | NWC-001 billed for the morning; the afternoon is on an ACME environment | `/billables:daily 2026-08-19` |
-```
-
-Under it, in one line each and in this order: the **Unexplained** dates, named, as a question — "the index says nothing about these five; were any of them worked?"; a day whose investigation came back `Unclear`, with what would resolve it; any maintenance finding from Step 2; and today, if the month asked for is the current one, as a day still in progress rather than a gap.
+After the dates, in this order: the **Unexplained** dates, named, with a question asking which of them were worked; a day whose investigation came back `Unclear`, with what would resolve it; any maintenance finding from Step 2; and today, if the month asked for is the current one, as a day still in progress rather than a gap.
 
 Close by saying plainly that nothing was recorded and nothing was changed, and that each row is billed by invoking `/billables:daily <date>` for one date at a time.
 

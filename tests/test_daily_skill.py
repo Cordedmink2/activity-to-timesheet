@@ -73,16 +73,16 @@ def presentation_step() -> str:
 
 
 def review_question() -> str:
-    """The blockquote the presentation step asks the user, lines joined.
+    """The paragraph that says what the presentation step asks the user.
 
-    The quoted question is the part the step puts to the user in so many words, so a fact
-    stated in the prose around it and left out of the quote is one they may never be told.
+    The step names the question's content rather than quoting it, so the layout stays the
+    harness's; a fact left out of this paragraph is one the user may never be told.
     """
-    quoted = [ln for ln in presentation_step().splitlines() if ln.startswith(">")]
-    assert quoted, (
-        "the presentation step asks the user nothing — no `> ` blockquote in it. The "
-        "review question is what the counts below are counted for.")
-    return " ".join(quoted)
+    asks = [p for p in presentation_step().split("\n\n") if p.startswith("**Then ask")]
+    assert len(asks) == 1, (
+        "the presentation step has no single `**Then ask…**` paragraph saying what the "
+        "review question contains. The question is what the counts below are counted for.")
+    return asks[0]
 
 
 def wrapper_source() -> str:
@@ -199,7 +199,7 @@ def test_the_presentation_step_puts_the_uncorroborated_events_to_the_user():
     """
     assert says(presentation_step(), "uncorroborated"), (
         "the daily skill's presentation step says nothing about uncorroborated calendar "
-        "events. Step 3 leaves them out of the table by design, so a step that does not "
+        "events. Step 3 leaves them out of the draft by design, so a step that does not "
         "list them as questions loses the client site visit and the call from the car "
         "silently — the half of ADR-0008 the user is the only witness to.")
 
@@ -227,17 +227,17 @@ def test_the_step_that_offers_batch_accept_is_a_step_that_knows_about_them():
 
 
 def test_the_review_question_states_how_many_calendar_questions_are_pending():
-    """The counts in the quoted question are what send the user under the table.
+    """The counts in the review question are what send the user to the calendar questions.
 
     #49 story 36. The block counts are in it because the user cannot see what to look at
-    otherwise; a question listed under the table and absent from the count is one they
+    otherwise; a question listed apart from the draft and absent from the count is one they
     have no reason to scroll to.
     """
     # Singular or plural: the count is a variable, so the question is written for whichever
     # number the day has.
     assert re.search(r"\bcalendar questions?\b", review_question(), re.I), (
         "the daily skill's review question counts blocks and 🔸 flags but not the pending "
-        "calendar questions. They sit under the table, unbilled until answered, so a "
+        "calendar questions. They sit apart from the draft, unbilled until answered, so a "
         "question nothing counts is a meeting the run reads, lists and never gets an "
         "answer to.")
 

@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-09-28
+
+### Changed
+- **The skills say what to show you, not how to lay it out.** The proposed timesheet, the
+  posting confirmation, the per-post report, the month's worklist and the optional timesheet
+  file each name the content they must carry and leave the layout to the agent, so it can
+  use whatever the harness it runs in presents best. Expect the wording and layout of those
+  messages to vary between runs; what they contain does not. A timesheet file still matches
+  the ones already in `Timesheets/`.
+
 ## [0.9.0] - 2026-09-14
 
 ### Fixed

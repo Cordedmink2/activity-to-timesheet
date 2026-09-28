@@ -1,44 +1,22 @@
 # Timesheet output format
 
-The `Timesheets/<date>_timesheet.md` is an *optional* internal-audit artefact. Generate it only when the user asks for it. Match the structure below.
+The `Timesheets/<date>_timesheet.md` is an *optional* internal-audit artefact. Generate it only when the user asks for it.
 
-```markdown
-# Timesheet — {{YYYY-MM-DD}}
+It holds, for the date:
 
-**Total billable hours:** {{X.X}} hrs
-**Total break time:** ~{{N}} mins (plus short interstitial breaks)
-**Generated:** {{HH:MM}} {{LOCAL_TZ_ABBREV}}
+- the total billable hours, the total break time, and when it was generated, with the zone
+- every block with its time range, duration, client and description, and every break row
+- the hours per client, with the day's total
+- a Notes section of judgment calls and splits worth reviewing, blocks the user's input changed, and time excluded as personal
+- a closing line saying it was generated from ActivityWatch and screenshots and wants review before submitting
 
-## Time Blocks
-
-| Time | Duration | Client | Description |
-|------|----------|--------|-------------|
-| {{HH:MM–HH:MM}} | {{X.XX hrs}} | {{Client}} | {{Description}} |
-| {{HH:MM–HH:MM}} | *Break* | — | {{AFK reason or "AFK (~N min)"}} |
-…
-
-## Daily Total by Client
-
-| Client | Hours |
-|--------|-------|
-| {{Client1}} | {{X.X}} |
-| {{Client2}} | {{X.X}} |
-| **Total** | **{{X.X}}** |
-
-## Notes
-- {{Judgment call or split worth user reviewing}}
-- {{Any block where user's input changed the auto-classification}}
-- {{Any time excluded as personal — keep brief}}
-
----
-*Auto-generated from ActivityWatch + screenshots. Please review before submitting.*
-```
+What the file holds is fixed; how it is laid out is yours. Where `Timesheets/` already has timesheets, match their layout so the days read alike.
 
 ## Conventions
 
-- **Time format**: `HH:MM` 24-hour, in the user's local timezone — the zone the scripts already render in, so their output needs no further conversion. That is the configured `TIMESHEET_TIMEZONE`, or, where none is configured, this machine's own zone: the skeleton's header and its JSON `zone` field then read `zone <name>, derived from this machine`. **When they do, say so in the Notes** — `Times in Pacific/Auckland, derived from this machine; set TIMESHEET_TIMEZONE to pin it` — and repeat the line in the Step 8 confirmation. A derived zone that is never announced is a silent default, and a wrong one dates the whole sheet without anything failing; announced, the user sees it before it reaches the provider. A configured zone is the user's own choice and needs no note. The separator between start and end is the en-dash `–` (U+2013), not a hyphen.
+- **Time format**: `HH:MM` 24-hour, in the user's local timezone — the zone the scripts already render in, so their output needs no further conversion. That is the configured `TIMESHEET_TIMEZONE`, or, where none is configured, this machine's own zone: the skeleton's header and its JSON `zone` field then read `zone <name>, derived from this machine`. **When they do, say so in the Notes** — the zone, that it was derived from this machine, and that setting `TIMESHEET_TIMEZONE` pins it — and say the same in the Step 8 confirmation. A derived zone that is never announced is a silent default, and a wrong one dates the whole sheet without anything failing; announced, the user sees it before it reaches the provider. A configured zone is the user's own choice and needs no note.
 - **A `*` on a time — the hour the clocks go back.** One hour of one day a year, the local clock repeats, and the scripts suffix the second pass: `02:30` is the first, `02:30*` the one an hour later. Four things follow, in the order you will hit them.
-  - **Keep it in the markdown row.** `02:30*–04:15` is a different block from `01:30–02:30`, and without the marker two rows can read identically for time the user actually spent twice. Add a Notes bullet saying the clocks changed that day.
+  - **Keep it in the file's block.** `02:30*–04:15` is a different block from `01:30–02:30`, and without the marker two rows can read identically for time the user actually spent twice. Add a Notes bullet saying the clocks changed that day.
   - **Strip it before `harvest_post.py`.** Harvest takes a plain `HH:MM` and has no notion of the repeated hour; a `*` in the argument is a bad time, not a marked one.
   - **Never let one entry span the change.** Harvest subtracts the two clock times, so a stretch worked straight through — `01:30` to `04:15` in `Pacific/Auckland` on 2026-04-05 — would post as 2.75 hrs against the 3.75 hrs that really passed. `harvest_post.py` refuses that entry and names the two to post instead, with the arithmetic; do what it says and add a Notes bullet saying the clocks changed. Do not "fix" the overlap it warns you about — closing it is what loses the hour. `harvest_patch.py` refuses it too, on what the patch would *result* in, so a correction cannot arrive at that entry either — not by moving a time, and not by moving the date under fixed times. Two things it still lets through: `--hours`, which a duration-mode account needs and which on a start/end-time account does not do what it looks like (the script's module docstring has that trap), and an entry whose stored times it cannot read. Correct such an entry the same way you would post one — patch it to the first of the two ranges and post the second.
   - **A block that touches the repeated hour without straddling it is still yours to split.** The refusal covers only an entry whose two times are *strictly outside* the repeated hour, one either side. Anything else it has to let through, and there are two shapes:
@@ -50,10 +28,10 @@ The `Timesheets/<date>_timesheet.md` is an *optional* internal-audit artefact. G
     Do not reach for `03:00` in a script argument to mean that instant: to the scripts `03:00` is 15:00Z, an hour after the change, and only `02:00*` names it.
 
   Everywhere else the marker is absent, including every `--utc-offset` run, so there is nothing to do about it on the other 364 days. Splitting only arises for work that actually runs through the change; a day whose blocks sit either side of it, like a break across the hour, needs none of this.
-- **Duration**: decimal hours rounded to 0.25 (`0.25`, `0.5`, `0.75`, `1.0`, …). Append ` hrs` literally.
-- **Break rows**: *only* for breaks ≥17.5 min (or the user's overridden threshold). Render `*Break*` in italic, `—` em-dash in the Client column. Shorter AFK gaps fold silently into the surrounding work block. A break a **calendar** block covers keeps its row — the AFK watcher recorded it and this file records what the instruments said — and the entry over it is declared in the Notes section, naming the event, the same way the table's declaration does. Both kinds: a **corroborated** event drafted over the break (`SKILL.md` Step 3), and an **uncorroborated** one the user accepted at review (Step 6), where their answer is the evidence the Notes bullet names. Deleting the row instead would leave the file agreeing with the blocks and disagreeing with the skeleton, which is the one thing the reader of an audit trail needs to be able to see.
-- **Client column**: short canonical name as defined in `.context.md`, not the long client name the provider carries.
-- **Description (markdown column)**: 1 sentence, concrete, internal-audit style. The markdown file stays local — so it can mention tools, work items, file names, participants if useful for review. Match the user's own tone (read existing files in `Timesheets/` or their posted entries for examples).
+- **Duration**: decimal hours rounded to 0.25 (`0.25`, `0.5`, `0.75`, `1.0`, …).
+- **Break rows**: *only* for breaks ≥17.5 min (or the user's overridden threshold), marked as a break with no client. Shorter AFK gaps fold silently into the surrounding work block. A break a **calendar** block covers keeps its row — the AFK watcher recorded it and this file records what the instruments said — and the entry over it is declared in the Notes section, naming the event, the same way Step 6 declares it with the draft. Both kinds: a **corroborated** event drafted over the break (`SKILL.md` Step 3), and an **uncorroborated** one the user accepted at review (Step 6), where their answer is the evidence the Notes bullet names. Deleting the row instead would leave the file agreeing with the blocks and disagreeing with the skeleton, which is the one thing the reader of an audit trail needs to be able to see.
+- **Client**: short canonical name as defined in `.context.md`, not the long client name the provider carries.
+- **Description**: 1 sentence, concrete, internal-audit style. The markdown file stays local — so it can mention tools, work items, file names, participants if useful for review. Match the user's own tone (read existing files in `Timesheets/` or their posted entries for examples).
 - **An entry's `notes` field is different.** Those get sent to clients with invoices — follow `classification-rules.md` "Writing the entry note"; the user's own examples are in `.context.md` "How I bill".
 - **Support work**: prefix description with `[Support] ` for work items matching the support pattern (e.g. trailing `S` if defined in `.context.md`).
 - **Notes section**: 3-6 bullets typically. Cover splits, judgment calls, exclusions. Skip trivial observations.
@@ -62,7 +40,6 @@ The `Timesheets/<date>_timesheet.md` is an *optional* internal-audit artefact. G
 
 Avoid (these feel "AI-generated"):
 - "I observed that…" / "Based on the activity data…" / any preamble
-- Em-dashes used for sentence-level pauses (use them only in time ranges or table cells)
 - Marketing-style adjectives ("comprehensive", "robust", "leveraging")
-- Bullet lists in the Description column — keep it one inline sentence
+- A description longer than one inline sentence
 - Padding the Notes section with obvious facts ("user used Edge today")
