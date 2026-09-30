@@ -7,7 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.1] - 2026-09-29
 
+### Added
+- **Setup offers to install what the machine is missing.** It checks for ActivityWatch, Python, Git
+  Bash and PowerShell 7, puts what is missing to you as one list with the command it would run
+  (winget on Windows, Homebrew on macOS where it is installed), and runs only what you say yes to
+  (#67).
+- **Setup interviews you about your clients and writes a starter `.context.md`.** It asks in
+  numbered rounds with a recommended answer to each, looks up what it can find itself (browser
+  profiles, tags, addresses) instead of asking, creates the workspace, and writes one section per
+  client with its profile tag and category terms. The `daily` skill's first run fills in the rest.
+- **The ActivityWatch web watcher** is offered alongside URL in title in every browser profile you
+  work in. It is recommended, not required.
+- **`category_rules.py --inspect` prints a `HOST` line per address in your browser titles**, so a
+  client can be recognised by its SharePoint site or DevOps organisation. `dev.azure.com`,
+  `github.com` and other shared hosts are only listed with the organisation after them.
+
 ### Changed
+- **A client's rule takes up to eight category terms, up from five**, so someone who works every
+  client from one browser profile has room for that client's addresses as well as its code and
+  name.
+- **Setup speaks plain language.** It assumes a non-technical user, gives a line of context before
+  each question, and keeps regular expressions, JSON and commands out of what it hands you.
+- **The timeline's zoom reads the web watcher's Edge, Brave and Opera buckets** as well as Firefox
+  and Chrome.
 - **The interactive demo runs the category terms the plugin writes.** It used to present a bare
   client code as a failure and bracketed rules as the recommendation. Its walkthroughs now show a
   tag term the titles do not carry, a client code that is also an ordinary word, a hand-typed rule

@@ -93,9 +93,11 @@ its own, never the two joined. Derived: the plugin writes it from the client's *
 span, seen at review — which is why the activity source's *configuration* is written to while its
 data is only read (ADR-0007).
 
-**Category terms** — the few literal words, up to five, that only one client's work puts in a window
-title: the client code, the names of the client's own products or apps, the client's full name.
-Chosen with the user, never generated; a domain word any client's work produces is not one.
+**Category terms** — the few literal words, up to eight, that only one client's work puts in a window
+title: the client code, the names of the client's own products or apps, the client's full name, and
+the addresses only that client's work opens (its SharePoint site, its DevOps organisation). Chosen
+with the user, never generated; a domain word any client's work produces is not one, and nor is an
+address every tenant shares or the user's own firm opens.
 
 **Work item** — the identifier the work is tracked under in the user's own **work-item source**: a
 ticket, case, story or bug. The highest-confidence signal there is, and what an entry's note should

@@ -6,7 +6,8 @@ longer manual. Amended rather than superseded because what this ADR decided, tha
 walkthrough owns the install and `llms.txt` is deleted, still holds; the amendment is to a bullet,
 and the precedent for the distinction is
 [ADR-0002](./0002-defer-splitting-the-provider-into-its-own-plugin.md), which was superseded when
-its decision reversed.
+its decision reversed. **Amended again 2026-10-01 (#67)**, on the same grounds: setup now offers to
+perform the installs it used to only describe, and scaffolds the workspace it used to defer.
 **Context:** distribution. Related: [`ADR-0004`](./0004-generate-the-shared-agent-skills-export.md)
 (the other install artifact), issues #12 and #14.
 
@@ -74,6 +75,16 @@ are the ones a person performs by hand either way.
   verified against their real window titles. Where the activity source will not take the write, it
   falls back to the instruction this ADR describes and verifies it exactly as before, which is why
   the human procedure is retained rather than deleted.
+- **Amended 2026-10-01 (#67): setup performs installs with the user's yes, and builds the
+  workspace.** Where ActivityWatch, Python, Git Bash or PowerShell 7 is missing, setup offers the
+  platform's package-manager command and runs only what the user agrees to — a machine-wide install
+  is the user's decision each time, so it is offered, never assumed. Declined, each step falls back to
+  the instruction this ADR describes. Setup also scaffolds the workspace and writes the client
+  sections of `Timesheets/.context.md` from the interview that chooses the category terms, because
+  that interview is where those facts are settled and a hand-over in prose was the one place they
+  could be lost before the `daily` skill wrote them down. The bullet below about deferring the
+  workspace is superseded by this; the rest of `.context.md` — colleagues, work kinds, billing voice —
+  is still the `daily` skill's first run.
 - One install path, so there is nothing for a second one to drift from — the failure this whole
   effort removes, rather than the same failure in a new shape.
 - The manual steps are now *verified* rather than described. A step blocked by endpoint security is
@@ -86,7 +97,7 @@ are the ones a person performs by hand either way.
   this reason, having previously named only `billables-daily`.
 - The version has one home. Bumping it is one edit, and `tests/test_distribution.py` fails if the
   changelog disagrees.
-- One step had no other agent-readable home and moved rather than went: scaffolding the workspace.
+- *(Superseded by the 2026-10-01 amendment above.)* One step had no other agent-readable home and moved rather than went: scaffolding the workspace.
   The `setup` skill defers it to the `daily` skill's first run, and `references/first-run.md` covered
   `.context.md` but never the three directories around it — the runbook was the only place that did.
   It is now §"First-run: the workspace" there.

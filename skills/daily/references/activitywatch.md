@@ -14,7 +14,7 @@ The bundled scripts (`afk_blocks.py`, `activity_timeline.py`) wrap this API and 
 - `aw-watcher-window_<host>` — `data.app`, `data.title`. Primary classifier signal.
 - `aw-watcher-afk_<host>` — `data.status` is `"afk"` or `"not-afk"`. Primary break-detection signal.
 - `aw-watcher-web-firefox_<host>` — `data.url`, `data.title` for Firefox tabs. Full URLs expose ChatGPT project slugs, Azure DevOps paths, SharePoint URLs.
-- `aw-watcher-web-chrome_<host>` — same shape for Edge/Chrome tabs.
+- `aw-watcher-web-chrome_<host>` — same shape for Edge, Chrome and Vivaldi tabs; Brave and Opera write `aw-watcher-web-brave_<host>` and `aw-watcher-web-opera_<host>`, and a user can rename theirs `edge` in the extension's options. The timeline's zoom reads all five.
 - `aw-watcher-vscode_<host>` — exact files/projects open in VS Code (when watcher is enabled — may be stale).
 
 ## Time zones

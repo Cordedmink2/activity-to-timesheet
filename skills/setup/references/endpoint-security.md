@@ -37,13 +37,14 @@ That prints the interpreter's absolute path and, as its first argument, the abso
 
 Include the capture directory too — the configured `TIMESHEET_SCREENSHOTS_DIR`, or `~/Pictures/WorkScreenshots` when it is unset — since a write-blocking rule and an execution-blocking rule are different exclusions.
 
-### The browser extension
+### The browser extensions
 
-A managed Edge or Chrome refuses extensions not on the policy allow-list, and the request is the extension's ID rather than its name:
+A managed Edge or Chrome refuses extensions not on the policy allow-list, and the request is each extension's ID rather than its name. Ask only for the ones the user is installing:
 
-- **URL in Title** — `ignpacbgnbnkaiooknalneoeladjnfgb`
+- **URL in Title** — `ignpacbgnbnkaiooknalneoeladjnfgb` — required
+- **ActivityWatch web watcher** — `nglaklhklhcoonedhgnpgddginnjdadi` — recommended
 
-The policy is `ExtensionInstallAllowlist` (and, if the ID appears there, removal from `ExtensionInstallBlocklist`). The extension reads the URL of the current tab and writes it into the window title; it sends nothing anywhere.
+The policy is `ExtensionInstallAllowlist` (and, if an ID appears there, removal from `ExtensionInstallBlocklist`). URL in Title reads the URL of the current tab and writes it into the window title; it sends nothing anywhere. The web watcher sends the current tab's URL and title to the ActivityWatch server on this machine (`localhost:5600` by default) and nowhere else.
 
 ### Reaching the package index
 

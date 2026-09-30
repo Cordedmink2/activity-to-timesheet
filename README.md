@@ -47,17 +47,19 @@ To change any of them later: `/plugin configure billables`.
 
 ### Then run `/billables:setup`
 
-It walks you through installing ActivityWatch, the browser extension and the title tags for the
-profiles that belong to one client, writes your category rules for you, sets up the screenshot task
-and settles whether your Outlook calendar is read — and *verifies each one before moving on*, which is the difference
-that matters: every one of those
+It offers to install whatever your machine is missing — ActivityWatch, Python, Git Bash — and runs
+each install only once you say yes. It walks you through the browser extensions, asks you about
+your clients in plain language, tags the profiles that belong to one client, creates your workspace
+with a starter `.context.md` naming each client, writes your category rules for you, sets up the
+screenshot task and settles whether your Outlook calendar is read — and *verifies each one before
+moving on*, which is the difference that matters: every one of those
 steps can look like it worked and have done nothing, and the symptom arrives days later as an
 empty timesheet. It tells you when setup is finished.
 
 That is the whole path — you don't need to clone this repo, read the rest of this file, or run a
-script by hand. What is left afterwards is scaffolding your workspace
-([step 6](#6-scaffold-your-workspace)) and filling in your `.context.md`
-([step 7](#7-fill-in-your-contextmd)), which the `daily` skill's first run does with you.
+script by hand. What is left afterwards is the rest of your `.context.md`
+([step 7](#7-fill-in-your-contextmd)) — colleagues, work kinds, how you bill — which the `daily`
+skill's first run does with you.
 
 > **Heads-up on antivirus / EDR.** A scheduled task that silently screenshots every few minutes
 > looks like spyware to endpoint security, so it (or `pip install`) may be blocked mid-setup. The
@@ -209,7 +211,8 @@ down beside your preferences is something a future run may read as current.
 
 ## Setup — step by step
 
-> `/billables:setup` does steps 1–4 and 10 for you, checking each one rather than assuming it.
+> `/billables:setup` does steps 1–4, 6 and 10 for you, and the client sections of step 7,
+> checking each one rather than assuming it.
 > This is the same ground written out, for reading first or for working without an agent.
 
 ### 1. Install ActivityWatch
@@ -226,7 +229,13 @@ Install **URL in Title** from the Chrome Web Store:
 **https://chromewebstore.google.com/detail/url-in-title/ignpacbgnbnkaiooknalneoeladjnfgb**
 
 This extension rewrites each tab's title to include URL components. ActivityWatch records the window
-title, so anything the extension puts in the title becomes a signal the skill can read.
+title, so anything the extension puts in the title becomes a signal the skill can read. Extensions
+are per-profile, so add it in every profile you work in.
+
+Also recommended: the **ActivityWatch web watcher**, which records each tab's full address for the
+skill to read when it zooms in on an unclear stretch of the day:
+**https://chromewebstore.google.com/detail/activitywatch-web-watcher/nglaklhklhcoonedhgnpgddginnjdadi**
+(Firefox: https://addons.mozilla.org/firefox/addon/aw-watcher-web/).
 
 ### 3. Tag the browser profiles that belong to one client
 
@@ -259,8 +268,10 @@ writes into that client's category rule.
 ### 4. The category rules (the plugin writes these)
 
 This step is not yours to type. `/billables:setup` agrees a few words per client with you — the
-client code from step 3, the names of that client's own products or apps, the client's full name —
-and writes one ActivityWatch category rule per client from them. You see the words, never a regular
+client code from step 3, the names of that client's own products or apps, the client's full name,
+and the addresses only that client's work opens (its SharePoint site, its DevOps organisation) —
+and writes one ActivityWatch category rule per client from them. The addresses are what carry a
+client when you work every client from one browser profile. You see the words, never a regular
 expression.
 
 Every word is checked against your own recent window titles before anything is written, because a

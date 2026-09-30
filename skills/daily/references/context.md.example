@@ -67,7 +67,7 @@ shipped script is not — an update overwrites it.
 - Window: `aw-watcher-window_<HOST>`
 - AFK: `aw-watcher-afk_<HOST>`
 - Web (Firefox): `aw-watcher-web-firefox_<HOST>`
-- Web (Edge/Chrome): `aw-watcher-web-chrome_<HOST>`
+- Web (Edge/Chrome/Vivaldi): `aw-watcher-web-chrome_<HOST>` — Brave and Opera report as `aw-watcher-web-brave_<HOST>` / `aw-watcher-web-opera_<HOST>`
 - VS Code: `aw-watcher-vscode_<HOST>` (optional)
 
 ---
@@ -100,7 +100,7 @@ One section per client. Include every signal that would let the skill identify
 **Client name**: `<exact name as your timesheet provider shows it>`
 **Default project**: `<project code>` `<project name>`
 **Profile tag**: `[<CODE>]` — only for a browser profile used for this client alone; else delete this line
-**Category terms**: `<CODE>`, `<the client's own product or app name>`, `<the client's full name>` — up to five words only this client's work puts in a title; the plugin's category rule for this client is these and nothing else
+**Category terms**: `<CODE>`, `<the client's own product or app name>`, `<the client's full name>`, `<an address only this client's work opens, e.g. its SharePoint site>` — up to eight words only this client's work puts in a title; the plugin's category rule for this client is these and nothing else. With one browser profile for every client, the addresses are what carry the client
 
 Signals:
 - Work-item prefixes: `<PREFIX>` (e.g. numbers like `<PREFIX>1234` are this client's)

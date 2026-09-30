@@ -481,3 +481,18 @@ def test_web_rows_inside_the_repeated_hour_are_ordered_by_instant_not_by_clock(l
         ("02:40:00", "ACME release runbook"),
         ("02:10:00*", "ACME ticket 4471"),
     ]
+
+
+@pytest.mark.parametrize("browser", ["brave", "opera", "edge"])
+def test_the_zoom_reads_the_web_watcher_of_whichever_browser_reports(live_aw, browser):
+    """The web watcher names its bucket for the browser it detects, so a Brave user's tabs
+    sit in `aw-watcher-web-brave_<host>` — a zoom that read Firefox and Chrome alone would
+    show that user no tabs at all, and say nothing about it."""
+    d = day()
+    d.active("09:00", "10:00")
+    d.window("09:00", "10:00", f"{browser}.exe", "ACME")
+    d.web("09:10", "09:20", "ACME board", "https://acme.example/board", browser=browser)
+    live_aw(d)
+    r = run_cli(tl, [d.date_str(), "--window", "09:00-10:00", "--json"])
+    assert r.code == 0, r.err
+    assert [w["title"] for w in r.json()["web"]] == ["ACME board"]

@@ -159,10 +159,22 @@ def test_the_run_reports_the_sample_it_gated_against(live_aw, workspace, tmp_pat
 
 def test_a_client_with_more_terms_than_a_curated_list_is_refused(live_aw, workspace, tmp_path):
     server = live_aw(sample_day([ACME_PAGE, PERSONAL]))
-    result = compile_run(tmp_path, [candidate("Acme", *[f"acme{n}" for n in range(6)])])
+    over = cr.MAX_TERMS + 1
+    result = compile_run(tmp_path, [candidate("Acme", *[f"acme{n}" for n in range(over)])])
     assert result.code == 1
-    assert "over the 5 a client's rule takes" in result.out
+    assert f"over the {cr.MAX_TERMS} a client's rule takes" in result.out
     assert posted(server) == [], "a refusal anywhere has to write nothing at all"
+
+
+def test_a_single_profile_client_has_room_for_its_addresses(live_aw, workspace, tmp_path):
+    """A user with one browser profile for every client names a client by its addresses as
+    well as its code, products and name, so eight terms is a curated list, not a generated
+    one."""
+    live_aw(sample_day([ACME_PAGE, PERSONAL]))
+    terms = ["ACME", "AcmePortal", "Acme Holdings", "acme.crm6", "acmetrust.sharepoint.com",
+             "dev.azure.com/acme-it", "acme.example.com", "Acme Trust"]
+    assert len(terms) == cr.MAX_TERMS == 8
+    assert compile_run(tmp_path, [candidate("Acme", *terms)]).code == 0
 
 
 @pytest.mark.parametrize("bad", [{"client": "Acme"}, {"client": "Acme", "terms": []},
@@ -505,6 +517,57 @@ def test_the_profile_tags_are_listed_where_the_rules_cannot_be_read(live_aw, wor
 
 
 # --------------------------------------------------------------------------------------
+# The addresses the browser titles carry
+# --------------------------------------------------------------------------------------
+
+SHAREPOINT = ("msedge.exe", f"Board pack-harbourtrust.sharepoint.com/sites/board - Work - Riley{EDGE}")
+SHAREPOINT_HOME = ("msedge.exe", f"Home-harbourtrust.sharepoint.com/ - Work - Riley{EDGE}")
+DYNAMICS = ("msedge.exe", f"Tideline UAT-tideline-uat.crm6.dynamics.com/main - Work - Riley{EDGE}")
+DEVOPS = ("msedge.exe", f"Sprint 12-dev.azure.com/harbour-trust-it/Tideline/_sprints - Work{EDGE}")
+DEVOPS_OWN = ("msedge.exe", f"Backlog-dev.azure.com/brightside/Internal/_backlogs - Work{EDGE}")
+DEVOPS_TAGGED = ("msedge.exe",
+                 f"Board-dev.azure.com/harbour-trust-it/Tideline - [HBR] and 3 more pages - Work{EDGE}")
+
+
+def inspected_hosts(rows: list[tuple[str, str]], live_aw) -> list[str]:
+    live_aw(sample_day(rows))
+    result = run_cli(cr, ["--inspect"])
+    assert result.code == 0, result.err
+    return [line for line in result.out.splitlines() if line.startswith("HOST ")]
+
+
+def test_inspect_lists_the_addresses_the_browser_titles_carry(live_aw, workspace):
+    """A user with one profile for every client has no tag; the addresses are what name the
+    client. Counted in distinct titles, most-seen first."""
+    hosts = inspected_hosts([SHAREPOINT, SHAREPOINT_HOME, DYNAMICS, PERSONAL], live_aw)
+    assert hosts[0] == "HOST harbourtrust.sharepoint.com — 2 distinct titles"
+    assert "HOST tideline-uat.crm6.dynamics.com — 1 distinct title" in hosts
+
+
+def test_a_hyphenated_host_is_read_whole_rather_than_from_its_own_hyphen(live_aw, workspace):
+    """The extension joins the page title to the address with a bare `-`, and the host has
+    hyphens of its own — so `UAT-tideline-uat.crm6…` reads as the whole host, not `uat.crm6…`."""
+    hosts = inspected_hosts([DYNAMICS, PERSONAL], live_aw)
+    assert not any("HOST uat.crm6" in line for line in hosts), hosts
+
+
+def test_a_shared_host_is_only_ever_listed_with_its_tenant(live_aw, workspace):
+    """`dev.azure.com` bare would match every client's DevOps work at once, and the user's own
+    firm's; the org after it is the part only one of them opens."""
+    hosts = inspected_hosts([DEVOPS, DEVOPS_OWN, DEVOPS_TAGGED, PERSONAL], live_aw)
+    assert "HOST dev.azure.com/harbour-trust-it — 2 distinct titles" in hosts
+    assert "HOST dev.azure.com/brightside — 1 distinct title" in hosts
+    assert not any(line.startswith("HOST dev.azure.com —") for line in hosts), hosts
+
+
+def test_addresses_are_read_from_browser_windows_alone(live_aw, workspace):
+    """An editor or a file name can look like a host (`notes-v2.md`), and is not one."""
+    editor = ("Code.exe", "release-notes.md - Tideline - Visual Studio Code")
+    hosts = inspected_hosts([editor, PERSONAL], live_aw)
+    assert not any("notes.md" in line for line in hosts), hosts
+
+
+# --------------------------------------------------------------------------------------
 # Adopting the rules a user already had (#73)
 # --------------------------------------------------------------------------------------
 
@@ -690,8 +753,9 @@ def test_status_leaves_no_directory_behind_where_no_workspace_resolves(tmp_path,
 
 
 def test_a_workspace_with_no_context_file_is_stale_rather_than_current(workspace):
-    """There is nothing to build rules from, which is a state to act on — the `daily`
-    skill's first run scaffolds that file — and not a run to report as up to date."""
+    """There is nothing to build rules from, which is a state to act on — the `setup` skill
+    writes that file, or the `daily` skill's first run where setup was skipped — and not a run
+    to report as up to date."""
     result = run_cli(cr, ["--status"])
     assert result.code == 0
     assert result.out.startswith("STALE")
