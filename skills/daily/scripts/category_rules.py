@@ -34,7 +34,8 @@ Three modes:
   * `--inspect`              what the activity source holds now, each rule marked managed
                              or not and carrying the share of the sample it matches — the
                              read behind adopting rules the plugin did not author — and,
-                             as `SEEN` lines, the profile tags the titles really carry
+                             as `SEEN` lines, the profile tags the titles really carry, and
+                             as `HOST` lines, the addresses the browser titles carry
   * `--status`               whether the rules are still current for the workspace context
                              file. Reads two local files and nothing over the wire
 
@@ -71,9 +72,11 @@ DEFAULT_DAYS = 7
 # `## Preferences` line in the workspace template is where a user's own value belongs.
 DEFAULT_MAX_SHARE = 0.35
 
-# A client's rule is a curated handful — its code, its products, its name. More than this is
-# a list generated rather than chosen, which is what this shape replaced.
-MAX_TERMS = 5
+# A client's rule is a curated handful — its code, its products, its name, and for a user who
+# works every client from one browser profile, the addresses only that client's work opens
+# (its SharePoint tenant, its DevOps org). More than this is a list generated rather than
+# chosen, which is what this shape replaced.
+MAX_TERMS = 8
 
 # The characters a term is escaped on. Not `re.escape`, which also escapes a space: the
 # activity source's own UI evaluates these rules too, and an escape one engine does not know
@@ -88,6 +91,20 @@ REGEX_SPECIAL = re.compile(r"([\\.^$|?*+()\[\]{}])")
 TAGGED_TITLE = re.compile(r"^.* - (\[[A-Za-z0-9-]{2,12}\])(?: and \d+ more pages?)?"
                           r"(?: - ([^-]+(?: - [^-]+)?) - Microsoft\W*Edge| - Google Chrome)?$",
                           re.IGNORECASE)
+
+# The address the extension appends: `{title}-{hostname}{path}…`, one whitespace-free token
+# that also carries the last word of the page title, since the extension joins the two with
+# a bare `-`. Hosts contain hyphens too, so the split is decided in `host_counts()`.
+HOST = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}", re.IGNORECASE)
+BROWSER_APP = re.compile(r"msedge|edge|chrome|firefox|brave|opera|vivaldi|safari", re.IGNORECASE)
+
+# Hosts shared by every tenant, whose tenant is the first path segment. Bare, they would
+# match every client's work at once, so they are only ever offered with that segment.
+SHARED_HOSTS = frozenset({"dev.azure.com", "github.com", "gitlab.com", "bitbucket.org"})
+
+# How many `HOST` lines `--inspect` prints: enough to find each client's addresses, few enough
+# that the run is not handed the week's browsing.
+HOSTS_SHOWN = 25
 
 # Where the backup and the stamp live under the workspace. `.mcp/` already holds the cached
 # catalogs — machine state the user does not hand-edit — which is what both of these are.
@@ -288,6 +305,71 @@ def print_seen(sample: list[Window]) -> None:
 
 def _named(slot: str | None) -> str:
     return f'"{slot}"' if slot else "no profile"
+
+
+def address_readings(title: str) -> list[str]:
+    """Every way the extension's address in `title` could read, as `host` or `host/tenant`.
+
+    The address is the last whitespace-free token holding `-<host>`. The extension joins the
+    page title's last word to it with a bare `-`, and a host has hyphens of its own, so
+    `Home-harbour-trust.example.com` could be either host — both are returned, and
+    `host_counts()` settles it on what the rest of the sample says.
+    """
+    for token in reversed(title.split()):
+        readings = []
+        for index, char in enumerate(token):
+            if char != "-":
+                continue
+            rest = token[index + 1:]
+            found = HOST.match(rest)
+            if not found or (rest[found.end():found.end() + 1] not in ("", "/", "?", "#", ":")):
+                continue
+            host = found.group(0).lower()
+            if host in SHARED_HOSTS:
+                segment = rest[found.end():].lstrip("/").split("/", 1)[0]
+                segment = re.split(r"[?#]", segment, maxsplit=1)[0]
+                if not segment:
+                    continue
+                host = f"{host}/{segment}"
+            readings.append(host)
+        if readings:
+            return readings
+    return []
+
+
+def host_counts(sample: list[Window]) -> collections.Counter:
+    """Distinct browser titles per address, each title counted once under one reading.
+
+    A title with several readings goes to the one most other titles agree on, then the
+    longest: `harbourtrust.sharepoint.com` seen on its own a hundred times outweighs the
+    `Home-harbourtrust…` reading of one title, and a hyphenated host seen whole wins over the
+    fragment of itself that follows its own hyphen.
+    """
+    per_title = [address_readings(title) for app, title in sample if BROWSER_APP.search(app)]
+    support = collections.Counter(reading for readings in per_title for reading in set(readings))
+    counts: collections.Counter = collections.Counter()
+    for readings in per_title:
+        if readings:
+            counts[max(readings, key=lambda r: (support[r], len(r)))] += 1
+    return counts
+
+
+def print_hosts(sample: list[Window]) -> None:
+    """One `HOST` line per address in the browser titles, most-seen first.
+
+    What a user who works every client from one browser profile has instead of a profile
+    tag: the addresses only one client's work opens are that client's terms. A count of
+    distinct titles, not of time, and no example title — the address is the whole finding.
+    """
+    counts = host_counts(sample)
+    if not counts:
+        print("HOST no address in the sampled browser titles")
+        return
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    for host, n in ranked[:HOSTS_SHOWN]:
+        print(f"HOST {host} — {n} distinct title{'' if n == 1 else 's'}")
+    if len(ranked) > HOSTS_SHOWN:
+        print(f"HOST … and {len(ranked) - HOSTS_SHOWN} more addresses seen fewer times")
 
 
 # --------------------------------------------------------------------------------------
@@ -630,6 +712,7 @@ def inspect(days: int, max_share: float, directory: Path) -> int:
     # Before the rules: a build with no settings endpoint refuses below, and the tags are
     # read from the sample alone.
     print_seen(sample)
+    print_hosts(sample)
     classes = read_classes()
     if not classes:
         print("RULES none — the activity source holds no categories")

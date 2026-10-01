@@ -2870,6 +2870,48 @@ ordinary word (`LEDGER`, `NIMBUS`) claims unrelated pages, and its tag is the te
 setup step 3 now says. Each scenario was run headless through the page's own model and does what
 its text claims.
 
+### A user with one browser profile for every client — rung 1, watched, 2026-10-01
+
+**The gap, watched.** Fresh no-tools agents were given the setup step as it was (0.11.1 before this
+change). The scenario was fictional: Riley, a non-technical bookkeeper working two clients and their
+own firm from one Edge profile. The agents also got a `--inspect` with no `SEEN` lines, an unmanaged
+`Harbour|Invoice` rule and a personal rule, plus Riley's raw words. 3 of 3 wrote clean candidates:
+code-free names, `Tideline`, and `harbourtrust` taken from the one example title the inspect happened to
+show. 0 of 3 found the client's DevOps organisation or its Dynamics environment, because nothing
+surfaced them. 3 of 3 left Quill & Co's work unrecognised. 0 of 3 wrote `.context.md`, as the step then
+said. None asked in numbered rounds.
+
+**What changed, together:**
+- `--inspect` prints a `HOST` line per address in the browser titles. A host every tenant shares
+  (`dev.azure.com`, `github.com`) is only ever listed with its organisation.
+- The cap went from five terms to eight. A one-profile client's code, product, name and two or three
+  addresses do not fit in five, and eight is still a list someone chose rather than one a script
+  generated.
+- Setup runs the interview in numbered rounds with a recommended answer to each (the `grilling`
+  method), speaks Simplified Technical English, and writes the client half of `.context.md` itself.
+
+**After, the same scenario and 3 fresh agents:**
+- 3 of 3 asked in numbered rounds with a recommendation under each, in short glossed sentences.
+- 3 of 3 found the client's SharePoint site and DevOps organisation. They kept the user's own firm's
+  addresses and `go.xero.com` / `app.asana.com` out.
+- 3 of 3 wrote `.context.md` before the rules.
+- 2 of 3 then made up a client code (`HTRUST`) and used it as a term, though no title carried it.
+  That was written `UNVERIFIED suspect` on every run. One sentence at step 4.3 now keeps a newly made-up
+  code out of the terms unless the titles or the user's folders already carry it.
+
+Re-run after that sentence: 3 of 3 left the code out of the terms and kept it in the context file.
+3 of 3 terms were `Tideline`, the name, the SharePoint site and the DevOps org, and for the other client
+its name and website. A control, a per-profile user with two tagged profiles and a general one, still
+tagged both profiles, left the general one alone, used `[ACME]`/`[BETA]` and added their addresses.
+
+**The split in the address is decided on the sample, not the string.** URL in title joins the page
+title to the address with a bare `-`, and hosts have hyphens of their own. So
+`UAT-tideline-uat.crm6…` reads equally as `tideline-uat.crm6…` or `uat.crm6…`, and
+`Sign-in-login.microsoftonline.com` equally as `in-login…` or `login…`. `host_counts()` gives each title
+to the reading most other titles agree on, then the longest. Where a host appears on its own
+elsewhere, it wins; where it never does, the longer reading wins. The second case is wrong only for a
+page whose last word is hyphenated, and it costs one mislabelled `HOST` line.
+
 ## Rejected
 
 ### Requiring billable status in the Step 6 draft — rung 2, n=3, 2026-09-28

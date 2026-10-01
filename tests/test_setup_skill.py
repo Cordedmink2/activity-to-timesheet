@@ -220,8 +220,42 @@ def test_the_category_step_hands_the_compiler_the_candidate_shape_it_reads():
         f"the category step's example is not the {{client, terms, adopts}} shape the "
         f"compiler reads: {candidates}")
     assert all(len(c["terms"]) <= compiler_max_terms() for c in candidates)
-    assert f"up to {['zero', 'one', 'two', 'three', 'four', 'five', 'six'][compiler_max_terms()]}" \
-        in body, "the category step does not state the compiler's cap on a client's terms"
+    cap = {n: word for word, n in NUMBER_WORDS.items()}[compiler_max_terms()]
+    assert f"up to {cap}" in body, (
+        "the category step does not state the compiler's cap on a client's terms")
+    assert f"over the {compiler_max_terms()} a client's rule takes" in body, (
+        "the category step quotes a cap refusal the compiler no longer prints")
+
+
+def test_the_category_step_offers_the_addresses_the_titles_carry():
+    """A user with one browser profile for every client has no tag, so a client code they
+    remember matches nothing; the addresses each client's work opens are what names it.
+    `--inspect` prints them as `HOST` lines — read out of `print_hosts()`, so renaming the
+    word fails here."""
+    source = RULE_COMPILER.read_text(encoding="utf-8")
+    printer = source.split("def print_hosts(", 1)[-1].split("\ndef ", 1)[0]
+    assert 'print(f"HOST ' in printer, (
+        "`print_hosts()` no longer prints `HOST` lines — step 4 chooses addresses from them")
+    heading, body = one_step_about(r"categor")
+    assert "`HOST`" in body, (
+        f"step '{heading.strip()}' never points at the `HOST` lines, so a one-profile user's "
+        "clients are named by codes their titles never carry")
+
+
+def test_the_category_step_writes_the_context_file_before_the_rules_and_never_over_one():
+    """The compiler stamps the rules with the context file's fingerprint, so the file has
+    to exist first — written after, the next `daily` run reads the rules as stale. And the
+    file is the user's: a re-run of setup changes it by a diff they see, never by a copy of
+    the template landing on top of their clients."""
+    heading, body = one_step_about(r"categor")
+    context = body.find("context.md.example")
+    candidates = body.find("--candidates <file>")
+    assert context != -1, f"step '{heading.strip()}' never writes the starter context file"
+    assert candidates != -1 and context < candidates, (
+        f"step '{heading.strip()}' writes the context file after the rules, so their "
+        "stamp is of a file that has since changed")
+    assert re.search(r"never written over", body, re.I), (
+        f"step '{heading.strip()}' does not say an existing context file is left alone")
 
 
 def test_the_category_step_keeps_a_loud_fallback_for_a_source_that_will_not_take_the_write():
@@ -304,6 +338,38 @@ def test_a_step_s_quoted_instruction_stays_inside_its_do():
             f"step '{heading.strip()}' has a quoted block outside its **Do** — a quoted "
             "block is what is read out to the user, and a verify or a failure branch is "
             "written for the agent")
+
+
+# What a non-technical user should never be handed. `Regex` itself is not here: it is the
+# label the activity source's own settings page gives the rule type the manual fallback
+# asks them to pick, and naming the button they have to click is the point.
+JARGON = re.compile(r"\bJSON\b|\bbuckets?\b|/api/|regular expression", re.I)
+
+
+def test_what_the_user_is_handed_is_plain_language():
+    """The user is assumed not to be technical, and a quoted block is what they are given
+    near enough verbatim. The rule for how to talk to them has to be written where a run
+    meets it, and no quoted block may hand them the machinery the agent drives for them."""
+    text = skill_text()
+    assert re.search(r"^## How to talk to the user", text, re.M), (
+        "SKILL.md never says how to talk to a non-technical user")
+    assert "Simplified Technical English" in shipped.section(text, "How to talk to the user")
+    for heading, body in steps():
+        quoted = "\n".join(line for line in body.splitlines() if line.lstrip().startswith(">"))
+        found = sorted({m.group(0) for m in JARGON.finditer(quoted)})
+        assert not found, (
+            f"step '{heading.strip()}' hands the user {', '.join(found)} in a quoted "
+            "instruction")
+
+
+def test_nothing_is_installed_on_the_users_machine_without_their_yes():
+    """Setup offers to run the installs it finds missing (#67) — machine-wide software, so
+    the decision is the user's every time, and an install that runs unasked is a change to
+    their machine they did not choose."""
+    before = shipped.section(skill_text(), "Before you start")
+    assert "winget install" in before, "\"Before you start\" offers nothing to install"
+    assert re.search(r"run only what the user says yes to", before, re.I), (
+        "the install offer does not wait for the user's yes")
 
 
 # The two strings a user has to hand their security team. Both are defined in the
@@ -398,20 +464,31 @@ def test_the_allow_list_ask_names_what_the_setup_script_actually_registers(field
         "setup script registers")
 
 
-def test_the_browser_extension_id_is_the_same_wherever_it_is_written():
+EXTENSIONS = ("URL in title", "web watcher")
+
+
+@pytest.mark.parametrize("extension", EXTENSIONS)
+def test_each_browser_extension_id_is_the_same_wherever_it_is_written(extension):
     """`ExtensionInstallAllowlist` takes the ID and nothing else, so a copy that drifts
     sends an administrator allow-listing an extension nobody ships — and the user's
-    browser watcher stays blocked with the ticket marked done. The reference owns the ID;
-    the skill's step and the README repeat it for the reader who never opens the reference,
-    and until this test nothing read the three together."""
+    browser watcher stays blocked with the ticket marked done. The reference owns each ID,
+    on the line naming its extension; the skill's step and the README repeat them for the
+    reader who never opens the reference, and until this test nothing read the three
+    together."""
     reference = (SETUP / "references" / "endpoint-security.md").read_text(encoding="utf-8")
-    ids = set(CHROME_EXTENSION_ID.findall(reference))
-    assert len(ids) == 1, f"the endpoint-security reference names {len(ids)} extension IDs"
+    assert len(set(CHROME_EXTENSION_ID.findall(reference))) == len(EXTENSIONS), (
+        "the endpoint-security reference names a different number of extension IDs from "
+        f"the {len(EXTENSIONS)} the setup step installs")
+    lines = [line for line in reference.splitlines()
+             if extension.lower() in line.lower() and CHROME_EXTENSION_ID.search(line)]
+    ids = {i for line in lines for i in CHROME_EXTENSION_ID.findall(line)}
+    assert len(ids) == 1, (
+        f"the endpoint-security reference names {len(ids)} IDs beside {extension!r}")
     (extension_id,) = ids
     for doc in (SETUP_MD, REPO / "README.md"):
         assert extension_id in doc.read_text(encoding="utf-8"), (
-            f"{doc.relative_to(REPO)} does not carry the extension ID the reference names, "
-            f"{extension_id}")
+            f"{doc.relative_to(REPO)} does not carry the {extension} ID the reference "
+            f"names, {extension_id}")
 
 
 def test_a_block_has_to_be_evidenced_before_it_is_escalated():

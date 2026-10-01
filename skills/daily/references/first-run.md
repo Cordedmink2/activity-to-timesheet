@@ -2,7 +2,7 @@
 
 Read this only when a prerequisite check fails (no workspace, missing `.context.md`, unconfigured credentials or timezone, no screenshot task, unknown AW buckets). Routine runs never need this file.
 
-**A first install is not this file.** The `setup` skill beside this one walks a first-time install — the activity source, the browser extension, the profile tags, the category rules (which it writes for the user rather than asking them to), the screenshot task — and verifies each one before moving on. This file is the mid-run diagnostic: one prerequisite came back wrong on a machine that was already working.
+**A first install is not this file.** The `setup` skill beside this one walks a first-time install — the activity source, the browser extensions, the profile tags, the workspace and the client sections of its `.context.md`, the category rules (which it writes for the user rather than asking them to), the screenshot task — and verifies each one before moving on. This file is the mid-run diagnostic: one prerequisite came back wrong on a machine that was already working.
 
 The skill is **shareable across users**. Each user maintains their own `Timesheets/.context.md` describing *their* clients, colleagues, billing conventions, and preferences. The skill stays generic; `.context.md` carries the personal facts.
 
@@ -36,7 +36,7 @@ and confirming new PNGs appear for every monitor.
 
 ## First-run: the workspace
 
-The `setup` skill deliberately does not build this — it covers only what a person has to do by hand, and this is not that. It belongs to this skill's first run, which is where a user arrives with no `Timesheets/` at all.
+The `setup` skill normally builds this, at its category step. This section is for a user who skipped setup and arrives with no `Timesheets/` at all.
 
 Ask which folder should be the workspace (the current directory is the usual answer), then from a clone of the repo run `install/setup_workspace.ps1 [-Workspace <path>]` (POSIX: `install/setup_workspace.sh [<path>]`).
 
@@ -52,10 +52,15 @@ If the workspace is not the folder Claude Code starts in, set `TIMESHEET_WORKSPA
 
 ## First-run: `Timesheets/.context.md`
 
-If `Timesheets/.context.md` doesn't exist:
+The `setup` skill writes a starter: the AW buckets and one section per client, with its profile tag, category terms and signals. Every other section is still the template's, placeholders and all. So there are two starting points:
+
+- **A starter from setup** — walk only the sections still holding the template's placeholders (`<Full Name>`, `<task name>`, `<Client Name>`). Leave the client sections as setup wrote them unless the user corrects one.
+- **No file at all** — a user who skipped setup. Walk the whole template.
+
+Either way:
 
 1. Read `references/context.md.example` as the template.
-2. Walk the user through filling it in — interactively, one section at a time. Ask about: their internal colleagues, the clients they bill, the profile tag of each client that has a browser profile to itself and each client's category terms (the `setup` skill's hand-over names both), the signal types each client has (Edge profile, codebase, ChatGPT project, etc.), known external contacts, and any personal-browsing patterns to exclude.
+2. Walk the user through filling it in — interactively, one section at a time. Ask about: their internal colleagues, the clients they bill, the profile tag of each client that has a browser profile to itself and each client's category terms (the `setup` skill's category step says how terms are chosen), the signal types each client has (Edge profile, codebase, ChatGPT project, etc.), known external contacts, and any personal-browsing patterns to exclude.
 3. Save the result as `Timesheets/.context.md`.
 4. Tell the user they can always edit this file directly — the skill re-reads it every run.
 
@@ -118,7 +123,7 @@ ActivityWatch buckets are hostname-suffixed. On first run for a user, call `GET 
 
 `activity_timeline.py` reads the category rules live from `/api/0/settings`: one client-level rule matched against the window's app name and its title, each on its own, which is where the timeline's client labels come from. They are never project- or work-item-level, and they are a first-pass signal only, not 100% certain.
 
-**The plugin owns them (#69), so this is not a section to act on by hand.** `scripts/category_rules.py` writes one per client from that client's **Category terms** in `.context.md` — the client code, the client's own products, its name — refuses a term that matches an implausible share of your real window titles and flags any that matches none of them, copies the previous set into `.mcp/` before it writes, and asks ActivityWatch itself what each rule labels before calling the write done. Step 2 of the workflow checks whether they are still current for `.context.md` and rebuilds them when they are not. What that means here:
+**The plugin owns them (#69), so this is not a section to act on by hand.** `scripts/category_rules.py` writes one per client from that client's **Category terms** in `.context.md` — the client code, the client's own products, its name, the addresses only its work opens — refuses a term that matches an implausible share of your real window titles and flags any that matches none of them, copies the previous set into `.mcp/` before it writes, and asks ActivityWatch itself what each rule labels before calling the write done. Step 2 of the workflow checks whether they are still current for `.context.md` and rebuilds them when they are not. What that means here:
 
 - **A missing client is a missing **Category terms** line, not a missing rule.** Add it to that client's section in `.context.md` and the next run writes it; editing the rule in the settings UI instead is a change the next rebuild discards.
 - **A term is a word only that client's work puts in a title** — its code, which also catches its profile tag and a profile named for it, its products, its name. Never a domain word any client's work produces: the first matching rule wins, so a broad term takes the label off a correct one, and the gate refuses one that matches too much of your day.

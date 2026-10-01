@@ -316,7 +316,7 @@ class Day:
             f"aw-watcher-afk_{self.host}": self.afk_events(),
             f"aw-watcher-window_{self.host}": self.window_events(),
         }
-        for browser in ("firefox", "chrome"):
+        for browser in sorted({row[0] for row in self._web}):
             evs = self.web_events(browser)
             if evs:
                 out[f"aw-watcher-web-{browser}_{self.host}"] = evs

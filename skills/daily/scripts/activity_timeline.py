@@ -46,7 +46,10 @@ from aw_client import (GAP_FOLD, NOISE_FLOOR, SourceError, UsageError, dedupe_he
 from timezone import (CONFIGURED, local_clock, parse_range, resolve_zone_with_source,
                       utc_bounds, zone_label)
 
-WEB_WATCHERS = ("aw-watcher-web-firefox", "aw-watcher-web-chrome")
+# The web watcher names its bucket for the browser it detects — Edge and Vivaldi report as
+# `chrome`, Brave and Opera as themselves — and its options let a user rename it `edge`.
+WEB_WATCHERS = tuple(f"aw-watcher-web-{browser}"
+                     for browser in ("firefox", "chrome", "edge", "brave", "opera"))
 
 def load_classes():
     """Return [(label, compiled_regex), ...] from AW settings 'classes'.
