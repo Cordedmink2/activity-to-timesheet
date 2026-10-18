@@ -76,24 +76,19 @@ def test_the_shipped_skills_validate_strictly():
     assert res.returncode == 0, res.stdout + res.stderr
 
 
-# The plugin root is the repo root, so the repo's own `CLAUDE.md` is a file the plugin
-# carries and does not use. Deleting it is not the fix: checked on 2026-08-28, a fresh
-# Claude Code session in this repo with `CLAUDE.md` moved aside loads no project
-# instructions at all — not `AGENTS.md`, which `CLAUDE.md` exists to import. So the
-# warning is accepted, and pinned here rather than left to be rediscovered.
-CLAUDE_MD_AT_PLUGIN_ROOT = re.compile(r"CLAUDE\.md at the plugin root")
+# The plugin root is the repo root, so a root `CLAUDE.md` would be a file the plugin carries
+# and does not use, and the validator warns about it. The repo's instructions live in
+# `AGENTS.md`, which Claude Code loads natively when no `CLAUDE.md` exists, so there is no
+# accepted warning: any warning fails this.
 
 
 @requires_claude
-def test_the_plugin_manifest_carries_no_warning_but_the_accepted_one():
-    """Pinned, not suppressed: a *second* warning fails this, which is the point.
-
-    Asserting the set rather than the exit code is what keeps the accepted exception from
-    turning into a blanket "warnings are fine here" — the next one has to be looked at.
+def test_the_plugin_manifest_carries_no_warning():
+    """Asserting the set rather than the exit code: `--strict` passes with warnings, and a
+    warning nobody has decided about has to be looked at.
     """
     res = validate(PLUGIN_MANIFEST)
-    unexpected = {w for w in validator_warnings(res.stdout + res.stderr)
-                  if not CLAUDE_MD_AT_PLUGIN_ROOT.search(w)}
+    unexpected = validator_warnings(res.stdout + res.stderr)
     assert not unexpected, (
         "the plugin manifest has a warning nobody has decided about:\n  "
         + "\n  ".join(sorted(unexpected)))
@@ -244,7 +239,7 @@ def instruction_docs() -> list[Path]:
     docstring naming a file that no longer exists sends a reader looking for it just as a
     markdown line does.
     """
-    docs = [REPO / "README.md", REPO / "AGENTS.md", REPO / "CLAUDE.md",
+    docs = [REPO / "README.md", REPO / "AGENTS.md",
             REPO / "CONTEXT.md", REPO / "intent" / "foundational" / "intent.md",
             REPO / "docs" / "CONTRIBUTING.md"]
     docs += sorted((REPO / ".github").rglob("*.yml"))
