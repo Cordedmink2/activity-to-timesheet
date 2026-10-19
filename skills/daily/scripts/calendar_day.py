@@ -161,6 +161,9 @@ OUTLOOK_ADAPTER = Path(__file__).resolve().parent / "outlook_calendar.ps1"
 # running; a hung adapter must still not hang the run that asked.
 ADAPTER_TIMEOUT_S = 120
 
+# What a drill-down returns beside the id: the two fields the day's read leaves out.
+DETAIL_FIELDS = ("body", "location")
+
 EVENT_FIELDS = ("id", "subject", "start", "end", "show_as", "response", "all_day",
                 "cancelled", "attendees")
 COUNTED_SHOW_AS = frozenset({"busy", "tentative"})
@@ -454,22 +457,23 @@ def day_window_events(local_date: dt.date, zone) -> list[dict]:
 
 # -- The adapter, run ------------------------------------------------------------------
 
-def adapter_argv(path: Path, local_date: dt.date) -> list[str]:
-    """How an adapter at `path` is invoked for `local_date`.
+def adapter_argv(path: Path, local_date: dt.date, event_id: str | None = None) -> list[str]:
+    """How an adapter at `path` is invoked for `local_date` — and, for a drill-down, the
+    one event it is asked about, as a second argument.
 
     A `.ps1` runs under Windows PowerShell — `powershell`, not `pwsh`, because the Outlook
     adapter has to parse under the 5.1 a stock Windows box has and that is what holds it
     to it. A `.py` runs under the interpreter running this script, so a fake written for
     the suite runs wherever the suite does. Anything else is taken to be executable.
     """
-    date = local_date.isoformat()
+    args = [local_date.isoformat()] + ([event_id] if event_id is not None else [])
     suffix = path.suffix.lower()
     if suffix == ".ps1":
         return ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                "-File", str(path), date]
+                "-File", str(path), *args]
     if suffix == ".py":
-        return [sys.executable, str(path), date]
-    return [str(path), date]
+        return [sys.executable, str(path), *args]
+    return [str(path), *args]
 
 
 def resolve_adapter(flag: str | None) -> Path:
@@ -537,6 +541,26 @@ def read_adapter(argv: list[str]) -> object:
             f"({exc.msg} at line {exc.lineno}): {head!r}") from None
 
 
+def event_detail(payload, event_id: str, local_date: dt.date) -> dict:
+    """The drill-down answer: one event's body and location, or the reason it is not one.
+
+    Only for the event asked about (#55). An answer naming any other event is refused
+    without repeating what it said, because a neighbour's body is exactly what a
+    drill-down must never put in front of the run that did not ask for it."""
+    event = payload.get("event") if isinstance(payload, dict) else None
+    if not isinstance(event, dict):
+        raise CalendarError('the adapter did not print one event: expected {"event": {...}}')
+    if event.get("id") != event_id:
+        raise CalendarError(f"the adapter answered about event {event.get('id')!r} when "
+                            f"asked about {event_id!r}; its answer is not shown")
+    missing = [k for k in DETAIL_FIELDS if not isinstance(event.get(k), str)]
+    if missing:
+        raise CalendarError(f"the adapter's event {event_id!r} has no "
+                            f"{', '.join(missing)} (each a string, empty when there is none)")
+    return {"date": local_date.isoformat(), "id": event_id,
+            **{k: event[k] for k in DETAIL_FIELDS}}
+
+
 # -- The command -----------------------------------------------------------------------
 
 def main():
@@ -568,6 +592,10 @@ def main():
                     help="Path of an adapter to run instead of the configured one; it is "
                          "handed the date and must print the contract in this script's "
                          "docstring. The calendar toggle still has to be on.")
+    ap.add_argument("--detail", metavar="EVENT_ID", default=None,
+                    help="Print one event's body and location instead of the day: the "
+                         "drill-down for a subject line that does not settle the client. "
+                         "Takes an id from the day's output; reads nothing else.")
     args = ap.parse_args()
 
     try:
@@ -578,6 +606,12 @@ def main():
 
     try:
         adapter = resolve_adapter(args.adapter)
+        if args.detail is not None:
+            # No zone and no activity source: the answer is one event's own words.
+            detail = event_detail(read_adapter(adapter_argv(adapter, local_date, args.detail)),
+                                  args.detail, local_date)
+            print(json.dumps(detail, indent=2, ensure_ascii=False))
+            return 0
         # After the toggle: a user with the calendar off should be told that, not asked
         # for a zone the read they did not want would have needed.
         zone, source = resolve_zone_with_source(args.utc_offset)

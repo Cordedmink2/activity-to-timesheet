@@ -36,7 +36,13 @@ Climb it in order, and stop at the rung that answers.
 
 1. **Zoom the timeline first:** `python scripts/activity_timeline.py <date> --window HH:MM-HH:MM`
    folds in Firefox/Chrome web-watcher rows — richer URL/title signals without opening images.
-2. **Then screenshots**, for generic apps that don't name their client (XrmToolBox, bare VS Code,
+2. **A calendar event's own words**, when the calendar is on and the block overlaps an event
+   whose subject did not settle it: `python scripts/calendar_day.py <date> --detail <id>`, with
+   the `id` from the day's calendar output. It prints that one event's body and location and
+   nothing about any other. Read it for the client, the way a zoom is read; it decides
+   attribution only, never AFK and never the block's span. Nothing it prints is written to the
+   workspace — not to the timesheet file, not to `.context.md`. Calendar off: skip this rung.
+3. **Then screenshots**, for generic apps that don't name their client (XrmToolBox, bare VS Code,
    terminals): find the nearest `HH-MM-SS_mN.png` to the ambiguous timestamps, read the env URL /
    workspace / repo / work item on screen. Different clients in different screenshots within one
    block → split the block, per "Interleaved days" below.
@@ -50,7 +56,7 @@ Climb it in order, and stop at the rung that answers.
      flips) if any block needs a switch point. It reports **raw signals per capture** (app,
      environment URL, ticket numbers, Edge profile, workspace) — never a billing verdict;
      attribution against `.context.md` stays with the main session.
-3. **Still ambiguous → ask the user**, showing which screenshots you checked, what you saw, and
+4. **Still ambiguous → ask the user**, showing which screenshots you checked, what you saw, and
    the candidate clients.
 
 ## Two signals that arrive here already flagged
@@ -58,14 +64,14 @@ Climb it in order, and stop at the rung that answers.
 `classification-rules.md` §5 and §6 rank these and raise the 🔸. What to do with one is here.
 
 - **An admin tool whose title never names its environment** — XrmToolBox, database/API clients,
-  RDP sessions, CLI auth profiles. Go straight to rung 2: only a screenshot of the connection
-  answers it. Rung 1 cannot — the environment was never in a title for the zoom to find — and
+  RDP sessions, CLI auth profiles. Go straight to rung 3: only a screenshot of the connection
+  answers it. Rungs 1 and 2 cannot — the environment was never in a title for the zoom to find — and
   neither can the block next door (`classification-rules.md` §6, "Adjacency stops at an admin
   tool").
 - **A Claude Code task slug that triangulates against nothing** (`classification-rules.md` §6,
-  which is where what a slug is worth is settled). Rungs 1 and 2 are looking for the thing it has
+  which is where what a slug is worth is settled). Rungs 1–3 are looking for the thing it has
   to triangulate against — an Edge profile, a repo path, an open client environment. Where none
-  appears, this is rung 3: ask. A slug is never promoted to the answer for want of a better one.
+  appears, this is rung 4: ask. A slug is never promoted to the answer for want of a better one.
 
 ## Interleaved days — find the switch point, don't average
 
