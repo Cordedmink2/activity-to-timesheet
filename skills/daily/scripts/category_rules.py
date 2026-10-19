@@ -627,7 +627,9 @@ def labelled_seconds(entry: dict, bucket: str, start_utc: str, end_utc: str) -> 
     answer = query([f"{start_utc}/{end_utc}"], [
         f"events = query_bucket({_query_string(bucket)});",
         f"events = categorize(events, {classes});",
-        "RETURN = merge_events_by_keys(events, ['$category']);",
+        # Double quotes: aw-server-rust's parser has no single-quoted string and answers
+        # `'$category'` with HTTP 400; the Python server takes either (measured against both).
+        'RETURN = merge_events_by_keys(events, ["$category"]);',
     ])
     return sum(e.get("duration", 0) for e in answer[0]
                if e.get("data", {}).get("$category") == entry["name"])

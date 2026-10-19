@@ -5,6 +5,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-10-19
+
+### Fixed
+- **Teams meetings titled by their subject now corroborate their calendar event** (#80, #90).
+  Many Teams builds title a meeting window `<Subject> | <Tenant> | <email> | Microsoft Teams`,
+  with no `Meeting |` prefix, so every calendar event came back uncorroborated. A Teams window
+  whose first segment, or the one after `Meeting join |`, is the event's own subject now
+  corroborates that event and no other.
+- **A few seconds of a meeting window no longer licenses a whole meeting block** (#89).
+  Corroboration needs at least a minute of meeting window inside the event (`--min-evidence`
+  moves it), and only windows from the meeting client count.
+- **The calendar says what it dropped** (#78). `calendar_day.py` prints a `dropped` list with
+  every event the day held and the filter removed, and why, so a calendar filtered to nothing
+  no longer reads as an empty one. A meeting you attend but never formally responded to is
+  kept when the machine saw it.
+- **Category rules verify against ActivityWatch 0.14.** The verification query used a
+  single-quoted string, which the Rust server ActivityWatch ships rejects with HTTP 400, so
+  every rule write reported itself unconfirmed.
+
+### Changed
+- **The test suite can run against a real ActivityWatch server.** `pytest --real-aw` serves
+  every test day from a genuine `aw-server` binary in a throwaway database instead of the
+  suite's fake, and CI runs it against ActivityWatch 0.14.1 on every push. Its first run found
+  the quoting bug above and that the fake never clipped events to the requested range, which
+  had the suite pinning an overnight `work_end` no real install prints.
+
 ## [0.11.1] - 2026-09-29
 
 ### Added

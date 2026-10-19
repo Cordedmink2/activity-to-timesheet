@@ -166,9 +166,10 @@ def _no_break_day() -> Day:
 def _overnight_day() -> Day:
     """Work running past local midnight.
 
-    The local day is bounded at midnight, so the final span's end renders as `01:12:00` —
-    a `work_end` that reads *earlier* than `work_start`. Pinned because it is the one
-    output where a naive string comparison of the two times gives the wrong answer.
+    The activity source clips every event to the range a script asks for, so this date's
+    day ends at `00:00:00` and the 00:00–01:12 tail is the next date's. The golden once
+    pinned a `work_end` of `01:12:00`; only the fake, which did not clip, ever printed that.
+    `--real-aw` (see `real_aw.py`) is what showed it.
     """
     d = day(dt.date(2026, 8, 4))
     d.classify(*ACME)

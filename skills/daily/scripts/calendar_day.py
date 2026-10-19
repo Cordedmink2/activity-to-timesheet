@@ -123,11 +123,34 @@ from timezone import CONFIGURED, local_clock, resolve_zone_with_source, utc_boun
 
 TOGGLE = "TIMESHEET_OUTLOOK_CALENDAR"
 
-# The skill's meeting-title pattern — SKILL.md Step 3 names it in prose as the soft boundary
-# a Teams meeting starts, and this is its one copy in code. A Teams window is titled
-# `Meeting | <name> | …` or `Call with <name> | …` for a meeting or call, and `Chat | …` for a
-# chat; only the first two are evidence that a meeting was attended.
-MEETING_TITLE = re.compile(r"^\s*(Meeting \||Call with\b)", re.IGNORECASE)
+# What corroborates an event. Two rules, because Teams builds title a meeting window two ways.
+#
+# - **Prefixed**: `Meeting | <name> | …` or `Call with <name> | …`. Corroborates whatever
+#   event it intersects, as it always has. `Meeting join | …` is excluded here: it names its
+#   meeting, so it goes through the subject rule instead.
+# - **Subject-titled** (#80, #90): `<Subject> | <Tenant> | <email> | Microsoft Teams`, with no
+#   prefix at all, and `Meeting join | <Subject> | …` on joining. Corroborates only the event
+#   whose subject it names — the first `|` segment, or the one after `Meeting join` — compared
+#   ignoring case and surrounding space, and only from the meeting client (#89): a folder or a
+#   document that happens to share a subject's words is not attendance.
+#
+# The soft boundary in SKILL.md Step 3 is the looser, model-applied counterpart: any Teams
+# window *except* the screens in NON_MEETING_SCREENS. A false positive there only splits a
+# block; here it bills a meeting, so this rule is anchored on the event.
+MEETING_TITLE = re.compile(r"^\s*(Meeting \|(?!\s*join\b)|Call with\b)", re.IGNORECASE)
+MEETING_JOIN = re.compile(r"^\s*Meeting join\s*$", re.IGNORECASE)
+MEETING_CLIENT = re.compile(r"teams", re.IGNORECASE)
+
+# The first `|` segment of a Teams window that is a screen of the app, not a meeting. One
+# place, so a screen seen in the wild that is not listed is a one-line addition.
+NON_MEETING_SCREENS = frozenset({"chat", "activity", "calendar", "teams", "files", "apps",
+                                 "people", "copilot", "onedrive", "settings"})
+
+# The least meeting window, inside the event, that corroborates it (#89). Twelve seconds of a
+# meeting window cleared the noise floor and licensed a ninety-minute block over three
+# clients' work. A minute is still well under a meeting anyone attended; `--min-evidence`
+# moves it.
+MIN_EVIDENCE = 60.0
 
 # The adapter the toggle names. Beside this script rather than configured, because there
 # is one, and a second calendar earns a toggle of its own rather than a path setting a user
@@ -223,14 +246,85 @@ def _enum(event: dict, field: str) -> str:
 
 def counted(event: dict) -> bool:
     """The filter, minus the day: committed to, shown as busy or tentative, timed, live."""
-    return (not event["all_day"] and not event["cancelled"]
-            and _enum(event, "show_as") in COUNTED_SHOW_AS
-            and _enum(event, "response") in COUNTED_RESPONSES)
+    return dropped_because(event) is None and _enum(event, "response") in COUNTED_RESPONSES
+
+
+def dropped_because(event: dict) -> str | None:
+    """Why the filter drops `event` whatever the machine saw, or None.
+
+    A response other than a commitment is not on this list. `declined` is — the user said
+    no. But `none` and `not_responded` are what a recurring meeting the user attends every
+    week and never formally answered carries (#78), so those are kept when the activity
+    source corroborates them and dropped, *with that reason*, when it does not.
+    """
+    if event["all_day"]:
+        return "all-day"
+    if event["cancelled"]:
+        return "cancelled"
+    show_as = _enum(event, "show_as")
+    if show_as not in COUNTED_SHOW_AS:
+        return f"shown as {show_as.replace('_', ' ')}"
+    if _enum(event, "response") == "declined":
+        return "declined"
+    return None
 
 
 # -- The verdict -----------------------------------------------------------------------
 
 Span = tuple[dt.datetime, dt.datetime]
+# A run of one meeting window: the subject it names (normalised), or None for a prefixed
+# window that corroborates whatever event it intersects; then its start and end.
+Run = tuple[str | None, dt.datetime, dt.datetime]
+
+ANY_EVENT = None
+
+
+def _normal(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def meeting_key(app: str, title: str) -> str | None | bool:
+    """What a window can corroborate: `ANY_EVENT` for a prefixed meeting or call title, the
+    normalised subject it names for a subject-titled Teams window, or False for a window
+    that is not a meeting window at all."""
+    if MEETING_TITLE.search(title):
+        return ANY_EVENT
+    if not (MEETING_CLIENT.search(app) or "microsoft teams" in title.casefold()):
+        return False
+    segments = [s.strip() for s in title.split("|")]
+    if len(segments) < 2:
+        return False
+    subject = segments[1] if MEETING_JOIN.match(segments[0]) else segments[0]
+    if not subject or _normal(subject) in NON_MEETING_SCREENS:
+        return False
+    return _normal(subject)
+
+
+def meeting_runs(window_events: list[dict], noise_floor: float = NOISE_FLOOR,
+                 gap_fold: float = GAP_FOLD) -> list[Run]:
+    """Runs of meeting window, each with what it can corroborate (see `meeting_key`).
+    Read as the timeline reads windows — the rules on `meeting_spans` below."""
+    fold = dt.timedelta(seconds=gap_fold)
+    runs: list[list] = []                       # [title, key, start, end], first sight order
+    latest: dict[str, list] = {}                # title -> the run it last extended
+    for e in dedupe_heartbeats(window_events):
+        title = e["data"].get("title", "") or ""
+        app = e["data"].get("app", "") or ""
+        if e["duration"] < noise_floor:
+            continue
+        key = meeting_key(app, title)
+        if key is False:
+            continue
+        start = parse_ts(e["timestamp"])
+        end = start + dt.timedelta(seconds=e["duration"])
+        run = latest.get(title)
+        if run is not None and start - run[3] < fold:
+            run[3] = max(run[3], end)
+        else:
+            run = [title, key, start, end]
+            runs.append(run)
+            latest[title] = run
+    return sorted(((k, s, e) for _, k, s, e in runs), key=lambda r: (r[1], r[2]))
 
 
 def meeting_spans(window_events: list[dict], noise_floor: float = NOISE_FLOOR,
@@ -247,27 +341,17 @@ def meeting_spans(window_events: list[dict], noise_floor: float = NOISE_FLOOR,
     lend its end to the first — and the last span *of that title*, so two meeting windows
     the user flicked between do not break each other's runs.
     """
-    fold = dt.timedelta(seconds=gap_fold)
-    spans: list[list] = []                      # [title, start, end], in order of first sight
-    latest: dict[str, list] = {}                # title -> the span it last extended
-    for e in dedupe_heartbeats(window_events):
-        title = e["data"].get("title", "") or ""
-        if e["duration"] < noise_floor or not MEETING_TITLE.search(title):
-            continue
-        start = parse_ts(e["timestamp"])
-        end = start + dt.timedelta(seconds=e["duration"])
-        run = latest.get(title)
-        if run is not None and start - run[2] < fold:
-            run[2] = max(run[2], end)
-        else:
-            run = [title, start, end]
-            spans.append(run)
-            latest[title] = run
-    return sorted((s, e) for _, s, e in spans)
+    return [(s, e) for _, s, e in meeting_runs(window_events, noise_floor, gap_fold)]
 
 
-def verdict(start: dt.datetime, end: dt.datetime, spans: list[Span]) -> dict:
+def verdict(start: dt.datetime, end: dt.datetime, runs: list[Run],
+            subject: str | None = None, min_evidence: float = 0.0) -> dict:
     """Whether a meeting window intersects `[start, end)`, and what follows if one does.
+
+    `runs` come from `meeting_runs`; only those naming `subject` — or prefixed, naming no
+    event — count for this one.
+    Corroboration also needs at least `min_evidence` seconds of those windows *inside* the
+    event (#89): a few seconds of a meeting window is a focus change, not attendance.
 
     Intersection is strict — a window that ended as the event began saw nothing of it, which
     is the back-to-back case where the previous meeting must not vouch for the next — and an
@@ -279,8 +363,11 @@ def verdict(start: dt.datetime, end: dt.datetime, spans: list[Span]) -> dict:
     because the minutes before a scheduled start are ordinary active time the surrounding
     block already covers, and nothing here re-times what the calendar said.
     """
-    seen = [(s, e) for s, e in spans if e > start and s < end] if end > start else []
-    if not seen:
+    wanted = None if subject is None else _normal(subject)
+    usable = [(s, e) for key, s, e in runs if key is ANY_EVENT or key == wanted]
+    seen = [(s, e) for s, e in usable if e > start and s < end] if end > start else []
+    inside = sum((min(e, end) - max(s, start)).total_seconds() for s, e in seen)
+    if not seen or inside < min_evidence:
         return {"corroborated": False, "evidence": None, "block": None}
     evidence = (min(s for s, _ in seen), max(e for _, e in seen))
     return {"corroborated": True, "evidence": evidence,
@@ -294,7 +381,7 @@ def _clocks(span: Span | None, zone) -> dict | None:
 
 def filtered_day(payload, local_date: dt.date, zone, window_events: list[dict],
                  noise_floor: float = NOISE_FLOOR, gap_fold: float = GAP_FOLD,
-                 source: str = CONFIGURED) -> dict:
+                 source: str = CONFIGURED, min_evidence: float = MIN_EVIDENCE) -> dict:
     """The calendar day the rules read: what counts, on `local_date` in `zone`, sorted, each
     event with its verdict against `window_events` — the day's foreground-window events from
     the activity source, read with the timeline's two noise settings.
@@ -306,11 +393,10 @@ def filtered_day(payload, local_date: dt.date, zone, window_events: list[dict],
     block's — is rendered by `timezone.local_clock`, so the second pass over a repeated hour
     carries its marker wherever it falls.
     """
-    spans = meeting_spans(window_events, noise_floor, gap_fold)
+    runs = meeting_runs(window_events, noise_floor, gap_fold)
     kept: list[tuple[dt.datetime, dict]] = []
+    dropped: list[tuple[dt.datetime, dict]] = []
     for event in adapter_events(payload):
-        if not counted(event):
-            continue
         start = parse_instant(event["start"])
         if start.astimezone(zone).date() != local_date:
             continue
@@ -318,7 +404,17 @@ def filtered_day(payload, local_date: dt.date, zone, window_events: list[dict],
         if end < start:
             raise CalendarError(
                 f"event {event['id']!s} ends ({event['end']}) before it starts ({event['start']})")
-        judged = verdict(start, end, spans)
+        reason = dropped_because(event)
+        judged = (verdict(start, end, runs, event["subject"], min_evidence)
+                  if reason is None else None)
+        if (reason is None and judged is not None and not judged["corroborated"]
+                and _enum(event, "response") not in COUNTED_RESPONSES):
+            reason = "not responded to, and no meeting window seen"
+        if reason is not None or judged is None:
+            dropped.append((start, {"id": event["id"], "subject": event["subject"],
+                                    "start": local_clock(start, zone),
+                                    "end": local_clock(end, zone), "reason": reason}))
+            continue
         kept.append((start, {
             "id": event["id"],
             "subject": event["subject"],
@@ -332,8 +428,10 @@ def filtered_day(payload, local_date: dt.date, zone, window_events: list[dict],
             "block": _clocks(judged["block"], zone),
         }))
     kept.sort(key=lambda pair: pair[0])
+    dropped.sort(key=lambda pair: pair[0])
     return {"date": local_date.isoformat(), "zone": zone_label(zone, source),
-            "events": [rendered for _, rendered in kept]}
+            "events": [rendered for _, rendered in kept],
+            "dropped": [rendered for _, rendered in dropped]}
 
 
 def day_window_events(local_date: dt.date, zone) -> list[dict]:
@@ -463,6 +561,9 @@ def main():
     ap.add_argument("--gap-fold", type=float, default=GAP_FOLD,
                     help=f"Fragments of one meeting window this many seconds apart or less "
                          f"are one run of evidence, as the timeline does (default {GAP_FOLD})")
+    ap.add_argument("--min-evidence", type=float, default=MIN_EVIDENCE,
+                    help=f"Seconds of meeting window inside an event needed to corroborate "
+                         f"it; less is a focus change, not attendance (default {MIN_EVIDENCE:g})")
     ap.add_argument("--adapter", default=None,
                     help="Path of an adapter to run instead of the configured one; it is "
                          "handed the date and must print the contract in this script's "
@@ -485,7 +586,7 @@ def main():
         payload = read_adapter(adapter_argv(adapter, local_date))
         result = filtered_day(payload, local_date, zone, window_events,
                               noise_floor=args.noise_floor, gap_fold=args.gap_fold,
-                              source=source)
+                              source=source, min_evidence=args.min_evidence)
     except CalendarError as exc:
         print(f"ERR {exc}", file=sys.stderr)
         return 1
