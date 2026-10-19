@@ -134,16 +134,53 @@ def test_an_event_with_a_missing_or_null_title_still_produces_a_span(data):
     assert spans[0]["category"] == "uncategorized"
 
 
-def test_a_locked_windows_screen_logs_as_unknown_and_lands_uncategorized():
-    """Windows records a locked screen as app `unknown` with an empty title. That stretch
-    is the user being *away*; it must read as uncategorized so the skill treats it as time
-    to question, never inherit the client of the window that happened to precede it."""
+@pytest.mark.parametrize("app,title", [("unknown", ""),
+                                       ("LockApp.exe", "Windows Default Lock Screen")],
+                         ids=["unknown", "LockApp"])
+def test_a_lock_screen_window_is_its_own_span_and_inherits_no_client(app, title):
+    """Windows records a lock screen as `LockApp.exe`, or as app `unknown` with an empty
+    title. It must never inherit the client of the window before it — and it is not an
+    uncategorized span either, because it is not activity to classify: it is a claim about
+    whether the user was there, which the window watcher cannot settle (#77)."""
     evs = [D.event("00:00", seconds=600, app="Code.exe", title="CMS - ACME"),
-           D.event("00:10", seconds=1800, app="unknown", title="")]
+           D.event("00:10", seconds=1800, app=app, title=title)]
     spans = at.build_window_spans(evs, ACME_FIRST)
-    assert [s["category"] for s in spans] == ["ACME", "uncategorized"]
+    assert [s["category"] for s in spans] == ["ACME", at.LOCK_SCREEN]
     assert spans[1]["categories"] == set()
     assert spans[1]["multi"] is False
+
+
+def test_a_lock_screen_does_not_merge_into_an_uncategorized_neighbour():
+    """An uncategorized editor run either side of a lock-screen stretch has to stay three
+    rows: folded into one, 46 minutes of LockApp would read as editor work, or the editor
+    work as lock screen."""
+    evs = [D.event("00:00", seconds=600, app="Code.exe", title="notes"),
+           D.event("00:10", seconds=1800, app="LockApp.exe", title="Windows Default Lock Screen"),
+           D.event("00:40", seconds=600, app="Code.exe", title="notes")]
+    cats = [s["category"] for s in at.build_window_spans(evs, ACME_FIRST)]
+    assert cats == ["uncategorized", at.LOCK_SCREEN, "uncategorized"]
+
+
+def test_a_named_app_with_an_empty_title_is_not_a_lock_screen():
+    """Only `unknown` with no title is the lock screen's other spelling. A real app that has
+    not painted its title yet is activity like any other."""
+    evs = [D.event("00:00", seconds=60, app="Code.exe", title="")]
+    assert at.build_window_spans(evs, ACME_FIRST)[0]["category"] == "uncategorized"
+
+
+def test_the_timeline_tells_the_reader_the_lock_screen_is_not_proof_of_absence(live_aw):
+    """#77: a 46-minute LockApp row on a day the AFK watcher read as 64% active. The row
+    has to send the reader to `active_ratio` rather than let the title decide."""
+    d = day(dt.date(2026, 6, 19))
+    d.active("15:00", "16:40")
+    d.window("15:00", "15:49", "Code.exe", "notes - Visual Studio Code")
+    d.window("15:49", "16:36", "LockApp.exe", "Windows Default Lock Screen")
+    live_aw(d)
+    out = run_cli(at, ["2026-06-19"])
+    assert out.code == 0, out.err
+    row = next(line for line in out.lines if "15:49:00-16:36:00" in line)
+    assert at.LOCK_SCREEN in row
+    assert "afk_blocks.py 2026-06-19 --window 15:49-16:36" in out.out
 
 
 # --------------------------------------------------------------------------------------

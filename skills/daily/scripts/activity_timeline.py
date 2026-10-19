@@ -76,6 +76,18 @@ def load_classes():
     return out
 
 
+# Windows puts its lock screen in the foreground as `LockApp.exe`, or the watcher logs it as
+# app `unknown` with no title. Its own row, never merged with a neighbour or labelled with a
+# client — and not proof the user was away: LockApp can stay the foreground window after an
+# unlock while the user works on (#77). `afk_blocks.py --window` is the arbiter.
+LOCK_SCREEN = "lock-screen"
+
+
+def is_lock_screen(app, title):
+    app = (app or "").strip().lower()
+    return app == "lockapp.exe" or (app == "unknown" and not (title or "").strip())
+
+
 def categorize(app, title, classes):
     """Labels of every class whose regex matches the app or the title. [] if none.
 
@@ -100,8 +112,9 @@ def build_window_spans(events, classes, noise_floor: float = NOISE_FLOOR,
         en = s + dt.timedelta(seconds=e["duration"])
         app = e["data"].get("app", "?")
         title = e["data"].get("title", "") or ""
-        cats = categorize(app, title, classes)
-        primary = cats[0] if cats else "uncategorized"
+        lock = is_lock_screen(app, title)
+        cats = [] if lock else categorize(app, title, classes)
+        primary = LOCK_SCREEN if lock else (cats[0] if cats else "uncategorized")
         key = f"{app} | {title}"
         if (cur is not None and cur["category"] == primary
                 and (s - cur["end"]).total_seconds() < gap_fold):
@@ -126,8 +139,12 @@ def category_rollup(events, classes, noise_floor: float = NOISE_FLOOR):
     for e in dedupe_heartbeats(events):
         if e["duration"] < noise_floor:
             continue
-        cats = categorize(e["data"].get("app", "?"), e["data"].get("title", "") or "", classes)
-        label = cats[0] if cats else "uncategorized"
+        app, title = e["data"].get("app", "?"), e["data"].get("title", "") or ""
+        if is_lock_screen(app, title):
+            label = LOCK_SCREEN
+        else:
+            cats = categorize(app, title, classes)
+            label = cats[0] if cats else "uncategorized"
         totals[label] = totals.get(label, 0) + e["duration"]
     return {k: round(v / 60, 1) for k, v in sorted(totals.items(), key=lambda kv: -kv[1])}
 
@@ -294,6 +311,11 @@ def main():
         flag = " !MULTI" if s["multi"] else ""
         top = s["top_titles"][0][0][:64] if s["top_titles"] else ""
         print(f"  {s['start']}-{s['end']}  {s['min']:>5}m  {s['category']:<14}{flag}  {top}")
+    locks = [s for s in result["spans"] if s["category"] == LOCK_SCREEN and s["min"] >= args.min_span]
+    for s in locks:
+        print(f"  {LOCK_SCREEN} {s['start'][:5]}-{s['end'][:5]} is not proof of absence: check "
+              f"`afk_blocks.py {result['date']} --window {s['start'][:5]}-{s['end'][:5]}` "
+              f"before excluding it")
     if hidden:
         print(f"  ... {hidden} sub-{args.min_span:g}min spans hidden (still counted in rollup; "
               f"use --full or --window HH:MM-HH:MM to see them)")

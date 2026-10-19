@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every event the day held and the filter removed, and why, so a calendar filtered to nothing
   no longer reads as an empty one. A meeting you attend but never formally responded to is
   kept when the machine saw it.
+- **A lock-screen window no longer reads as time away** (#77). Windows can leave `LockApp.exe`
+  as the foreground window after an unlock while you keep working. The timeline now gives it
+  its own `lock-screen` row instead of folding it into the uncategorized work either side,
+  and names the `afk_blocks.py --window` check that decides it; the reference no longer says
+  to exclude it unread.
 - **Category rules verify against ActivityWatch 0.14.** The verification query used a
   single-quoted string, which the Rust server ActivityWatch ships rejects with HTTP 400, so
   every rule write reported itself unconfirmed.

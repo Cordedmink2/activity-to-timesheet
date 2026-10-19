@@ -24,7 +24,7 @@
         "start": "09:00:00",
         "end": "17:00:00",
         "min": 480.0,
-        "category": "uncategorized",
+        "category": "lock-screen",
         "multi": false,
         "categories": [],
         "top_titles": [
@@ -36,9 +36,9 @@
       }
     ],
     "rollup_min_by_category": {
-      "uncategorized": 480.0
+      "lock-screen": 480.0
     },
     "web": null
   },
-  "timeline_text": "Window timeline for 2026-08-03 (offset UTC+12)\n  window bucket: aw-watcher-window_TESTHOST   classes loaded: 1\n  09:00:00-17:00:00  480.0m  uncategorized   unknown | \n  --- day totals by category (min) ---\n     uncategorized    480.0\n"
+  "timeline_text": "Window timeline for 2026-08-03 (offset UTC+12)\n  window bucket: aw-watcher-window_TESTHOST   classes loaded: 1\n  09:00:00-17:00:00  480.0m  lock-screen     unknown | \n  lock-screen 09:00-17:00 is not proof of absence: check `afk_blocks.py 2026-08-03 --window 09:00-17:00` before excluding it\n  --- day totals by category (min) ---\n     lock-screen      480.0\n"
 }
