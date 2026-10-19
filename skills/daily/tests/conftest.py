@@ -37,6 +37,7 @@ for p in (str(SCRIPTS), str(TESTS)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import afk_blocks                    # noqa: E402
 import harvest_client                # noqa: E402
 import skill_config                  # noqa: E402
 import timezone                      # noqa: E402
@@ -78,6 +79,9 @@ def _hermetic(monkeypatch, tmp_path):
     # Left set, a developer's own shell would leak into assertions about defaults.
     for key in SETTING_KEYS:
         monkeypatch.delenv(key, raising=False)
+    # The skeleton counts the date's captures (#34). Never the developer's own folder: a
+    # real ~/Pictures/WorkScreenshots would make every golden depend on whose machine ran it.
+    monkeypatch.setattr(afk_blocks, "screenshots_dir", lambda: tmp_path / "shots")
     # ...and then the activity source is put back, pointed nowhere. After the delenv loop,
     # necessarily: TIMESHEET_ACTIVITY_URL is one of the keys it clears.
     monkeypatch.setenv("TIMESHEET_ACTIVITY_URL", DEAD)
@@ -256,3 +260,11 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "bench" in item.keywords:
             item.add_marker(skip)
+
+
+@pytest.fixture
+def shots_dir(tmp_path):
+    """The screenshot root `_hermetic` points the skeleton at, created and returned."""
+    root = tmp_path / "shots"
+    root.mkdir(exist_ok=True)
+    return root

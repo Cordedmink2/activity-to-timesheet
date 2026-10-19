@@ -11,7 +11,8 @@
     "active_spans": [],
     "window_watcher_tail": null,
     "window_report": null,
-    "coverage_report": null
+    "coverage_report": null,
+    "captures": null
   },
   "afk_text": "No not-afk activity found for 2026-08-03.\n",
   "window_reports": {},

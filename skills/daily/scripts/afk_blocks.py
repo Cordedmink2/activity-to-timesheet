@@ -45,6 +45,10 @@ import json
 import sys
 from typing import NamedTuple
 
+import os
+import re
+
+from skill_config import setting
 from aw_client import (UsageError, dedupe_heartbeats, fetch_events, get, parse_ts,
                        pick_bucket, unreachable)
 from timezone import (CONFIGURED, local_clock, parse_range, resolve_zone_with_source,
@@ -294,6 +298,32 @@ def coverage_report(spans, active, label, proposed, zone, tunables=Tunables()):
     }
 
 
+# A capture tick writes `HH-MM-SS_m<n>.png` per monitor; older days hold one `HH-MM-SS.png`.
+_CAPTURE = re.compile(r"^(\d\d)-(\d\d)-(\d\d)(?:_m\d+)?\.png$", re.I)
+
+
+def screenshots_dir():
+    """The capture root, resolved as `screenshot_capture.py --where` resolves it — that
+    script is an entry point, so the rule is repeated rather than imported, and
+    `test_afk_blocks` holds the two equal."""
+    return os.path.expanduser(setting("TIMESHEET_SCREENSHOTS_DIR", default=os.path.join(
+        os.path.expanduser("~"), "Pictures", "WorkScreenshots")))
+
+
+def captures(date):
+    """The date's capture ticks — distinct timestamps, not files — and the last one.
+
+    A missing folder and an empty one are the same answer: no captures. Reported beside
+    the skeleton because a real workday with none means the capture task was dead before
+    the day began (#34), and only the skeleton knows whether there was a workday."""
+    try:
+        names = os.listdir(os.path.join(screenshots_dir(), date.isoformat()))
+    except OSError:
+        names = []
+    ticks = sorted({m.groups() for m in map(_CAPTURE.match, names) if m})
+    return {"count": len(ticks), "last": ":".join(ticks[-1]) if ticks else None}
+
+
 def empty_skeleton(date, afk_bucket, zone=None, source=CONFIGURED):
     """The result's one shape, with nothing in it: every key a populated day has, so
     `--json` output parses the same way whether or not the day held any activity. The
@@ -308,6 +338,7 @@ def empty_skeleton(date, afk_bucket, zone=None, source=CONFIGURED):
         "work_start": None, "work_end": None, "work_end_blip": None,
         "total_active_min": 0.0, "breaks": [], "active_spans": [],
         "window_watcher_tail": None, "window_report": None, "coverage_report": None,
+        "captures": None,
     }
 
 
@@ -392,6 +423,14 @@ def render_text(result, zone, tunables=Tunables(), focused=False):
         out.append(f"  BLIP:        work_end is a momentary flicker; last substantive activity "
                    f"ended {result['work_end_blip']['last_solid_end']} -> end the final block there")
     out.append(f"  active time: {result['total_active_min']} min total")
+    shots = result.get("captures")
+    if shots is not None:
+        if shots["count"]:
+            out.append(f"  captures:    {shots['count']} ticks, last {shots['last']} "
+                       f"(compare with work end)")
+        else:
+            out.append("  captures:    none for this date  <- capture task dead all day; "
+                       "no screenshot fallback for any block")
     tail = result["window_watcher_tail"]
     if tail:
         flag = "  <- left-in-focus trap, NOT work" if tail["gap_past_work_end_min"] > 1 else ""
@@ -499,6 +538,8 @@ def main():
         print(f"ERR {e}", file=sys.stderr)
         return 2
 
+    if result["work_start"] is not None:
+        result["captures"] = captures(local_date)
     if args.json:
         print(json.dumps(result, indent=2))
         return 0
