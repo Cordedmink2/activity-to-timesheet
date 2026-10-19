@@ -23,6 +23,5 @@ Not triage roles, and not drift either:
 - `wayfinder:map` and `wayfinder:<type>` — the wayfinding infrastructure in
   [`issue-tracker.md`](./issue-tracker.md) § "Wayfinding operations".
 
-The GitHub defaults `duplicate`, `invalid`, `question`, `good first issue` and `help wanted` are
-unused and are to be deleted (#46); one still present is a deletion not yet run, not a label to
-use. `wontfix` stays because it is a triage role above.
+The GitHub defaults `duplicate`, `invalid`, `question`, `good first issue` and `help wanted`
+were unused and have been deleted (#46). `wontfix` stays because it is a triage role above.
