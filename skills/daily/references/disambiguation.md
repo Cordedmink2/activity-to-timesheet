@@ -44,7 +44,9 @@ Climb it in order, and stop at the rung that answers.
    workspace — not to the timesheet file, not to `.context.md`. Calendar off: skip this rung.
 3. **Then screenshots**, for generic apps that don't name their client (XrmToolBox, bare VS Code,
    terminals): find the nearest `HH-MM-SS_mN.png` to the ambiguous timestamps, read the env URL /
-   workspace / repo / work item on screen. Different clients in different screenshots within one
+   workspace / repo / work item on screen. A screenshot also answers *how long* a meeting ran:
+   read a Teams call timer and subtract it from the capture time (`classification-rules.md` §3,
+   "A meeting on another monitor"). Different clients in different screenshots within one
    block → split the block, per "Interleaved days" below.
    - **When several blocks need screenshot-checking, delegate the reading to a cheap subagent**
      (e.g. `Agent` with `model: "haiku"`) rather than reading every capture in the main session —
@@ -54,7 +56,9 @@ Climb it in order, and stop at the rung that answers.
      timestamps to check (all monitors — `_m1`/`_m2`/…), the signal list from `.context.md`, the
      AFK-settled rule above, and the probe-economically procedure below (3 spread, densify around
      flips) if any block needs a switch point. It reports **raw signals per capture** (app,
-     environment URL, ticket numbers, Edge profile, workspace) — never a billing verdict;
+     environment URL, ticket numbers, Edge profile, workspace, and **any elapsed call timer on
+     screen, with the monitor it was on** — it will not volunteer a timer unless asked, because
+     a clock does not look like a client signal) — never a billing verdict;
      attribution against `.context.md` stays with the main session.
 4. **Still ambiguous → ask the user**, showing which screenshots you checked, what you saw, and
    the candidate clients.
