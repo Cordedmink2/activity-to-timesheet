@@ -3,8 +3,8 @@
 Both halves of this skill need this and neither owns it. The day-reading scripts need it to
 bound a day, to parse a `--window` and to render an instant a person will read; the provider
 scripts need it to tell whether an entry runs through a clock change that would bill it
-short. It lived in `aw_client.py` until #36, which meant `harvest_post.py` and
-`harvest_patch.py` imported the activity-source client to get at it — the one import edge
+short. It lived in `aw_client.py` until #36, which meant the Harvest write scripts (now the
+adapter's `check_post` / `check_patch`) imported the activity-source client to get at it — the one import edge
 that ran the wrong way, and one an adapter behind a boundary cannot have. Nothing about the
 functions changed in the move; only where they live.
 
@@ -146,7 +146,7 @@ def resolve_zone_with_source(flag, offers_offset_flag: bool = True) -> Resolved:
         ("\n  Or for this run only:  --utc-offset <hours>" if offers_offset_flag else "")
         # Last, after the escape hatch, because it is the cause a user cannot deduce
         # and the two lines above are the wrong advice for it. Shared with
-        # `harvest_client.load_creds()`: one absence, one cause, one wording.
+        # `provider.harvest.client.load_creds()`: one absence, one cause, one wording.
         + skill_config.note_for_an_unreached_shell())
 
 
@@ -441,9 +441,9 @@ def repeated_span(spent, zone) -> tuple[int, int] | None:
     Answered in minutes since midnight, not as the two `time`s the transition carries,
     because the callers compare it against an interval — and a caller that did its own
     conversion would be the second place the midnight-crossing case has to be got right.
-    `harvest_write.py`'s `refusal_for_a_straddled_change()` is the one that decides what to
+    `provider/harvest/guards.py`'s `refusal_for_a_straddled_change()` is the one that decides what to
     do about a straddle; this is the cheap half of the question it asks first, and
-    `harvest_patch.py` asks it directly for that reason: on a date with no repeated span it
+    the adapter's `check_patch` asks it directly for that reason: on a date with no repeated span it
     can skip reading the entry it is about to patch, which is a request over the wire.
 
     Here and not beside that refusal because the answer is the zone's: what the clocks did

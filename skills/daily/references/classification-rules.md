@@ -19,8 +19,8 @@ This file contains only the **generic heuristics** for *applying* `.context.md` 
 
 If any window title, URL, or terminal task name within the block contains a string matching the user's work-item pattern (typically `[A-Z]{2,4}\d{3,}S?` — but check `.context.md` for the exact regex if customised):
 
-1. Look up the prefix under `.context.md` § "Active client projects" — each client's signal list carries its work-item prefixes — to identify the client. A prefix that resolves to more than one client there is settled by grouping the assignment catalog on `project.code` prefix → `client.name`, not by picking the first match.
-2. Look up the same string against `project.code` in the assignment catalog (`.mcp/harvest_assignments*.json`) to get `project.id` and `task_assignments[]`.
+1. Look up the prefix under `.context.md` § "Active client projects" — each client's signal list carries its work-item prefixes — to identify the client. A prefix that resolves to more than one client there is settled by `timesheet-provider lookup <prefix> --json`, grouped by `client`, not by picking the first match.
+2. Look up the same string with `timesheet-provider lookup <code> --json` to get the `project_id` and the `tasks[]`.
 3. If the user maintains a work-item catalog file (e.g. a dump of active incidents), look up the title there for the entry note.
 4. Direct hit → HIGH confidence.
 
@@ -101,13 +101,13 @@ Resolution order:
 4. **Turn the work kind into a task name.** Three sources, in this order — the first that answers wins, and the order is the whole point of the step:
 
    a. **The work kind's row in `.context.md` § "Work kinds"**, where that table exists and the row is filled in. The user's own mapping, and the cheapest correct answer.
-   b. **Otherwise, the task in *this project's* `task_assignments[]` whose name most nearly means that work kind.** `harvest_lookup.py` returns them. Read the mapping off the account rather than guessing a name — these are the tasks that demonstrably exist.
+   b. **Otherwise, the task among the `tasks[]` `lookup` returns for *this project*, whose name most nearly means that work kind.** `lookup` returns them. Read the mapping off the account rather than guessing a name — these are the tasks that demonstrably exist.
    c. **Otherwise, `.context.md`'s default task** for client work, or for `Internal admin` its default task for internal/admin time.
 
    **(b) sits before (c) deliberately, and getting that backwards is the failure this step exists to stop.** An install predating the "Work kinds" table has a default task and no rows — both (a) and (c) are "unanswered" and "answered" at once. Taking the default there would collapse `Meeting`, `Documentation`, `Testing` and `Project management` all onto the development task, which is worse than what the rules did before the table existed. (c) is the catch-all for when (b) finds nothing near, not a shortcut past it.
 
    If two tasks are equally near under (b) and none is obviously right, flag the block 🔸 and ask.
-5. **Whatever the source, the task has to be in this project's `task_assignments[]`** — that list is the authority on what the project offers. A task `.context.md` names but this project doesn't have falls back to (b) against what it does have; say in the presentation that you substituted. **Don't invent tasks** — a name that isn't in `task_assignments[]` doesn't exist as far as the provider is concerned, and posting it fails.
+5. **Whatever the source, the task has to be among the `tasks[]` `lookup` returns for this project** — that list is the authority on what the project offers. A task `.context.md` names but this project doesn't have falls back to (b) against what it does have; say in the presentation that you substituted. **Don't invent tasks** — a name that isn't in that list doesn't exist as far as the provider is concerned, and posting it fails.
 6. **A mapping you had to work out is a fact `.context.md` is missing.** Propose the row at Step 11, so the next run reads it rather than re-deriving it. (b) is how the skill works on day one; the table is how it stops costing anything.
 
 ## Billing conventions (defaults — `.context.md` overrides win)
@@ -129,7 +129,7 @@ Notes go to clients on invoices — `SKILL.md` carries the hard rule (client-rea
 **Sourcing a work-item number: delegate the dig to a subagent.** A window title rarely names the exact US/Bug number, but `git log` in the client's repos at the block's timestamps often does, and a subagent can search several repos and a project wiki in parallel without spending the main session's context on file listings and commit dumps. Give it: the repo paths, the local-time windows in question, and what each window's window-titles/screenshots showed (so it knows what to corroborate). Tell it explicitly not to invent a number — a wrong ADO number on a client invoice is worse than a generic description — and to report its evidence (commit hash + message, or wiki doc title) alongside each finding so you can judge confidence yourself rather than trust its say-so.
 - A subagent finding a file open in a workspace doesn't confirm it's that client's file — have it check the file's actual repo history, not just the window title, before citing anything from it.
 
-**Billable status comes from the task assignment, not the task name.** `task_assignments[N].billable` in the assignment catalog is authoritative. A `(NB)`-style suffix is a naming convention hint — some non-billable tasks (e.g. everything under an internal admin project) don't carry one. When the work kind is `Internal admin`, pick a task whose `billable` is `false` in the catalog.
+**Billable status comes from the task's `billable` flag, not the task name.** The `billable` `lookup` returns for a task is authoritative (text: `(billable)` / `(NON-billable)`). A `(NB)`-style suffix is a naming convention hint — some non-billable tasks (e.g. everything under an internal admin project) don't carry one. When the work kind is `Internal admin`, pick a task `lookup` lists as NON-billable.
 
 ## Confidence rating
 

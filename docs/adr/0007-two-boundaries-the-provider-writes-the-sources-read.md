@@ -56,7 +56,7 @@ it puts a secret on the side of the line where a leak buys an attacker nothing t
 
 **The confirmation gate belongs at the write boundary, in the invocation.** Every script that writes
 to the provider requires `--confirm` and prints a preview without it. The gate is implemented once,
-in `skills/daily/scripts/harvest_write.py`, and both writers declare their bodies to it. No read
+in the provider dispatcher (`skills/daily/scripts/provider/dispatcher.py`, #35; `docs/provider-contract.md` § 2), and an adapter never sees an unconfirmed write and carries no gate of its own. No read
 script carries a gate, because nothing a read does needs undoing.
 
 **A read boundary fails loudly and cheaply.** An unreachable source or an adapter that cannot read

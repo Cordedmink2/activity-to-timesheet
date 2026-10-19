@@ -1,5 +1,5 @@
-"""Edge cases in the catalog write path (`refresh_catalogs`) and the read path
-(`harvest_lookup`).
+"""Edge cases in the Harvest adapter's catalog write path (`refresh`) and read path
+(`lookup`), driven through the dispatcher or at the adapter's own functions.
 
 The two tests at the top guard promises the source makes in comments and nothing
 else checks: a refresh fetches every page before it deletes anything, and it clears
@@ -15,9 +15,11 @@ from pathlib import Path
 
 import pytest
 
-import harvest_lookup as hl
 import refresh_catalogs as rc
 import skill_config
+from provider import dispatcher as tp
+from provider.errors import NoMatch, Refused
+from provider.harvest import catalog
 from support import assignments_page, paged_assignments, project, run_cli, write_catalog
 
 
@@ -31,7 +33,7 @@ def _write(directory: Path, name: str, text: str):
 
 
 # --------------------------------------------------------------------------------------
-# refresh_harvest(): the two invariants the comments promise
+# refresh: the two invariants the comments promise
 # --------------------------------------------------------------------------------------
 
 def test_a_failure_on_page_two_leaves_every_existing_catalog_file_byte_for_byte_intact(workspace, live_harvest):
@@ -52,10 +54,11 @@ def test_a_failure_on_page_two_leaves_every_existing_catalog_file_byte_for_byte_
 
     live_harvest(paged_assignments([assignments_page(1, 2, [project(9, "NEW-9")]),
                          assignments_page(2, 2, [project(10, "NEW-10")])], fail_on=2))
-    r = run_cli(rc, ["--harvest-only"])
+    r = run_cli(tp, ["refresh"])
 
-    assert r.code != 0
-    assert "existing catalog left untouched" in (r.err + r.out)
+    assert r.code == 4, "an answer of any status is a refusal, and the reason is on stderr"
+    assert "existing catalog left untouched" in r.err
+    assert r.out == ""
     # Contents *and* the filename set: a half-written page would slip past a
     # contents-only check on the seeded files.
     assert _snapshot(mcp) == before
@@ -74,13 +77,13 @@ def test_a_refresh_returning_fewer_pages_deletes_the_leftover_page_files(workspa
     })
 
     live_harvest(paged_assignments([assignments_page(1, 1, [project(9, "NEW-9")])]))
-    r = run_cli(rc, ["--harvest-only"])
+    r = run_cli(tp, ["refresh"])
 
-    assert r.code == 0
+    assert r.code == 0 and r.out == "OK 1 projects\n"
     assert sorted(p.name for p in mcp.iterdir()) == ["harvest_assignments.json"]
     kept = json.loads((mcp / "harvest_assignments.json").read_text(encoding="utf-8"))
     assert [pa["project"]["code"] for pa in kept["project_assignments"]] == ["NEW-9"]
-    assert [pa["project"]["code"] for pa in hl.iter_assignments(str(mcp))] == ["NEW-9"]
+    assert [pa["project"]["code"] for pa in catalog._assignments(mcp)] == ["NEW-9"]
 
 
 def test_page_one_is_unsuffixed_and_later_pages_each_hold_their_own_payload(workspace, live_harvest):
@@ -94,9 +97,10 @@ def test_page_one_is_unsuffixed_and_later_pages_each_hold_their_own_payload(work
              assignments_page(3, 3, [project(4, "P3-A")])]
 
     live_harvest(paged_assignments(pages))
-    r = run_cli(rc, ["--harvest-only"])
+    r = run_cli(tp, ["refresh"])
 
-    assert r.code == 0
+    assert r.code == 0 and r.out == "OK 4 projects\n"
+    assert "page 3" in r.err, "per-page progress is stderr, never stdout"
     names = ["harvest_assignments.json", "harvest_assignments_p2.json",
              "harvest_assignments_p3.json"]
     assert sorted(p.name for p in mcp.iterdir()) == sorted(names)
@@ -114,11 +118,30 @@ def test_the_dataverse_refresh_reports_a_skip_when_the_org_is_not_configured(wor
     assert "Skipping Dataverse refresh" in r.out
 
 
+def test_refresh_catalogs_no_longer_touches_the_provider(workspace):
+    """The provider's catalog is `timesheet-provider refresh`; the two flags the contract
+    retires do not exist on this script, and it asks for no provider credential."""
+    assert run_cli(rc, ["--harvest-only"]).code == 2
+    assert run_cli(rc, []).code == 2
+
+
+def test_a_catalog_that_comes_back_empty_is_a_failure_not_an_empty_catalog(workspace, live_harvest):
+    """Written empty it would make every later lookup fall through to the live fallback
+    unannounced (contract section 3.5). The existing catalog is left as it was."""
+    mcp = workspace / ".mcp"
+    write_catalog(mcp, {"harvest_assignments.json": assignments_page(1, 1, [project(1, "OLD-1")])})
+    before = _snapshot(mcp)
+    live_harvest(paged_assignments([assignments_page(1, 1, [])]))
+    r = run_cli(tp, ["refresh"])
+    assert r.code == 4 and "existing catalog left untouched" in r.err
+    assert _snapshot(mcp) == before
+
+
 # --------------------------------------------------------------------------------------
-# wait_for_project(): the pre-billing poll for an eventually-consistent row
+# refresh --wait: the pre-billing poll for an eventually-consistent row
 # --------------------------------------------------------------------------------------
 
-def test_wait_for_project_returns_the_assignment_from_whichever_page_holds_the_code(workspace, live_harvest, monkeypatch):
+def test_wait_finds_the_code_on_whichever_page_holds_it_and_writes_what_it_found(workspace, live_harvest, monkeypatch):
     """This is what a user runs before billing a freshly-created project. If it only
     looked at page one, anyone with more than a hundred assignments would be told their
     new project does not exist yet and would wait out the whole poll for nothing.
@@ -128,28 +151,63 @@ def test_wait_for_project_returns_the_assignment_from_whichever_page_holds_the_c
     live_harvest(paged_assignments([assignments_page(1, 2, [project(1, "OTHER-1")]),
                          assignments_page(2, 2, [project(2, "ACM-CR900", "Brand new case")])]))
 
-    pa = rc.wait_for_project("ACM-CR900", attempts=3, delay=15)
+    r = run_cli(tp, ["refresh", "--wait", "ACM-CR900", "--attempts", "3", "--delay", "15"])
 
-    assert pa is not None, "the project on page 2 was never found"
-    assert pa["project"]["id"] == 2
-    assert pa["project"]["name"] == "Brand new case"
+    assert r.code == 0 and r.out == "OK ACM-CR900\n"
     assert slept == []          # found on the first attempt, so it never waits
+    written = [pa["project"]["code"] for pa in catalog._assignments(workspace / ".mcp")]
+    assert written == ["OTHER-1", "ACM-CR900"], "it writes the catalog it found"
 
 
-def test_wait_for_project_returns_none_once_its_attempts_are_exhausted(workspace, live_harvest, monkeypatch):
-    """A code that never appears has to come back as None so the caller can say "not
-    visible yet". Looping forever, or raising, strands the user mid-timesheet.
-    """
+def test_wait_that_never_appears_is_exit_6_and_leaves_the_catalog(workspace, live_harvest, monkeypatch):
+    """A code that never appears has to come back as a *no match* so the caller can say "not
+    visible yet" - not as success, and not as a hang."""
     slept = []
     monkeypatch.setattr(time, "sleep", slept.append)
+    mcp = workspace / ".mcp"
+    write_catalog(mcp, {"harvest_assignments.json": assignments_page(1, 1, [project(1, "OLD-1")])})
+    before = _snapshot(mcp)
     live_harvest(paged_assignments([assignments_page(1, 1, [project(1, "OTHER-1")])]))
 
-    assert rc.wait_for_project("NEVER-1", attempts=3, delay=15) is None
+    r = run_cli(tp, ["refresh", "--wait", "NEVER-1", "--attempts", "3", "--delay", "15"])
+
+    assert r.code == 6
+    assert r.err.startswith("ERR NEVER-1 did not appear after 3 attempts")
     assert slept == [15, 15]    # waits between attempts, not after the last one
+    assert _snapshot(mcp) == before
+
+
+def test_wait_never_posts_anything(workspace, live_harvest, monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    srv = live_harvest(paged_assignments([assignments_page(1, 1, [project(1, "ACM-1")])]))
+    run_cli(tp, ["refresh", "--wait", "ACM-1"])
+    assert [r["method"] for r in srv.requests] == ["GET"]
+
+
+def test_age_is_whole_days_rounded_down_and_needs_no_credential(workspace):
+    """`--age` is how a caller decides whether to refresh without reading the adapter's
+    storage; the hermetic fixture blanks every credential, so success is the proof."""
+    mcp = workspace / ".mcp"
+    assert run_cli(tp, ["refresh", "--age"]).out == "ABSENT\n"
+    write_catalog(mcp, {"harvest_assignments.json": assignments_page(1, 1, [project(1, "A-1")])})
+    old = time.time() - 8.9 * 86400
+    os.utime(mcp / "harvest_assignments.json", (old, old))
+    r = run_cli(tp, ["refresh", "--age"])
+    assert r.code == 0 and r.out == "AGE 8\n"
+
+
+def test_age_is_the_newest_page_not_the_oldest(workspace):
+    """A refresh rewrites every page together, so the catalog is as fresh as its newest."""
+    mcp = workspace / ".mcp"
+    write_catalog(mcp, {"harvest_assignments.json": assignments_page(1, 2, [project(1, "A-1")]),
+                        "harvest_assignments_p2.json": assignments_page(2, 2, [project(2, "B-2")])})
+    old = time.time() - 40 * 86400
+    os.utime(mcp / "harvest_assignments.json", (old, old))
+    assert run_cli(tp, ["refresh", "--age"]).out == "AGE 0\n"
 
 
 # --------------------------------------------------------------------------------------
-# harvest_lookup.iter_assignments(): reading a catalog someone else wrote
+# the adapter's catalog reader: reading a catalog someone else wrote
 # --------------------------------------------------------------------------------------
 
 def test_a_page_of_unparseable_json_is_skipped_instead_of_aborting_the_whole_lookup(tmp_path):
@@ -161,7 +219,7 @@ def test_a_page_of_unparseable_json_is_skipped_instead_of_aborting_the_whole_loo
     write_catalog(tmp_path, {"harvest_assignments_p2.json":
                             assignments_page(2, 2, [project(2, "GOOD-2", "Survivor")])})
 
-    rows = list(hl.iter_assignments(str(tmp_path)))
+    rows = list(catalog._assignments(tmp_path))
 
     assert [pa["project"]["code"] for pa in rows] == ["GOOD-2"]
 
@@ -174,7 +232,7 @@ def test_a_page_stored_as_a_bare_json_list_is_read_like_a_wrapped_one(tmp_path):
     write_catalog(tmp_path, {"harvest_assignments.json":
                             [project(1, "BARE-1", "Written as a list")]})
 
-    rows = list(hl.iter_assignments(str(tmp_path)))
+    rows = list(catalog._assignments(tmp_path))
 
     assert [pa["project"]["code"] for pa in rows] == ["BARE-1"]
 
@@ -186,7 +244,7 @@ def test_a_page_keyed_on_assignments_is_read_like_one_keyed_on_project_assignmen
     write_catalog(tmp_path, {"harvest_assignments.json":
                             {"assignments": [project(1, "ALT-1", "Short key")]}})
 
-    rows = list(hl.iter_assignments(str(tmp_path)))
+    rows = list(catalog._assignments(tmp_path))
 
     assert [pa["project"]["code"] for pa in rows] == ["ALT-1"]
 
@@ -205,7 +263,7 @@ def test_a_project_appearing_on_several_pages_is_yielded_once_from_the_first_pag
             project(37122824, "NWC-001", "Admin")]),
     })
 
-    rows = list(hl.iter_assignments(str(tmp_path)))
+    rows = list(catalog._assignments(tmp_path))
 
     assert [pa["project"]["id"] for pa in rows] == [48084036, 37122824]
     dupe = rows[0]
@@ -214,7 +272,7 @@ def test_a_project_appearing_on_several_pages_is_yielded_once_from_the_first_pag
 
 
 # --------------------------------------------------------------------------------------
-# harvest_lookup.lookup(): choosing between the matches
+# lookup: choosing between the matches
 # --------------------------------------------------------------------------------------
 
 def test_an_exact_code_match_sorts_ahead_of_the_substring_matches(tmp_path):
@@ -231,7 +289,7 @@ def test_an_exact_code_match_sorts_ahead_of_the_substring_matches(tmp_path):
         project(4, "ZZZ-9", "Nothing to do with the query"),
     ])})
 
-    matches = hl.lookup("CON", str(tmp_path))
+    matches = catalog.from_catalog("CON", tmp_path, None)
 
     assert [m["code"] for m in matches] == ["CON", "ACON-1", "CON-2"]
 
@@ -246,7 +304,7 @@ def test_the_task_filter_is_a_case_insensitive_substring_of_the_task_name(tmp_pa
             {"billable": True, "task": {"id": 10, "name": "Gen - Development/Configuration"}},
             {"billable": False, "task": {"id": 11, "name": "Meeting - Standup Meetings"}}])])})
 
-    matches = hl.lookup("CON-1", str(tmp_path), task_filter="development")
+    matches = catalog.from_catalog("CON-1", tmp_path, "development")
 
     assert [t["id"] for t in matches[0]["tasks"]] == [10]
 
@@ -262,7 +320,7 @@ def test_billable_comes_from_the_task_assignments_own_flag_not_from_the_task_nam
             {"billable": True, "task": {"id": 10, "name": "Gen - Development (NB)"}},
             {"billable": False, "task": {"id": 11, "name": "Billable Development"}}])])})
 
-    tasks = {t["id"]: t["billable"] for t in hl.lookup("CON-1", str(tmp_path))[0]["tasks"]}
+    tasks = {t["id"]: t["billable"] for t in catalog.from_catalog("CON-1", tmp_path, None)[0]["tasks"]}
 
     assert tasks == {10: True, 11: False}
 
@@ -275,7 +333,7 @@ def test_a_project_with_no_task_assignments_returns_an_empty_task_list(tmp_path)
     write_catalog(tmp_path, {"harvest_assignments.json": assignments_page(1, 1, [
         {"project": {"id": 1, "code": "BARE-1", "name": "No tasks yet"}}])})
 
-    matches = hl.lookup("BARE-1", str(tmp_path))
+    matches = catalog.from_catalog("BARE-1", tmp_path, None)
 
     assert len(matches) == 1
     assert matches[0]["project_id"] == 1
@@ -283,25 +341,35 @@ def test_a_project_with_no_task_assignments_returns_an_empty_task_list(tmp_path)
 
 
 # --------------------------------------------------------------------------------------
-# harvest_lookup.find_catalog_dir(): where to read when nothing is configured
+# catalog_dir(): where to read when nothing is configured
 # --------------------------------------------------------------------------------------
 
-def test_find_catalog_dir_falls_back_to_a_dot_mcp_under_the_current_directory(tmp_path, monkeypatch):
-    """With no workspace configured, a missing catalog is not fatal for the reader: it
-    names the directory it looked in and recovers via the live time-entries API. Raising
-    or returning None instead turns "no catalog here" into a traceback.
+def test_with_no_workspace_a_lookup_says_so_and_still_asks_the_provider(tmp_path, monkeypatch, live_harvest):
+    """With no workspace configured the catalog cannot be found, which is not fatal while the
+    history fallback can answer (contract section 3.3): it says so on stderr and recovers.
+    Failing instead would turn "no catalog here" into a dead end.
     """
-    # SKILL_ROOT must be repointed too, not just the cwd. find_workspace() also walks the
+    # SKILL_ROOT must be repointed too, not just the cwd: `find_workspace()` also walks the
     # directories the skill is installed under, so this test's result depended on where the
-    # checkout happened to sit: it passed from `~/.claude/skills/`, and failed from the
-    # public checkout at `~/Admin/activity-to-timesheet/`, because `~/Admin` is a real
-    # workspace and the walk resolved to it. Caught by the release mirror, not by this suite.
-    # docs/skills/daily/decision-log.md § "A test's result depended on where the checkout sat" has the entry.
+    # checkout happened to sit. docs/skills/daily/decision-log.md has the entry.
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(skill_config, "SKILL_ROOT", tmp_path / "skills" / "daily")
     assert skill_config.find_workspace() is None, "the fallback branch is only reachable unresolved"
+    live_harvest({
+        ("GET", "/users/me"): (200, {"id": 1}),
+        ("GET", "/time_entries"): (200, {"time_entries": [{
+            "project": {"id": 5, "code": "ARCH-1", "name": "Archived"},
+            "task": {"id": 6, "name": "Dev"}, "billable": True}], "next_page": None}),
+    })
 
-    got = hl.find_catalog_dir(None)
+    r = run_cli(tp, ["lookup", "ARCH-1", "--json"])
 
-    assert os.path.basename(got) == ".mcp"
-    assert os.path.samefile(os.path.dirname(got), str(tmp_path))
+    assert r.code == 0 and r.json()[0]["source"] == "history"
+    assert "WARN no workspace" in r.err
+
+
+def test_a_catalog_dir_that_does_not_exist_is_said_and_not_fatal(tmp_path, live_harvest):
+    live_harvest({("GET", "/users/me"): (200, {"id": 1}),
+                  ("GET", "/time_entries"): (200, {"time_entries": [], "next_page": None})})
+    r = run_cli(tp, ["lookup", "NOPE", "--catalog-dir", str(tmp_path / "absent")])
+    assert r.code == 6 and "WARN no catalog in" in r.err

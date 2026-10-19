@@ -21,7 +21,8 @@ import pytest
 
 import activity_timeline as tl
 import afk_blocks as ab
-import harvest_post as hpost
+from provider import dispatcher as tp
+from support import create_args
 from scenarios import SCENARIOS, BY_NAME
 from support import day, run_cli, with_heartbeats
 
@@ -301,7 +302,7 @@ def test_web_rows_in_the_repeated_hour_keep_the_order_they_happened_in(live_aw):
 
 
 # --------------------------------------------------------------------------------------
-# The write side of the same morning. `harvest_post` reads no ActivityWatch, so these take
+# The write side of the same morning. `post` reads no ActivityWatch, so these take
 # the fall-back scenario for its date and zone only — the point is that the script that
 # *bills* the repeated hour answers for the same day the scripts that *read* it do.
 # --------------------------------------------------------------------------------------
@@ -342,7 +343,7 @@ REFUSAL = (
 def create(monkeypatch, zone, date, start, end, *extra):
     """A create against a configured zone, run in-process. The ids are the fixtures' own."""
     monkeypatch.setenv("TIMESHEET_TIMEZONE", zone)
-    return run_cli(hpost, ["48084036", "20753151", date, start, end, "Cutover", *extra])
+    return run_cli(tp, create_args(date=date, start=start, end=end, notes="Cutover") + list(extra))
 
 
 def fall_back_day():
@@ -432,8 +433,8 @@ def test_a_date_with_no_transition_posts_exactly_what_it_always_did(monkeypatch)
 
     assert r.code == 0 and r.err == ""
     assert r.lines[0] == (
-        'WOULD POST {"project_id": 48084036, "task_id": 20753151, '
-        '"spent_date": "2026-08-12", "started_time": "01:30", "ended_time": "04:15", '
+        'WOULD POST {"project_id": "48084036", "task_id": "20753151", '
+        '"date": "2026-08-12", "start": "01:30", "end": "04:15", '
         '"notes": "Cutover"}')
 
 

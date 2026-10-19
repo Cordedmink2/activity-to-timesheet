@@ -2,12 +2,12 @@
 
 Three rules, and each one had been broken by a script that read perfectly well on its own:
 
-1. **A provider script never imports the activity-source client.** `harvest_post.py` and
-   `harvest_patch.py` imported `aw_client` for timezone arithmetic — the one import edge
+1. **A provider script never imports the activity-source client.** the Harvest write scripts (now the adapter, `scripts/provider/harvest/`)
+   imported `aw_client` for timezone arithmetic — the one import edge
    that ran the wrong way, since an adapter that reaches into the activity source is not
    behind a boundary at all. ADR-0006 records it; #36 removed it.
-2. **Nothing imports an entry point.** `harvest_patch.py` imported `harvest_post.py` for a
-   message and a helper, which is the shape `harvest_write.py` exists to make unnecessary:
+2. **Nothing imports an entry point.** One write script imported another for a
+   message and a helper, which is the shape a shared module exists to make unnecessary:
    "not a script … everything a write has in common happens here, once". A module that
    imports a script imports its command line, its usage text and whatever else it grows.
 3. **The shared ground stays neutral.** `timezone.py` is imported by both halves, so an
@@ -32,9 +32,11 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 SHARED_ZONE = "timezone"
 SEAM = "skill_config"
 
-# What the provider half is: the scripts that talk to the timesheet provider. A prefix
-# rather than a list, so a fourth `harvest_*.py` is held to the same rule the day it lands.
-PROVIDER_PREFIX = "harvest_"
+# What the provider half is: everything under `scripts/provider/` - the dispatcher, the
+# config helper and every adapter. Derived from the directory, so an adapter added tomorrow is
+# held to the same rule the day it lands. It is never empty: the guard below asserts that,
+# because a parametrisation over nothing passes.
+PROVIDER_DIR = SCRIPTS / "provider"
 ACTIVITY_CLIENT = "aw_client"
 
 
@@ -61,7 +63,7 @@ def imports(path: Path) -> set[str]:
 def names_used(path: Path) -> set[str]:
     """Every identifier `path` actually uses — read as code, not as text.
 
-    A cross-reference in a docstring is not a use: `harvest_client.py` mentions
+    A cross-reference in a docstring is not a use: the adapter's client mentions
     `resolve_zone()` in prose to say which absence it shares its wording with, and a text
     search cannot tell that from a call. Both spellings of a use count, the bare
     `resolve_zone(...)` and the qualified `timezone.resolve_zone(...)`.
@@ -80,8 +82,7 @@ def names_used(path: Path) -> set[str]:
 def entry_points() -> set[str]:
     """Every bundled module that is a script — one with a `__main__` guard to run.
 
-    Derived from the guard rather than from a list of names: `harvest_write.py` and
-    `timezone.py` are modules that happen to sit in `scripts/`, and the distinction that
+    Derived from the guard rather than from a list of names: `timezone.py` and `skill_config.py` are modules that happen to sit in `scripts/`, and the distinction that
     matters is whether a thing is invoked or imported, which the guard is exactly.
 
     Read as code for the same reason `names_used()` is: `"__main__" in text` would classify
@@ -94,10 +95,17 @@ def entry_points() -> set[str]:
 
 
 def provider_scripts() -> list[Path]:
-    return [p for p in bundled_scripts() if p.stem.startswith(PROVIDER_PREFIX)]
+    return sorted(p for p in PROVIDER_DIR.rglob("*.py") if "__pycache__" not in p.parts)
 
 
-@pytest.mark.parametrize("path", provider_scripts(), ids=lambda p: p.stem)
+def test_the_provider_population_this_file_guards_is_not_empty():
+    """The guard below is parametrised over this list; over an empty one it passes."""
+    names = {p.name for p in provider_scripts()}
+    assert {"dispatcher.py", "provider_config.py", "client.py", "entries.py",
+            "catalog.py", "guards.py"} <= names, sorted(names)
+
+
+@pytest.mark.parametrize("path", provider_scripts(), ids=lambda p: p.relative_to(PROVIDER_DIR).as_posix())
 def test_no_provider_module_imports_the_activity_source_client(path):
     """The edge #36 removed. Both halves need the zone arithmetic; neither owns it."""
     assert ACTIVITY_CLIENT not in imports(path), (
@@ -111,7 +119,7 @@ def test_no_provider_module_imports_the_activity_source_client(path):
 def test_no_bundled_module_imports_an_entry_point(path):
     """Shared logic lives in a module that is not a command.
 
-    `harvest_write.py` was created for exactly this and says so in its first line. A
+    The shared modules exist for exactly this. A
     script imported for one function brings its argument parsing and its usage string
     along, and the next thing that is shared lands in whichever of the two happens to
     already import the other.
@@ -120,7 +128,7 @@ def test_no_bundled_module_imports_an_entry_point(path):
     assert not reached, (
         f"{path.name} imports {', '.join(sorted(reached))} — a script, for something the "
         f"two have in common. Move what is shared into a module with no command line: "
-        f"`harvest_write.py` for the write path, `{SHARED_ZONE}.py` for zone arithmetic.")
+        f"the provider package for the write path, `{SHARED_ZONE}.py` for zone arithmetic.")
 
 
 def test_the_shared_zone_module_imports_neither_half():

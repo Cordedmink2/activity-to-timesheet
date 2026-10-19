@@ -63,6 +63,6 @@ drafting:
 - **"It didn't know this client / signal / convention"** — a `.context.md` fact.
 - **"A title came back `uncategorized`"** — an ActivityWatch category rule on this machine;
   `references/first-run.md` § categories.
-- **"`harvest_lookup.py` can't find the project"** — usually a project that doesn't exist
+- **"`lookup` finds no project (exit 6)"** — usually a project that doesn't exist
   yet; `references/new-client-work.md`. A miss *after* the live-entry fallback is not a
   lookup bug.

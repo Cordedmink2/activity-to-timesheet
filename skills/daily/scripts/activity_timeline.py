@@ -212,9 +212,9 @@ def timeline(win_events, web_events, classes, date, zone, win_bucket=None, windo
 
 
 def main():
-    # Not `harvest_client.use_utf8()`: that also sets PYTHONIOENCODING for child
-    # processes, and this script spawns none — reaching for it would pull the Harvest
-    # client, its base URL and its credential machinery into a script that never bills.
+    # Only the streams are reconfigured: PYTHONIOENCODING is for child processes, and this
+    # script spawns none — reaching for the provider's console setup would pull the
+    # provider's machinery into a script that never bills.
     # In `main()` rather than at module scope because an import must have no side effect
     # (issue #21); a captured or redirected stream is not a TextIOWrapper and is skipped.
     for stream in (sys.stdout, sys.stderr):

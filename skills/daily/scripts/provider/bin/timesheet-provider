@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""timesheet-provider <post|patch|lookup|list|refresh> [arguments]
+
+The provider contract's one command (docs/provider-contract.md). It is a path today
+(`python "<daily>/scripts/provider/bin/timesheet-provider" ...`) and a bare command name
+after a plugin split; nothing about its arguments, output or exit codes changes then.
+"""
+import sys
+from pathlib import Path
+
+# scripts/provider/bin/timesheet-provider -> scripts/
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from provider import dispatcher  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(dispatcher.main())

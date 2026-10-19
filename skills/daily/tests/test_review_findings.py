@@ -22,10 +22,11 @@ import pytest
 import activity_timeline as tl
 import afk_blocks as ab
 import aw_client
-import harvest_client
-import harvest_lookup as hl
 import refresh_catalogs as rc
 import skill_config
+from provider import dispatcher as tp
+from provider.errors import Refused
+from provider.harvest import catalog
 from support import aw_server, day, run_cli
 
 
@@ -54,20 +55,14 @@ def test_timeline_errors_when_the_window_bucket_is_missing(monkeypatch):
 # 2. Every script must import under a captured stdout
 # --------------------------------------------------------------------------------------
 
-def test_the_encoding_fix_survives_a_stdout_that_cannot_be_reconfigured(monkeypatch):
-    """A captured or redirected stream — a test harness, a wrapper, `pythonw.exe` — is not
-    a `TextIOWrapper` and has no `reconfigure`. A bare call died there with an
-    AttributeError naming neither the script nor the cause.
-
-    This used to import `refresh_catalogs` under a swapped stream, because the call sat at
-    that module's import scope. It does not any more; `use_utf8()` is called from `main()`
-    and is the only copy, so the guard is asserted on the function itself. Doing it that
-    way also stops this test from being the thing that decides whether the module is in
-    `sys.modules` for whatever runs next.
-    """
+def test_the_encoding_fix_survives_a_stdout_that_cannot_be_reconfigured(monkeypatch, tmp_path):
+    """A captured or redirected stream - a test harness, a wrapper, `pythonw.exe` - is not a
+    `TextIOWrapper` and has no `reconfigure`. A bare call died there with an AttributeError
+    naming neither the script nor the cause. The dispatcher's `main()` is where it lives."""
     monkeypatch.setattr(sys, "stdout", io.StringIO())
     monkeypatch.setattr(sys, "stderr", io.StringIO())
-    harvest_client.use_utf8()          # must not raise
+    monkeypatch.setattr(sys, "argv", ["timesheet-provider", "--help"])
+    assert tp.main() == 0          # must not raise
 
 
 # --------------------------------------------------------------------------------------
@@ -150,7 +145,7 @@ def test_workspace_is_found_when_the_skill_is_installed_under_dot_claude(tmp_pat
     `<workspace>/skills/<name>` and one level short of `<workspace>/.claude/skills/<name>`
     — the layout Claude Code actually installs into.
 
-    So on a stock install with `TIMESHEET_WORKSPACE` unset, `refresh_catalogs.py` refused
+    So on a stock install with `TIMESHEET_WORKSPACE` unset, `timesheet-provider refresh` refused
     to run against a perfectly valid workspace, while `.env.example` promised auto-detect
     would find it.
     """
@@ -180,18 +175,15 @@ def test_workspace_detection_still_refuses_to_guess(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------------------
 
 def test_a_null_project_on_a_pending_assignment_does_not_crash_the_poll(workspace, live_harvest):
-    """`pa.get("project", {})` returns None — not {} — when the key is present and null,
-    so `.get("code")` raised. `wait_for_project` is the pre-billing poll for a
-    brand-new project, which is exactly when Harvest is likeliest to serve a
-    half-populated row. Every other project access in the skill uses the `or {}` idiom.
-    """
+    """`pa.get("project", {})` returns None - not {} - when the key is present and null,
+    so `.get("code")` raised. `refresh --wait` is the pre-billing poll for a brand-new
+    project, which is exactly when Harvest is likeliest to serve a half-populated row."""
     live_harvest({("GET", "/users/me/project_assignments"): (200, {
         "project_assignments": [{"project": None, "task_assignments": []},
                                 {"project": {"id": 7, "code": "NEW-1"}, "task_assignments": []}],
         "next_page": None})})
-    pa = rc.wait_for_project("NEW-1", attempts=1)
-    assert pa is not None, "the null-project row swallowed the real one behind it"
-    assert pa["project"]["code"] == "NEW-1"
+    r = run_cli(tp, ["refresh", "--wait", "NEW-1", "--attempts", "1"])
+    assert r.code == 0 and r.out == "OK NEW-1\n", "the null-project row swallowed the real one behind it"
 
 
 def test_a_failed_first_write_does_not_destroy_the_existing_catalog(workspace, live_harvest, monkeypatch):
@@ -207,7 +199,8 @@ def test_a_failed_first_write_does_not_destroy_the_existing_catalog(workspace, l
     before = existing.read_text(encoding="utf-8")
 
     live_harvest({("GET", "/users/me/project_assignments"):
-                  (200, {"project_assignments": [], "next_page": None})})
+                  (200, {"project_assignments": [{"project": {"id": 9, "code": "NEW"}}],
+                         "next_page": None})})
 
     real_open = open
 
@@ -217,8 +210,8 @@ def test_a_failed_first_write_does_not_destroy_the_existing_catalog(workspace, l
         return real_open(path, mode, *a, **kw)
 
     monkeypatch.setattr("builtins.open", exploding_open)
-    with pytest.raises((OSError, SystemExit)):
-        rc.refresh_harvest()
+    with pytest.raises(OSError):
+        catalog.refresh()
     monkeypatch.undo()
 
     assert existing.exists(), "the old catalog was deleted with nothing to replace it"
@@ -252,7 +245,7 @@ def test_an_unreadable_pac_profile_list_warns_instead_of_silently_switching(work
 # --------------------------------------------------------------------------------------
 
 def test_the_time_entries_fallback_asks_only_for_this_users_entries(live_harvest):
-    """The fallback queried `/time_entries` with no `user_id`, unlike `harvest_list.py`
+    """The fallback queried `/time_entries` with no `user_id`, unlike `list`,
     which always scopes by it. On a member PAT the results coincide; on an admin-scope
     token it paginates the whole company and can surface a project/task pair the user has
     no assignment to — which then fails, or mis-bills, at post time.
@@ -264,7 +257,7 @@ def test_the_time_entries_fallback_asks_only_for_this_users_entries(live_harvest
             "task": {"id": 222, "name": "Gen - Development/Configuration"},
             "billable": True}], "next_page": None}),
     })
-    matches = hl.lookup_from_entries("ARCH-9")
+    matches = catalog.from_history("ARCH-9", 180, None)
     assert matches[0]["project_id"] == 111
     queries = [r["query"] for r in srv.sent("GET", "/time_entries")]
     assert queries and all(q.get("user_id") == "4242" for q in queries), (

@@ -577,7 +577,7 @@ def event_detail(payload, event_id: str, local_date: dt.date) -> dict:
 def main():
     # The script's own streams only: it spawns an adapter, but reads that as UTF-8 by
     # contract rather than by setting the child's `PYTHONIOENCODING`, so there is no
-    # reason to reach for `harvest_client.use_utf8()` from a script that never bills. In
+    # reason to reach for the provider's console setup from a script that never bills. In
     # `main()` rather than at module scope because an import must have no side effect
     # (issue #21); a captured or redirected stream is not a TextIOWrapper and is skipped.
     for stream in (sys.stdout, sys.stderr):

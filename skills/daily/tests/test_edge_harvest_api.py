@@ -1,4 +1,4 @@
-"""Edge cases of the three Harvest CLIs and the client they share.
+"""Edge cases of the Harvest adapter, driven through the `timesheet-provider` dispatcher.
 
 Everything here asserts on what actually went over the wire — the recorded request body,
 the query string, the headers — rather than on what the script said it did. The two are
@@ -22,14 +22,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-import harvest_client as hc
-import harvest_list as hlist
-import harvest_patch as hp
-import harvest_post as hpost
-import harvest_write as hw
 import skill_config
 import timezone as tz
-from support import CREATE_ARGS, NO_BODY, resource_warnings_from, run_cli
+from provider import dispatcher as tp
+from provider.errors import Refused, Unreachable
+from provider.harvest import client as hc
+from provider.harvest import guards as hw
+from support import CREATE_ARGS, NO_BODY, create_args, resource_warnings_from, run_cli
 
 CONFIRM = "--confirm"
 POST_ARGS = [*CREATE_ARGS, CONFIRM]
@@ -50,7 +49,7 @@ def test_post_always_sends_started_and_ended_time_and_never_a_bare_hours_field(l
     Asserted against the recorded body, because `OK <id>` is printed either way.
     """
     srv = live_harvest({("POST", "/time_entries"): (201, {"id": 3001})})
-    r = run_cli(hpost, POST_ARGS)
+    r = run_cli(tp, POST_ARGS)
     assert r.code == 0
 
     posts = srv.sent("POST", "/time_entries")
@@ -68,26 +67,26 @@ def test_post_always_sends_started_and_ended_time_and_never_a_bare_hours_field(l
     }
 
 
-def test_post_passes_12_hour_times_through_verbatim(live_harvest):
-    """The script accepts `8:15am` as well as `08:15` and must forward whichever the user
-    typed. Normalising to 24h here would be a second, silent parser between the user and
-    Harvest — and the one place the two disagree is exactly where a wrong entry lands."""
+def test_post_sends_the_clock_times_as_the_contract_spells_them(live_harvest):
+    """The contract has one spelling (`HH:MM`, 24-hour), so the dispatcher refuses `8:15am`
+    before any adapter is asked - and what reaches Harvest is exactly what was typed, with no
+    second, silent parser between the user and the provider."""
     srv = live_harvest({("POST", "/time_entries"): (201, {"id": 3002})})
-    r = run_cli(hpost, ["48084036", "20753151", "2026-08-12", "8:15am", "12:21pm", "n",
-                        CONFIRM])
+    r = run_cli(tp, create_args(start="08:15", end="12:21", notes="n") + [CONFIRM])
     assert r.code == 0
 
     body = srv.sent("POST", "/time_entries")[0]["body"]
-    assert body["started_time"] == "8:15am"
-    assert body["ended_time"] == "12:21pm"
+    assert (body["started_time"], body["ended_time"]) == ("08:15", "12:21")
     assert "hours" not in body
+    assert run_cli(tp, create_args(start="8:15am", end="12:21pm") + [CONFIRM]).code == 2
+    assert len(srv.sent("POST", "/time_entries")) == 1
 
 
 def test_post_prints_ok_and_the_entry_id_and_exits_zero(live_harvest):
     """`OK <id>` is the whole machine-readable contract: the id is what a follow-up
     `harvest_patch.py` needs. A reworded success line orphans every entry it creates."""
     live_harvest({("POST", "/time_entries"): (201, {"id": 3003})})
-    r = run_cli(hpost, POST_ARGS)
+    r = run_cli(tp, POST_ARGS)
     assert r.code == 0
     assert r.lines == ["OK 3003"]
 
@@ -98,8 +97,7 @@ def test_post_sends_notes_through_the_json_body_byte_for_byte(live_harvest):
     lands on the invoice line a client reads — and nobody re-reads notes after posting."""
     notes = "Reviewed $5k variation with Renée — naïve estimate\nfollow-up: $12.5k cap"
     srv = live_harvest({("POST", "/time_entries"): (201, {"id": 3004})})
-    r = run_cli(hpost, ["48084036", "20753151", "2026-08-12", "09:00", "10:30", notes,
-                        CONFIRM])
+    r = run_cli(tp, create_args(notes=notes) + [CONFIRM])
     assert r.code == 0
     assert srv.sent("POST", "/time_entries")[0]["body"]["notes"] == notes
 
@@ -109,8 +107,8 @@ def test_post_turns_an_api_rejection_into_an_err_line_not_a_traceback(live_harve
     output has to tell "your arguments were wrong" from "the tool is broken"; a traceback
     reads as the latter and sends it debugging the script instead of fixing the ids."""
     live_harvest({("POST", "/time_entries"): (422, {"message": "Task is not assigned"})})
-    r = run_cli(hpost, POST_ARGS)
-    assert r.code == 1
+    r = run_cli(tp, POST_ARGS)
+    assert r.code == 4, "an answer of any status is the provider refusing, class 4"
     assert r.err.startswith("ERR")
     assert "422" in r.err
     assert "Task is not assigned" in r.err
@@ -126,7 +124,7 @@ def post_on(monkeypatch, live_harvest, zone, date, start, end):
     """
     monkeypatch.setenv("TIMESHEET_TIMEZONE", zone)
     srv = live_harvest({("POST", "/time_entries"): (201, {"id": 3010})})
-    r = run_cli(hpost, ["48084036", "20753151", date, start, end, "Cutover", CONFIRM])
+    r = run_cli(tp, create_args(date=date, start=start, end=end, notes="Cutover") + [CONFIRM])
     return r, srv.sent("POST", "/time_entries")
 
 
@@ -138,7 +136,7 @@ def test_a_change_of_half_an_hour_is_split_at_half_an_hour(monkeypatch, live_har
     happened."""
     r, sent = post_on(monkeypatch, live_harvest, "Australia/Lord_Howe",
                       "2026-04-05", "01:00", "03:00")
-    assert sent == [] and r.code != 0
+    assert sent == [] and r.code == 4
     assert "01:00 02:00" in r.err and "01:30 03:00" in r.err
     assert "(1.0 hrs)" in r.err and "(1.5 hrs)" in r.err
     assert "2.5 hrs that really passed" in r.err
@@ -193,14 +191,22 @@ def test_clocks_going_back_at_midnight_do_not_refuse_an_ordinary_working_day(
 
 
 def test_a_date_that_is_not_a_date_is_refused_before_anything_is_sent(live_harvest):
-    """The date is now read rather than passed through, because the guard above needs to
-    know whether the clocks changed on it. Harvest answers a malformed one with a 422 of
-    its own; saying so here costs a round trip less and names the format."""
+    """The dispatcher reads the date, because the guard needs to know whether the clocks
+    changed on it. Harvest answers a malformed one with a 422 of its own; saying so here costs
+    a round trip less, names the format, and is a usage error (2), never a refusal (4)."""
     srv = live_harvest({("POST", "/time_entries"): (201, {"id": 3011})})
-    r = run_cli(hpost, ["48084036", "20753151", "12/08/2026", "09:00", "10:30", "n", CONFIRM])
-    assert srv.sent("POST", "/time_entries") == []
-    assert r.code == 1 and r.err.startswith("ERR") and "YYYY-MM-DD" in r.err
+    r = run_cli(tp, create_args(date="12/08/2026", notes="n") + [CONFIRM])
+    assert srv.requests == []
+    assert r.code == 2 and r.err.startswith("ERR") and "YYYY-MM-DD" in r.err
     assert "Traceback" not in r.err
+
+
+def test_a_project_code_given_where_an_id_belongs_is_refused_and_points_at_lookup(live_harvest):
+    """The adapter checks its own identifiers' shape (contract section 1): a *code* is the
+    plausible, recoverable mistake, and Harvest would answer it with a bare 422."""
+    srv = live_harvest({("POST", "/time_entries"): (201, {"id": 3012})})
+    r = run_cli(tp, create_args(project="ACM-CR202") + [CONFIRM])
+    assert r.code == 4 and "lookup" in r.err and srv.requests == []
 
 
 # ======================================================================================
@@ -224,17 +230,34 @@ def test_a_query_of_only_none_values_sends_no_query_string_at_all(live_harvest):
     assert srv.sent("GET", "/users/me")[0]["query"] == {}
 
 
-def test_an_http_error_becomes_a_runtime_error_carrying_status_and_body(live_harvest):
+def test_an_http_error_becomes_a_refusal_carrying_status_and_body(live_harvest):
     """`urllib` raises `HTTPError`, whose `str()` is "HTTP Error 422: Unprocessable Entity"
     — the reason Harvest gives is in the body, which `HTTPError` throws away once read.
-    Every CLI catches `RuntimeError` only, so an escaping `HTTPError` is a traceback."""
+    The dispatcher maps only the contract's own classes, so an escaping `HTTPError` is a
+    traceback; here it is `Refused` (exit 4), with the status on the first line."""
     live_harvest({("POST", "/time_entries"): (422, {"message": "Task is not assigned"})})
 
-    with pytest.raises(RuntimeError) as exc:
+    with pytest.raises(Refused) as exc:
         hc.request("POST", "/time_entries", body={"project_id": 1})
 
-    assert str(exc.value).startswith("422 ")
+    assert "422" in str(exc.value).splitlines()[0]
     assert "Task is not assigned" in str(exc.value)
+
+
+def test_a_provider_5xx_is_still_a_response_and_so_a_refusal_not_unreachable(live_harvest):
+    """Contract section 4: telling 4 from 5 is the adapter's job. Harvest *answered*, even
+    if its answer was 503; class 5 is for getting no answer at all, where a blind retry of a
+    write could double-post."""
+    live_harvest({("GET", "/users/me"): (503, {"error": "down for maintenance"})})
+    with pytest.raises(Refused):
+        hc.request("GET", "/users/me")
+
+
+def test_no_answer_at_all_is_unreachable(monkeypatch):
+    """The hermetic base is a port nothing can listen on: a connection refused is no answer."""
+    monkeypatch.setattr(hc, "_CREDS_CACHE", ("x", "y"))
+    with pytest.raises(Unreachable):
+        hc.request("GET", "/users/me")
 
 
 def test_a_failed_request_does_not_leak_its_error_response(live_harvest):
@@ -257,7 +280,7 @@ def test_a_failed_request_does_not_leak_its_error_response(live_harvest):
     live_harvest({("POST", "/time_entries"): (422, {"message": "Task is not assigned"})})
 
     def attempt():
-        with pytest.raises(RuntimeError):
+        with pytest.raises(Refused):
             hc.request("POST", "/time_entries", body={"project_id": 1})
 
     assert resource_warnings_from(attempt) == []
@@ -268,12 +291,12 @@ def test_a_huge_error_body_is_capped_at_300_characters(live_harvest):
     with markup, pushing the one useful line out of view."""
     live_harvest({("POST", "/time_entries"): (500, {"error": "x" * 4000 + "TAIL-SENTINEL"})})
 
-    with pytest.raises(RuntimeError) as exc:
+    with pytest.raises(Refused) as exc:
         hc.request("POST", "/time_entries", body={})
 
     message = str(exc.value)
-    assert message.startswith("500 ")
-    assert len(message) == 304          # "500 " + a 300-character excerpt, nothing more
+    assert message.splitlines()[0] == "Harvest answered 500"
+    assert len(message.splitlines()[1].strip()) == 300   # a 300-character excerpt, no more
     assert "TAIL-SENTINEL" not in message
 
 
@@ -326,7 +349,7 @@ def test_patch_sends_only_the_fields_whose_flags_were_passed(live_harvest):
     a defaulted `hours`, an echoed `spent_date` — overwrites a field on the server that
     the user never asked to touch, and there is no undo on a submitted timesheet."""
     srv = live_harvest({("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)}})
-    r = run_cli(hp, [ENTRY_ID, "--notes", "Reworded for the client", CONFIRM])
+    r = run_cli(tp, ["patch", ENTRY_ID, "--notes", "Reworded for the client", CONFIRM])
     assert r.code == 0
     assert r.lines == [f"OK {ENTRY_ID}"]
 
@@ -342,7 +365,7 @@ def test_patch_sends_both_times_and_nothing_else_when_shifting_a_block(live_harv
                                                "started_time": "9:00am", "ended_time": "10:30am"},
         ("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)},
     })
-    r = run_cli(hp, [ENTRY_ID, "--start", "09:15", "--end", "10:45", CONFIRM])
+    r = run_cli(tp, ["patch", ENTRY_ID, "--start", "09:15", "--end", "10:45", CONFIRM])
     assert r.code == 0
 
     body = srv.sent("PATCH", "/time_entries")[0]["body"]
@@ -350,16 +373,13 @@ def test_patch_sends_both_times_and_nothing_else_when_shifting_a_block(live_harv
     assert "hours" not in body          # Harvest recomputes hours from the times itself
 
 
-def test_patch_accepts_hours_on_its_own(live_harvest):
-    """A documented footgun on start/end-time accounts, and deliberately still allowed —
-    duration-mode accounts have no other way to correct a duration. Pinned so that a
-    future "let's just block the footgun" edit is a conscious decision, not a surprise
-    for whoever is on a duration-mode account."""
+def test_patch_has_no_duration_flag_at_all(live_harvest):
+    """Contract section 3.2: the duration-only flag is the one capability dropped. On a
+    start/end account it leaves an entry inconsistent or converts it to a running timer, and
+    an adapter for a duration-only account maps `--start`/`--end` itself."""
     srv = live_harvest({("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)}})
-    r = run_cli(hp, [ENTRY_ID, "--hours", "1.5", CONFIRM])
-    assert r.code == 0
-
-    assert srv.sent("PATCH", "/time_entries")[0]["body"] == {"hours": 1.5}
+    r = run_cli(tp, ["patch", ENTRY_ID, "--hours", "1.5", CONFIRM])
+    assert r.code == 2 and srv.requests == []
 
 
 def test_patch_refuses_the_same_flag_given_twice(live_harvest):
@@ -373,7 +393,7 @@ def test_patch_refuses_the_same_flag_given_twice(live_harvest):
     below is that nothing reached the wire, not merely that the exit code was non-zero.
     """
     srv = live_harvest({("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)}})
-    r = run_cli(hp, [ENTRY_ID, "--notes", "first draft", "--notes", "second draft", CONFIRM])
+    r = run_cli(tp, ["patch", ENTRY_ID, "--notes", "first draft", "--notes", "second draft", CONFIRM])
 
     assert r.code != 0
     assert srv.sent("PATCH", "/time_entries") == [], "nothing may be written on ambiguous input"
@@ -383,11 +403,10 @@ def test_patch_rejects_an_unknown_flag_by_name(live_harvest):
     """A typo like `--note` would otherwise be swallowed or, worse, parsed as an entry id.
     Naming the offending flag is what makes the message actionable."""
     srv = live_harvest({("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)}})
-    r = run_cli(hp, [ENTRY_ID, "--note", "typo", CONFIRM])
+    r = run_cli(tp, ["patch", ENTRY_ID, "--note", "typo", CONFIRM])
 
-    assert r.code != 0
-    assert "Unknown flag: --note" in r.err
-    assert "Usage:" in r.err            # the message shows the flags that do exist
+    assert r.code == 2
+    assert "unknown flag --note" in r.err
     assert srv.sent("PATCH", "/time_entries") == []
 
 
@@ -399,10 +418,10 @@ def test_patch_rejects_a_flag_with_no_value(live_harvest):
     there to be nothing after it to read — put the gate after it and `--notes` swallows
     the flag as its value, which is a different test entirely."""
     srv = live_harvest({("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)}})
-    r = run_cli(hp, [ENTRY_ID, CONFIRM, "--notes"])
+    r = run_cli(tp, ["patch", ENTRY_ID, CONFIRM, "--notes"])
 
-    assert r.code != 0
-    assert "Missing value for --notes" in r.err
+    assert r.code == 2
+    assert "--notes needs a value" in r.err
     assert srv.sent("PATCH", "/time_entries") == []
 
 
@@ -410,9 +429,9 @@ def test_patch_rejects_an_entry_id_with_no_flags_at_all(live_harvest):
     """An empty PATCH body is a no-op that Harvest answers 200 to. Exiting 0 on it tells
     the caller the edit landed when nothing was even attempted."""
     srv = live_harvest({("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)}})
-    r = run_cli(hp, [ENTRY_ID, CONFIRM])
+    r = run_cli(tp, ["patch", ENTRY_ID, CONFIRM])
 
-    assert r.code != 0
+    assert r.code == 2
     assert "at least one field" in r.err
     assert srv.sent("PATCH", "/time_entries") == []
 
@@ -425,10 +444,10 @@ def test_patch_passes_a_non_numeric_entry_id_straight_through_to_the_url(live_ha
     A client-side numeric check would add a second failure mode without removing this one.
     """
     srv = live_harvest({("PATCH", "/time_entries/not-an-id"): (404, {"message": "Not Found"})})
-    r = run_cli(hp, ["not-an-id", "--notes", "x", CONFIRM])
+    r = run_cli(tp, ["patch", "not-an-id", "--notes", "x", CONFIRM])
 
     assert srv.sent("PATCH", "/time_entries")[0]["path"] == "/v2/time_entries/not-an-id"
-    assert r.code == 1
+    assert r.code == 4
     assert r.err.startswith("ERR")
     assert "404" in r.err
     assert "Traceback" not in r.err
@@ -469,8 +488,8 @@ def patched(monkeypatch, live_harvest, args, current=None, zone="Pacific/Aucklan
                                                   else entry_on())},
         ("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)},
     })
-    argv = [ENTRY_ID, *args] + ([CONFIRM] if confirm else [])
-    return run_cli(hp, argv), srv
+    argv = ["patch", ENTRY_ID, *args] + ([CONFIRM] if confirm else [])
+    return run_cli(tp, argv), srv
 
 
 def test_a_patch_whose_result_straddles_the_change_is_refused_and_nothing_is_sent(
@@ -484,7 +503,7 @@ def test_a_patch_whose_result_straddles_the_change_is_refused_and_nothing_is_sen
                      entry_on(start="9:00am", end="10:30am"))
 
     assert srv.sent("PATCH") == [], "nothing may be written that would bill short"
-    assert r.code == 1 and r.out == ""
+    assert r.code == 4 and r.out == ""
     assert "runs straight through the daylight-saving change" in r.err
     assert "Traceback" not in r.err
 
@@ -501,7 +520,7 @@ def test_the_refusal_is_the_create_s_message_rather_than_a_second_wording(
     expected = hw.refusal_for_a_straddled_change(
         dt.date(2026, 4, 5), 90, 255, ZoneInfo("Pacific/Auckland"))
     assert expected is not None
-    assert r.err.strip() == expected.strip()
+    assert r.err.strip() == ("ERR " + expected).strip()
 
 
 @pytest.mark.parametrize("args,current", [
@@ -517,37 +536,7 @@ def test_every_flag_that_can_produce_the_straddle_on_its_own_reaches_the_guard(
     r, srv = patched(monkeypatch, live_harvest, args, current)
 
     assert srv.sent("PATCH") == []
-    assert r.code == 1
-    assert "runs straight through the daylight-saving change" in r.err
-
-
-def test_hours_states_a_duration_the_clock_cannot_and_is_never_refused(
-        monkeypatch, live_harvest):
-    """`--hours 3.75` is the *correct* answer on a transition day — the one way to record
-    what really passed when the two clock times cannot say it. Refusing it would leave no
-    way to fix the entry at all. It settles the duration outright, so it also ends the
-    question before the read."""
-    r, srv = patched(monkeypatch, live_harvest,
-                     ["--date", AUCKLAND_FALL_BACK, "--hours", "3.75"])
-
-    assert r.code == 0
-    assert srv.sent("PATCH")[0]["body"] == {"spent_date": AUCKLAND_FALL_BACK, "hours": 3.75}
-    assert srv.sent("GET") == [], "the duration is stated, so the entry's times decide nothing"
-
-
-def test_hours_is_an_exception_for_the_duration_alone_not_a_way_past_the_guard(
-        monkeypatch, live_harvest):
-    """The escape hatch is for the duration the two clock times cannot state. It is not a
-    flag that suspends the check: where the same body also carries times, Harvest
-    recomputes hours from them — which is what
-    `test_patch_sends_both_times_and_nothing_else_when_shifting_a_block` pins — so the
-    entry lands at the 2.75 hrs this exists to refuse, with a `3.75` in the request that
-    changed nothing. A model assembling one command to fix both is the likely way here."""
-    r, srv = patched(monkeypatch, live_harvest,
-                     ["--date", AUCKLAND_FALL_BACK, "--start", STRADDLE[0],
-                      "--end", STRADDLE[1], "--hours", "3.75"])
-
-    assert r.code == 1 and srv.sent("PATCH") == []
+    assert r.code == 4
     assert "runs straight through the daylight-saving change" in r.err
 
 
@@ -611,7 +600,7 @@ def test_a_patch_that_names_the_date_and_both_times_is_refused_without_reading_a
                      ["--start", STRADDLE[0], "--end", STRADDLE[1],
                       "--date", AUCKLAND_FALL_BACK])
 
-    assert r.code == 1 and srv.sent("PATCH") == []
+    assert r.code == 4 and srv.sent("PATCH") == []
     assert srv.sent("GET") == []
 
 
@@ -635,7 +624,7 @@ def test_a_straddling_patch_is_refused_before_the_preview_as_well(monkeypatch, l
     r, srv = patched(monkeypatch, live_harvest,
                      ["--start", STRADDLE[0], "--end", STRADDLE[1]], confirm=False)
 
-    assert r.code == 1 and r.out == "", "nothing may be previewed that cannot then be applied"
+    assert r.code == 4 and r.out == "", "nothing may be previewed that cannot then be applied"
     assert srv.sent("PATCH") == []
 
 
@@ -655,10 +644,10 @@ def test_a_patch_date_that_is_not_a_date_is_refused_by_name(live_harvest):
     whether the clocks changed on it. Harvest answers a malformed one with a 422 of its
     own; saying so here costs a round trip less and names the format."""
     srv = live_harvest({("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)}})
-    r = run_cli(hp, [ENTRY_ID, "--date", "05/04/2026", CONFIRM])
+    r = run_cli(tp, ["patch", ENTRY_ID, "--date", "05/04/2026", CONFIRM])
 
     assert srv.sent("PATCH") == []
-    assert r.code == 1 and "YYYY-MM-DD" in r.err
+    assert r.code == 2 and "YYYY-MM-DD" in r.err
     assert "Traceback" not in r.err
 
 
@@ -672,10 +661,10 @@ def test_an_entry_the_provider_will_not_hand_back_is_an_err_line_not_a_traceback
         ("GET", f"/time_entries/{ENTRY_ID}"): (404, {"message": "Not Found"}),
         ("PATCH", f"/time_entries/{ENTRY_ID}"): {"id": int(ENTRY_ID)},
     })
-    r = run_cli(hp, [ENTRY_ID, "--start", "01:30", CONFIRM])
+    r = run_cli(tp, ["patch", ENTRY_ID, "--start", "01:30", CONFIRM])
 
     assert srv.sent("PATCH") == []
-    assert r.code == 1 and r.err.startswith("ERR") and "404" in r.err
+    assert r.code == 4 and r.err.startswith("ERR") and "404" in r.err
     assert "Traceback" not in r.err
 
 
@@ -717,7 +706,7 @@ def test_list_follows_next_page_and_shows_entries_from_every_page(live_harvest):
         [_entry(101, "2026-08-12", "9:00am", "10:00am")],
         [_entry(202, "2026-08-12", "2:00pm", "3:00pm")],
     ]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
 
     calls = srv.sent("GET", "/time_entries")
@@ -727,7 +716,7 @@ def test_list_follows_next_page_and_shows_entries_from_every_page(live_harvest):
 
 def test_list_stops_after_one_page_when_there_is_no_next_page(live_harvest):
     srv = live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am")]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
     assert len(srv.sent("GET", "/time_entries")) == 1
 
@@ -744,7 +733,7 @@ def test_list_sorts_by_date_then_real_start_time_then_id(live_harvest):
         _entry(200, "2026-08-12", "8:15am", "9:00am"),     # ties with 100 on date + time
         _entry(100, "2026-08-12", "8:15am", "9:00am"),
     ]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-13"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-13"])
     assert r.code == 0
     assert [ln.split()[0] for ln in r.lines] == ["100", "200", "300", "500"]
 
@@ -753,7 +742,7 @@ def test_list_truncates_notes_over_60_characters_with_an_ellipsis(live_harvest):
     """One entry per line is what makes the listing scannable and cheap to read. A pasted
     paragraph in the notes field wraps the terminal and buries every other entry."""
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am", notes="N" * 80)]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
     assert r.lines[0].endswith("N" * 59 + "…")
     assert "N" * 60 not in r.lines[0]
@@ -763,7 +752,7 @@ def test_list_leaves_a_note_of_exactly_60_characters_alone(live_harvest):
     """The boundary: truncating at the limit rather than past it would clip a note that fit."""
     note = "M" * 60
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am", notes=note)]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
     assert r.lines[0].endswith(note)
     assert "…" not in r.lines[0]
@@ -776,7 +765,7 @@ def test_list_flattens_newlines_so_one_entry_stays_on_one_line(live_harvest):
     live_harvest(_list_routes([[
         _entry(101, "2026-08-12", "9:00am", "10:00am", notes="line one\nline two\r\nline three"),
     ]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
     assert len(r.lines) == 1
     for fragment in ("line one", "line two", "line three"):
@@ -813,7 +802,7 @@ def test_list_renders_a_missing_project_code_or_task_name_as_a_question_mark(
         _entry(101, "2026-08-12", "9:00am", "10:00am", notes="no metadata",
                code=code, task=task),
     ]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
 
     fields = _columns(r.lines[0])
@@ -829,7 +818,7 @@ def test_list_renders_an_entry_whose_hours_are_null(live_harvest):
     entry = _entry(101, "2026-08-12", "9:00am", "10:00am")
     entry["hours"] = None
     live_harvest(_list_routes([[entry]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
     assert "0.00h" in r.lines[0]
 
@@ -840,7 +829,7 @@ def test_by_day_totals_an_entry_whose_hours_are_null(live_harvest):
     entry["hours"] = None
     live_harvest(_list_routes([[entry, _entry(102, "2026-08-12", "2:00pm", "3:00pm",
                                               hours=1.0)]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert "1.00h" in r.lines[0]
 
@@ -852,7 +841,7 @@ def test_by_day_survives_an_entry_with_no_date_on_it(live_harvest):
     entry = _entry(101, "2026-08-12", "9:00am", "10:00am")
     del entry["spent_date"]
     live_harvest(_list_routes([[entry]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert "0.00h" in r.lines[0]
     assert "Traceback" not in r.err
@@ -866,7 +855,7 @@ def test_by_day_says_when_it_could_not_place_an_entry(live_harvest):
     entry = _entry(101, "2026-08-12", "9:00am", "10:00am")
     del entry["spent_date"]
     live_harvest(_list_routes([[entry]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert "skipped 1" in r.err and "101" in r.err
 
@@ -875,14 +864,14 @@ def test_by_day_says_nothing_when_every_entry_was_placed(live_harvest):
     """The notice has to mean something. Printed on a clean month it is noise the caller
     learns to skip, and then it is not there on the month that needed it."""
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am")]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert "skipped" not in r.err
 
 
 def test_by_day_says_one_entry_rather_than_one_entries(live_harvest):
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am")]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert "1 entry" in r.lines[0] and "1 entries" not in r.lines[0]
 
@@ -894,7 +883,7 @@ def test_list_renders_a_null_project_and_task_as_question_marks(live_harvest):
     entry["project"] = None
     entry["task"] = None
     live_harvest(_list_routes([[entry]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
 
     fields = _columns(r.lines[0])
@@ -920,7 +909,7 @@ def test_by_day_prints_one_row_per_date_in_the_range_including_the_empty_ones(li
     off an entry listing means reasoning about what *isn't* printed, which is how a
     forgotten Tuesday stays forgotten."""
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am", hours=1.0)]]))
-    r = run_cli(hlist, ["2026-08-11", "2026-08-13", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-11", "2026-08-13", "--by-day"])
     assert r.code == 0
 
     assert [ln.split()[0] for ln in r.lines] == ["2026-08-11", "2026-08-12", "2026-08-13"]
@@ -935,7 +924,7 @@ def test_by_day_totals_every_entry_on_a_date_and_counts_them(live_harvest):
         _entry(101, "2026-08-12", "9:00am", "9:15am", hours=0.25),
         _entry(102, "2026-08-12", "1:00pm", "3:30pm", hours=2.5),
     ]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert len(r.lines) == 1
     assert "2.75h" in r.lines[0]
@@ -950,7 +939,7 @@ def test_by_day_totals_across_every_page(live_harvest):
         [_entry(101, "2026-08-12", "9:00am", "10:00am", hours=1.0)],
         [_entry(202, "2026-08-12", "2:00pm", "4:00pm", hours=2.0)],
     ]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert [c["query"]["page"] for c in srv.sent("GET", "/time_entries")] == ["1", "2"]
     assert "3.00h" in r.lines[0]
@@ -960,7 +949,7 @@ def test_by_day_names_the_weekday_so_a_weekend_is_not_chased(live_harvest):
     """Most unbilled Saturdays are Saturdays, not gaps. The weekday is what lets the sweep
     drop them before anything is dispatched to investigate them."""
     live_harvest(_list_routes([[]]))
-    r = run_cli(hlist, ["2026-08-15", "2026-08-17", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-15", "2026-08-17", "--by-day"])
     assert r.code == 0
     assert [ln.split()[1] for ln in r.lines] == ["Sat", "Sun", "Mon"]
 
@@ -974,7 +963,7 @@ def test_by_day_names_the_projects_already_billed_on_a_short_day(live_harvest):
         _entry(102, "2026-08-12", "10:00am", "11:00am", code="NWC-001"),
         _entry(103, "2026-08-12", "11:00am", "12:00pm", code="ACM-CR202"),
     ]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert "ACM-CR202" in r.lines[0] and "NWC-001" in r.lines[0]
     assert r.lines[0].count("ACM-CR202") == 1, "each project named once, not once per entry"
@@ -985,7 +974,7 @@ def test_by_day_refuses_a_range_that_ends_before_it_starts(live_harvest):
     month with no gaps in it — the sweep would report "all caught up" over a month it
     never looked at."""
     live_harvest(_list_routes([[]]))
-    r = run_cli(hlist, ["2026-08-31", "2026-08-01", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-31", "2026-08-01", "--by-day"])
     assert r.code != 0
     assert "Traceback" not in r.err
 
@@ -994,7 +983,7 @@ def test_by_day_refuses_a_date_it_cannot_parse(live_harvest):
     """The mode walks the range date by date, so a malformed bound is a crash rather than
     the API's own error message."""
     live_harvest(_list_routes([[]]))
-    r = run_cli(hlist, ["2026-08-01", "the-31st", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-01", "the-31st", "--by-day"])
     assert r.code != 0
     assert "Traceback" not in r.err
 
@@ -1003,7 +992,7 @@ def test_by_day_replaces_the_per_entry_rows_rather_than_adding_to_them(live_harv
     """The sweep is one cheap read of a month. Printing both shapes puts the per-entry
     listing it was meant to replace back into the context it was meant to save."""
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am")]]))
-    r = run_cli(hlist, ["2026-08-12", "2026-08-12", "--by-day"])
+    r = run_cli(tp, ["list", "2026-08-12", "2026-08-12", "--by-day"])
     assert r.code == 0
     assert len(r.lines) == 1
     assert "101" not in r.lines[0], "the entry id belongs to the per-entry listing"
@@ -1013,6 +1002,21 @@ def test_the_default_listing_is_unchanged_by_the_flag_existing(live_harvest):
     """The pin on the older contract: `harvest_list.py <date>` is what Step 1 of the
     `daily` skill and `references/first-run.md`'s credential check both run."""
     live_harvest(_list_routes([[_entry(101, "2026-08-12", "9:00am", "10:00am")]]))
-    r = run_cli(hlist, ["2026-08-12"])
+    r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
     assert r.lines[0].split()[0] == "101"
+
+
+@pytest.mark.parametrize("argv", [["list", "2026-08-12"], ["refresh"]])
+def test_a_missing_credential_keeps_the_whole_set_it_with_block(monkeypatch, tmp_path, argv):
+    """§ 5: the context an adapter adds to a failure (which page, which read) must not cost
+    the user the `Set it with:` line and the setup steps that follow it. `list` and
+    `refresh` once kept only the first line of the message when they added that context."""
+    monkeypatch.setenv("TIMESHEET_PROVIDER", "harvest")
+    (tmp_path / ".mcp").mkdir()
+    monkeypatch.setenv("TIMESHEET_WORKSPACE", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    r = run_cli(tp, argv)
+    assert r.code == 3
+    assert r.err.startswith("ERR missing configuration:")
+    assert "Set it with:" in r.err and "Exported install instead?" in r.err

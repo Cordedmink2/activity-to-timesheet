@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.2] - 2026-10-19
 
+### Changed
+- **The Harvest adapter now sits behind the provider contract** (#35, #22).
+  `docs/provider-contract.md` is implemented: one command,
+  `python "<daily>/scripts/provider/bin/timesheet-provider" <post|patch|lookup|list|refresh>`,
+  whose dispatcher holds the confirmation gate **once** (so #22's two copies are gone, and an
+  adapter can no longer see an unconfirmed write), the argument validation, the adapter selection
+  (`TIMESHEET_PROVIDER`, `harvest` when unset) and the five exit-code classes. Everything
+  Harvest-shaped moved into `scripts/provider/harvest/`, behind one interface, and credentials are
+  read only there, through one config helper. `harvest_post.py`, `harvest_patch.py`,
+  `harvest_list.py`, `harvest_lookup.py`, `harvest_write.py` and `harvest_client.py` are retired;
+  every caller (`daily`, `reconcile`, the references) now names the command and no provider file
+  or field. What a user sees change: `post` and `patch` take flags, not positionals; times are
+  `HH:MM` 24-hour only; failures exit 2 (usage), 3 (missing configuration), 4 (the provider
+  refused), 5 (unreachable) or 6 (no match) instead of 1; `lookup --no-live` is `--cache-only` and
+  `--mcp-dir` is `--catalog-dir`; `lookup --json` always says where a match came from; and
+  `refresh --age` replaces reading a catalog file's modification time. The duration-only `patch`
+  flag is gone (use `--start` and `--end`). `refresh_catalogs.py` now refreshes the work-item
+  catalog alone (`--dataverse-only`); the provider's catalog is `timesheet-provider refresh`.
+
+### Fixed
+- **A catalog refresh that comes back with no projects is a failure, not an empty catalog** (#35).
+  It used to be written, so every later lookup quietly fell through to the history fallback.
+- **A missing credential keeps its whole setup message on `list` and `refresh`** (#35). Adding
+  which read failed used to cut the message to its first line, which dropped `Set it with:` and the
+  setup steps under it.
+- **A lookup whose history fallback fails is never reported as "no such project"** (#35). The
+  failure keeps its own class (3, 4 or 5), where a miss after a *completed* fallback is exit 6.
+
 ### Fixed
 - **Teams meetings titled by their subject now corroborate their calendar event** (#80, #90).
   Many Teams builds title a meeting window `<Subject> | <Tenant> | <email> | Microsoft Teams`,

@@ -40,7 +40,7 @@ while a whitespace-only *environment variable* used to be handed to the caller v
 `docs/skills/daily/decision-log.md` § "Settled decisions" records why that inconsistency was not preserved.
 
 Nothing here is provider-specific: the keys belong to their callers, and the credentials
-contract in particular stays in `harvest_client.load_creds()`. This module owns only the
+contract in particular stays in the adapter, behind `provider_config.require()`. This module owns only the
 question of *where a value comes from*.
 
 No third-party deps — stdlib only, so a script that imports it stays importable on a
@@ -100,10 +100,10 @@ def _parse_env_file(path: Path) -> dict:
 def has_value(candidate: str | None) -> TypeGuard[str]:
     """Whether a candidate counts as configured. Blank and whitespace-only do not.
 
-    Public because the rule outlives `setting()`: `harvest_lookup.find_catalog_dir`
-    layers a `--mcp-dir` flag over a resolved workspace, and its flag has no settings key
+    Public because the rule outlives `setting()`: the Harvest adapter's `catalog.catalog_dir`
+    layers a `--catalog-dir` flag over a resolved workspace, and its flag has no settings key
     of its own to resolve through. Asking here keeps "blank means unset" to one
-    implementation instead of a truth test per call site — which is how `--mcp-dir ""`
+    implementation instead of a truth test per call site — which is how `--catalog-dir ""`
     came to beat a perfectly good configured workspace.
 
     A `TypeGuard` rather than a plain `bool` so a caller that guards on this is known to
@@ -308,7 +308,7 @@ def _install_workspace() -> Path | None:
 def find_workspace() -> Path | None:
     """Locate the workspace root holding the `.mcp/` catalogs, or None if it can't be found.
 
-    The writer (refresh_catalogs.py) and the readers (harvest_lookup.py) both resolve
+    The writer (`refresh`) and the reader (`lookup`) of the Harvest adapter's catalog both resolve
     the workspace through here, so a refresh cannot write catalogs into one directory
     while a lookup reads another. Resolution order:
 
