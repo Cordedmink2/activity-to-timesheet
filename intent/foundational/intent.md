@@ -1,6 +1,7 @@
 # Intent: Reconstruct work activity into a trustworthy timesheet
 
-Status: draft — Connor, created 2026-08-31, refusals section added 2026-09-07 and open under #42.
+Status: Accepted — 2026-10-19 (Atlas for Connor, under #42). Created 2026-08-31; refusals drafted
+2026-09-07 and agreed under #42.
 
 ## Problem
 
@@ -45,27 +46,36 @@ Today the workflow uses ActivityWatch as the activity source, an agent to interp
 - What evidence is sufficient to resolve a period automatically, and when should the agent ask the user?
 - What learned context should be retained, and how should stale or conflicting context be corrected over time?
 - What decomposition approach best keeps each run context-efficient without losing evidence needed to reconstruct the day accurately?
-- How far should the product extend beyond reconstructing a normal workday?
+- ~~How far should the product extend beyond reconstructing a normal workday?~~ Answered by
+  "What it will not become" below (#42).
 
 ## What it will not become
 
 These are refusals, not a backlog. A feature request that requires one of them is declined, and
-the refusal is the answer rather than a deferral.
+the refusal is the answer rather than a deferral. Agreed under #42: the union of the refusals in
+that issue and the draft reconstructed from spec issue #2.
 
-*Draft, reconstructed 2026-09-07 from the surviving head of the original and the "Out of Scope"
-section of spec issue #2. Issue #42 is where Connor finishes it.*
+1. **A thing that bills on its own.** Every write to the provider carries the confirmation gate in
+   the invocation. No auto-post, no batch mode, no "just bill it" setting that turns the gate off:
+   the gate is the product, not a safety feature on it. The same holds for distribution — the
+   frontmatter that stops a harness invoking the skill unprompted is kept, and a channel that
+   rejects it is declined rather than accommodated.
+2. **A monitoring tool.** One person's own machine and their own timesheet. No employer, team or
+   manager view of anyone's activity.
+3. **A thing that sends activity anywhere.** The product runs no service of its own: no cloud
+   backend, no telemetry, no upload of activity or screenshots. Activity is read only by the
+   user's own agent, and the only thing written outward is the entries the user confirms to their
+   own provider.
+4. **A carrier of one user's facts.** Client names, project codes, task names, colleagues and
+   machine specifics live in the user's workspace. A shipped file that names them is a defect;
+   `tests/test_provider_neutrality.py` and the redaction guard hold it.
+5. **A thing that decides whether the user was working.** Idle is settled by the AFK watcher and
+   nothing re-infers it — not a screenshot, not a window title, not a calendar event. A source that
+   disagrees becomes a question to the user, never a block.
+6. **A second front end to the provider.** Raw provider data beyond a day's entries — project
+   lists, monthly totals, reports — is the provider's own interface's job.
+7. **A product that is conceptually ActivityWatch-to-Harvest.** Both are the current adapters. A
+   rule that could only be true of one of them is written wrongly.
 
-- **A thing that decides whether the user was working.** Idle is settled by the AFK watcher and
-  nothing re-infers it — not a screenshot, not a window title, not a calendar event. A source that
-  disagrees becomes a question to the user, never a block.
-- **A thing that bills on its own.** Every write to the provider carries the confirmation gate in
-  the invocation. No batch mode, no auto-post, no setting that turns the gate off.
-- **A carrier of one user's facts.** Client names, project codes, task names, colleagues, machine
-  specifics live in the user's workspace. A shipped file that names them is a defect.
-- **A second front end to the provider.** Raw provider data beyond a day's entries — project lists,
-  monthly totals, reports — is the provider's own interface's job.
-- **A channel that drops the guard against starting unprompted.** The frontmatter that stops a
-  harness invoking the skill on its own is kept, and any distribution channel that rejects it is
-  declined rather than accommodated.
-- **A product that is conceptually ActivityWatch-to-Harvest.** Both are the current adapters. A rule
-  that could only be true of one of them is written wrongly.
+**Not now** — not refused, so a request for one is triaged rather than declined: start/stop time
+tracking, and invoicing, quoting or rates.

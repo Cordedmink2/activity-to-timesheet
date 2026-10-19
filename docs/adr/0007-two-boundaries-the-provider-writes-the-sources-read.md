@@ -1,9 +1,10 @@
-# ADR-0007: Two boundaries — the provider writes, the sources read
+# ADR-0007: Two boundaries — drawn on what a mistake costs
 
-**Status:** Proposed — drafted 2026-09-07 under #44, for Connor to accept or amend. The rule it
-records is already enforced; what is proposed is the write-up. **Amended 2026-09-10 under #75**,
-while still Proposed: the line is drawn on *what a mistake costs* rather than on direction, because
-#69 made the activity source's **configuration** a write target while its data stays read-only.
+**Status:** Accepted — 2026-10-19 (Atlas for Connor, under #44), as amended under #75. Drafted
+2026-09-07 under #44; **amended 2026-09-10 under #75**, while still Proposed: the line is drawn on
+*what a mistake costs* rather than on direction, because #69 made the activity source's
+**configuration** a write target while its data stays read-only. The filename keeps the first
+draft's framing ("the provider writes, the sources read") so that existing links hold.
 **Context:** whole repo. Related: [`CONTEXT.md`](../../CONTEXT.md), whose opening paragraphs state
 the rule; [ADR-0006](./0006-keep-the-provider-in-plugin-but-behind-a-command-contract.md), which keeps the
 written side inside this plugin behind a command contract; [ADR-0008](./0008-the-calendar-is-evidence-of-intent-not-activity.md),
@@ -81,9 +82,12 @@ were a day with nothing in it.
   ship as defaults.
 - The read/write asymmetry is why a forgotten `--confirm` is a preview rather than an error, and why
   a `WOULD POST` line is the expected output of an unconfirmed run rather than a failure to fix.
-- `CONTEXT.md` today carries a paragraph of status about how far each side of the line is abstracted
-  ("the provider half is done to that line; the other halves are not"). That is this ADR's subject,
-  not the glossary's, and moves here once this is accepted.
+- **How far each side is abstracted today** (moved here from `CONTEXT.md` under #61; it is status,
+  not vocabulary). The provider half is done to the line `tests/test_provider_neutrality.py`
+  enforces: no account's strings ship. It is not yet behind its command contract — that is #35,
+  against `docs/provider-contract.md`. The activity-source and work-item-source halves are not
+  abstracted: the rules name ActivityWatch's buckets, event schema and categories throughout, and the
+  work-item source has no boundary of its own until #37.
 
 ## Alternatives considered
 
@@ -92,7 +96,7 @@ uniformly. Rejected: a gate on a read costs every run a question that has no ans
 credential on a read source widens what a leaked token can reach for no protection the read needed.
 
 **One boundary per service** — four. Rejected: the distinction that changes how a boundary is
-guarded is direction, not which product sits behind it. Four boundaries invite four gate
+guarded is what a mistake costs, not which product sits behind it. Four boundaries invite four gate
 implementations, which is the "five loose scripts" ADR-0006 already rejected.
 
 **No boundary at all — trust the prose.** The state before the `--confirm` flag: the instruction

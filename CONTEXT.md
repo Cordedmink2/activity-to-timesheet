@@ -6,10 +6,12 @@ the billed time. A fourth, the user's calendar, is opt-in and records what they 
 doing. All of them are meant to be swappable, and the terms below are how the rules talk about
 them — so that a second provider is an adapter rather than a rewrite.
 
-**Only the provider is written to; everything else is read**, and that is the distinction the
-boundaries are drawn on. A mistake at a read boundary yields an empty catalog. A mistake at the
-write boundary bills a client wrongly — so credentials and the confirmation gate belong there and
-nowhere else.
+**The boundaries are drawn on what a mistake costs.** A mistake at a source — the activity source,
+the work-item source, the calendar — yields an empty catalog or a mislabelled span the user sees
+before anything is billed. A mistake at the provider bills a client wrongly — so credentials and the
+confirmation gate belong there and nowhere else. Usually that reads as "the provider is written to
+and the sources are read", and direction is how it reads, not the rule: the activity source's
+category rules are written too, and sit on the cheap side.
 
 **What this asks for is precise, and it is not "delete the word Harvest".** A rule may name the
 product where the product is the subject: "Post to Harvest", "no Harvest write without explicit
@@ -18,9 +20,6 @@ confirmation", the endpoint documentation. What a rule may not do is bake in one
 facts and every user's differ. That is the line the glossary draws and
 `tests/test_provider_neutrality.py` enforces.
 
-The provider half of the abstraction is done to that line; the activity-source and work-item-source
-halves are not, and this file says so below rather than pretending otherwise.
-
 Use these words in issue titles, test names, skill instructions and reference documents. Where a
 term below and a synonym both read fine, the term below wins; the synonyms are what drift looks
 like.
@@ -28,7 +27,8 @@ like.
 Decisions that shaped this vocabulary are in [`docs/adr/`](./docs/adr/) — ADR-0006 for why the
 provider stays inside this plugin for now. The two boundaries the paragraph above draws are the
 rule; [ADR-0007](./docs/adr/0007-two-boundaries-the-provider-writes-the-sources-read.md) is the
-write-up of why they are drawn on direction rather than on service.
+write-up of why they are drawn on what a mistake costs rather than on service, and records how far
+each side is abstracted today.
 
 ## The services
 
