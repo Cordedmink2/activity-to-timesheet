@@ -60,11 +60,6 @@ OPTIONAL = {"TIMESHEET_TIMEZONE", "TIMESHEET_ACTIVITY_URL", "TIMESHEET_SCREENSHO
 # together below.
 ENV_TEMPLATE = REPO / "skills" / "daily" / ".env.example"
 
-# Keys the template carries that the manifest deliberately does not: the work-item source's.
-# They belong to one org rather than to every install, so the configure dialog never asks
-# for them (README § "Coming from a hand-installed copy"), and drawing that boundary
-# properly is #37's. Named here so that *any other* difference between the two fails.
-WORK_ITEM_SOURCE_KEYS = {"DATAVERSE_URL", "PAC_AUTH_PROFILE"}
 
 
 def user_config() -> dict:
@@ -250,7 +245,7 @@ def test_the_env_template_names_exactly_the_keys_the_manifest_declares():
     the plugin's setup instructions, finds no such key in the file they were told to fill
     in, and the feature stays off with nothing saying why. The other direction is a key the
     template offers that nothing resolves."""
-    assert set(template_lines()) == set(user_config()) | WORK_ITEM_SOURCE_KEYS, (
+    assert set(template_lines()) == set(user_config()), (
         "the export's .env.example and the manifest's userConfig name different keys")
 
 

@@ -23,45 +23,38 @@ Where the catalog is stored, its endpoint, its headers, its paging and its page 
 
 **Read-replica lag (important).** The provider's catalog is eventually consistent: a just-created project can take minutes to surface, and neither a single refresh nor a row count is reliable for it. To bill against a brand-new project, run `timesheet-provider refresh --wait <code>`: it polls across minutes (`--attempts`, default 20; `--delay` seconds, default 15), writes the catalog it found and prints `OK <code>` once the code surfaces, or exits 6 with `ERR <code> did not appear` if it never does. It posts nothing. Don't treat a one-off miss as failure.
 
-## User-specific work-item catalogs (optional)
+## The work-item source (optional)
 
-If the user maintains a work-item dump (e.g. an active-incidents list from a CRM, a Jira/Linear export), `python scripts/refresh_catalogs.py --dataverse-only` can refresh it — it is the read side's catalog, not the provider's. The exact query is user-specific — see `.context.md` for the user's work-item-source configuration.
+`python scripts/refresh_catalogs.py` refreshes the catalog of the user's work items into
+`.mcp/work_item_catalog.txt` (a header row, then one work item per row). It is the read side's,
+not the provider's: no confirmation gate and no credential (ADR-0007). Which system it reads
+and every fact about the user's account come from `Timesheets/.context.md` § "Work-item
+source" — the plugin ships none of them.
 
-The script's design assumes:
-- Output goes to `.mcp/<catalog>.txt` or `.mcp/<catalog>.json`
-- Format is tabular text or JSON — readable line-by-line by downstream classifiers
-- Auth uses whatever CLI the user has configured for their backend (e.g. `pac` CLI for Dataverse, `gh` for GitHub Issues)
+- **Nothing configured** (no section, or only the template's placeholders): the run says no
+  work-item source is configured, writes no catalog and exits 0. It never writes an empty
+  catalog that looks healthy, and a source that answers with no work items is a failure
+  (exit 4) that leaves the existing catalog as it was.
+- **The old shape**: `DATAVERSE_URL` and `PAC_AUTH_PROFILE`, in the skill `.env` or the
+  environment, were the configuration before #37. With no section in `.context.md` the run
+  stops (exit 3) and names each one and the line that replaces it; with a section it carries on
+  and says the old ones are ignored. `DATAVERSE_URL` → `Environment URL`, `PAC_AUTH_PROFILE` →
+  `Auth profile`.
+- **The section** is `- Label: value` lines under `## Work-item source`. `Adapter` selects the
+  kind of system. `dataverse` reads a Dataverse / Dynamics 365 table through the Power Platform
+  CLI (`pac`) the user has already authenticated, and needs `Environment URL`, `Auth profile`,
+  `Entity`, `Number column`, `Title column`, `Modified column` and `State column` (zero while the
+  item is open). A missing one is refused by name; none is defaulted.
+- The auth profile must be a **named** `pac` one — the refresh selects it with `pac auth select
+  --name`, and restores the user's active profile afterwards (and says so if it could not).
+  `pac auth create --name <name> --environment <url>`, or name an existing one with
+  `pac auth name --index <N> --name <name>`.
+- A `### Case creation` subsection of the same section is the user's convention for creating a
+  work item: read it with `references/new-client-work.md`.
+- Adding another kind of system is one module in `scripts/work_items/adapters/`; nothing else
+  changes.
 
-### Dataverse (the one adapter that ships)
-
-If you create work tickets in a **Dataverse / Dynamics 365** org that sync to Harvest as projects, you
-can enable ticket-number → title lookups by setting two values:
-
-```
-DATAVERSE_URL=https://yourorg.crm6.dynamics.com/
-PAC_AUTH_PROFILE=YourPacAuthProfileName
-```
-
-These two are deliberately **not** declared plugin configuration: they belong to one org's setup
-rather than to every install, so `/plugin configure billables` never asks for them. Where they go
-depends on which install you have:
-
-- **Plugin install:** set them as ordinary environment variables. Not in a `.env` inside the plugin
-  folder — a `/plugin update` overwrites that folder, and the skill's own diagnostic tells you to
-  delete any `.env` it finds there, because on a plugin install one silently outranks the
-  configuration dialog.
-- **Exported install**: the skill root's `.env`, alongside the Harvest keys.
-
-The profile must be a **named** one — the refresh selects it with `pac auth select --name`, and
-`pac auth create` without `--name` creates an unnamed profile it can never select. Authenticate with
-`pac auth create --name YourPacAuthProfileName --environment https://yourorg.crm6.dynamics.com/`, or
-name an existing profile without re-authenticating: `pac auth name --index <N> --name <name>`.
-
-This requires the [Power Platform CLI](https://learn.microsoft.com/power-platform/developer/cli/introduction)
-(`pac`) installed and authenticated. **Leave both blank to skip it** — everything else works
-Harvest-only.
-
-If you instead connect Dataverse through an MCP server (e.g. via the `dataverse` plugin's `dv-connect` skill), register it **scoped locally to this workspace** — run `claude mcp add -s local …` from this folder, never user scope — so a single-env server can't follow you into your other client repos.
+If the user connects Dataverse through an MCP server instead, register it **scoped locally to this workspace** — `claude mcp add -s local …` from this folder, never user scope — so a single-env server can't follow you into your other client repos.
 
 ## Creating a backend work item to bill against
 
@@ -73,4 +66,4 @@ A block that belongs to new work with no project yet is `references/new-client-w
 - Work-item catalog file has the expected row count and column headers → looks reasonable
 - If either looks empty / wrong, restore the previous file from backup before overwriting
 
-`timesheet-provider refresh` does the provider's half in one go, and `refresh_catalogs.py --dataverse-only` the work-item half.
+`timesheet-provider refresh` does the provider's half in one go, and `refresh_catalogs.py` the work-item half.

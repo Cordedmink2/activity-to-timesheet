@@ -22,7 +22,6 @@ import pytest
 import activity_timeline as tl
 import afk_blocks as ab
 import aw_client
-import refresh_catalogs as rc
 import skill_config
 from provider import dispatcher as tp
 from provider.errors import Refused
@@ -216,28 +215,6 @@ def test_a_failed_first_write_does_not_destroy_the_existing_catalog(workspace, l
 
     assert existing.exists(), "the old catalog was deleted with nothing to replace it"
     assert existing.read_text(encoding="utf-8") == before
-
-
-def test_an_unreadable_pac_profile_list_warns_instead_of_silently_switching(workspace, capsys, monkeypatch):
-    """`_active_pac_index` returns None when `pac auth list` fails or changes format, and
-    the restore was then skipped in silence — leaving the user's active profile switched
-    to the timesheet one. That cross-tenant drift is the exact thing the restore was
-    written to prevent, so it must at least say so."""
-    monkeypatch.setattr(
-        rc, "dataverse_settings",
-        lambda: ("https://example.crm6.dynamics.com", "timesheet"))
-    monkeypatch.setattr(rc.shutil, "which", lambda _: "pac")
-    monkeypatch.setattr(rc, "_active_pac_index", lambda _: None)
-
-    class Result:
-        returncode = 0
-        stdout = "ticketnumber\ttitle\n"
-        stderr = ""
-
-    monkeypatch.setattr(rc.subprocess, "run", lambda *a, **kw: Result())
-    rc.refresh_dataverse()
-    out = capsys.readouterr()
-    assert "WARN" in (out.out + out.err)
 
 
 # --------------------------------------------------------------------------------------
