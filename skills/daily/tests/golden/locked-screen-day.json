@@ -101,8 +101,22 @@
       },
       {
         "start": "10:57:00",
-        "end": "18:53:00",
-        "min": 476.0,
+        "end": "11:45:00",
+        "min": 48.0,
+        "category": "lock-screen",
+        "multi": false,
+        "categories": [],
+        "top_titles": [
+          [
+            "unknown | ",
+            2880.0
+          ]
+        ]
+      },
+      {
+        "start": "11:45:00",
+        "end": "18:02:00",
+        "min": 377.0,
         "category": "uncategorized",
         "multi": false,
         "categories": [],
@@ -116,8 +130,22 @@
             6060.0
           ],
           [
+            "firefox.exe | Jellyfin - Home Media",
+            1320.0
+          ]
+        ]
+      },
+      {
+        "start": "18:02:00",
+        "end": "18:53:00",
+        "min": 51.0,
+        "category": "lock-screen",
+        "multi": false,
+        "categories": [],
+        "top_titles": [
+          [
             "unknown | ",
-            5940.0
+            3060.0
           ]
         ]
       },
@@ -139,21 +167,22 @@
       }
     ],
     "rollup_min_by_category": {
-      "uncategorized": 494.0,
-      "ACME": 155.0
+      "uncategorized": 395.0,
+      "ACME": 155.0,
+      "lock-screen": 99.0
     },
     "web": null
   },
-  "timeline_text": "Window timeline for 2026-08-12 (offset UTC+12)\n  window bucket: aw-watcher-window_TESTHOST   classes loaded: 1\n  08:12:00-08:30:00   18.0m  uncategorized   ms-teams.exe | Meeting | Daily Standup\n  08:30:00-10:57:00  147.0m  ACME            Code.exe | sharepoint-access-sync - Visual Studio Code\n  10:57:00-18:53:00  476.0m  uncategorized   WindowsTerminal.exe | claude - AGENTS.md\n  18:53:00-19:01:00    8.0m  ACME            msedge.exe | Power Apps - example-uat.crm6.dynamics.com\n  --- day totals by category (min) ---\n     uncategorized    494.0\n     ACME             155.0\n",
+  "timeline_text": "Window timeline for 2026-08-12 (offset UTC+12)\n  window bucket: aw-watcher-window_TESTHOST   classes loaded: 1\n  08:12:00-08:30:00   18.0m  uncategorized   ms-teams.exe | Meeting | Daily Standup\n  08:30:00-10:57:00  147.0m  ACME            Code.exe | sharepoint-access-sync - Visual Studio Code\n  10:57:00-11:45:00   48.0m  lock-screen     unknown | \n  11:45:00-18:02:00  377.0m  uncategorized   WindowsTerminal.exe | claude - AGENTS.md\n  18:02:00-18:53:00   51.0m  lock-screen     unknown | \n  18:53:00-19:01:00    8.0m  ACME            msedge.exe | Power Apps - example-uat.crm6.dynamics.com\n  lock-screen 10:57-11:45 is not proof of absence: check `afk_blocks.py 2026-08-12 --window 10:57-11:45` before excluding it\n  lock-screen 18:02-18:53 is not proof of absence: check `afk_blocks.py 2026-08-12 --window 18:02-18:53` before excluding it\n  --- day totals by category (min) ---\n     uncategorized    395.0\n     ACME             155.0\n     lock-screen      99.0\n",
   "zoom_json": {
     "date": "2026-08-12",
     "zone": "offset UTC+12",
     "window_bucket": "aw-watcher-window_TESTHOST",
     "spans": [
       {
-        "start": "10:57:00",
-        "end": "18:53:00",
-        "min": 476.0,
+        "start": "11:45:00",
+        "end": "18:02:00",
+        "min": 377.0,
         "category": "uncategorized",
         "multi": false,
         "categories": [],
@@ -167,15 +196,16 @@
             6060.0
           ],
           [
-            "unknown | ",
-            5940.0
+            "firefox.exe | Jellyfin - Home Media",
+            1320.0
           ]
         ]
       }
     ],
     "rollup_min_by_category": {
-      "uncategorized": 494.0,
-      "ACME": 155.0
+      "uncategorized": 395.0,
+      "ACME": 155.0,
+      "lock-screen": 99.0
     },
     "web": [
       {
