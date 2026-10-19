@@ -1271,6 +1271,43 @@ Fictional day with an internal description and a composed note per block, three 
 no-tool agents per arm. **Before:** notes in the draft 3/3, in the posting question 1/3.
 **After:** 3/3 at both.
 
+### SKILL.md moved under the word ceiling by relocating mechanism, not guards — #57
+**Rung 3 for the behavioural claim (reasoned, one thin measurement); rung 2 for the hazard.**
+2026-10-20. `SKILL.md` was 11,806 words after #35 and #37 (11,430 when the issue was
+measured), against a 5,000 ceiling, with ~150 words to be left for #48. Now 4,844.
+
+What moved, text kept whole: "Files in this skill" to `references/scripts.md`
+(`INVENTORY_HEADING` stays; `test_references.py` now reads `INVENTORY_FILE`, and the
+inventory and flag-equality assertions are unchanged); Steps 1–3, the screenshot folder and
+the timezone and script-resolution mechanism to `references/day-reading.md`; Steps 6–12 to
+`references/review-and-posting.md`. What stayed: every guard a run acts on (Step 2's verdict
+words and the `ERR`-line rule, Step 3's skeleton rules and the calendar block, Step 6's three
+guards and the calendar questions, Step 8's checklist, Step 9's `--confirm` rule, Step 12's
+reset ask), plus a pointer from each step. Words were cut from SKILL.md's own copies only; the
+references hold the original wording, so nothing was deleted from the plugin.
+
+**What the tests say.** Every repo-level test reading `SKILL.md` stayed green without being
+weakened: `1306 passed, 51 skipped`; `--real-aw` on the skill suite `929 passed, 5 skipped`;
+`pyright` 0 errors. Per the section above, that measures the scripts and the shape of the
+prose, not whether a run behaves the same.
+
+**What the instrument says — thin.** Scenarios are in `tests/evals/daily/evals.json`
+(calendar and guards; an already-billed day with a prior ruling; the confirmation gate on a
+fall-back day). Only the first was run: one fresh no-filesystem subagent per arm, baseline
+(pre-trim) against trimmed, read by hand against its six checks. Both arms scored 6/6 and gave
+the same `--cover` argument, the same declared break and the same treatment of the
+uncorroborated event. That is n=1 per arm, one scenario, on a model that is not the usual
+runner, and it exercises the guards the trim kept nearly verbatim. The card asked for 2–3
+scenarios and at least 3 reps; the one-shot run allowed two subagents in total
+(`delegation.oneshot_max_children`), so the rest was not run. **Not shown:** that Step 1's
+already-covered ruling rule and Step 8's yes-gate behave the same after the trim, the two cuts
+that most changed wording. Re-run scenarios 2 and 3 with 3 reps per arm before treating this as
+more than a reasoned change; if either arm differs, put that step's cut back.
+
+**Rejected: deleting rationale outright.** The mechanism has a home in the references, so a
+rule measured useful is not lost, and CONTRIBUTING's "Rules with more than one copy" rows that
+cited "Files in this skill" or SKILL.md's folder mechanics now cite the new files.
+
 ## Script defects
 
 Found while building the scenario/contract suite, 2026-08-14. All **rung 1** — each was

@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting and where it goes; with a section it carries on and says the old ones are ignored.
 
 ### Changed
+- **`skills/daily/SKILL.md` is under its word ceiling** (#57): 11,806 words to 4,844, against 5,000. The
+  guards a run acts on stay in `SKILL.md`; the mechanism and worked cases moved, whole, to
+  `references/day-reading.md` (Steps 1–3, screenshot folder), `references/review-and-posting.md`
+  (Steps 6–12) and `references/scripts.md` (the script and flag inventory, formerly "Files in this
+  skill"). Nothing for a user to do. The inventory check in `skills/daily/tests/test_references.py`
+  reads the new file. Only one of three before/after scenarios was run, at one rep per arm
+  (`docs/skills/daily/decision-log.md`).
+
 - **The work-item source has its own boundary** (#37). The Dataverse half of
   `refresh_catalogs.py` moved into `scripts/work_items/`: a read boundary with no gate and no
   credentials (ADR-0007), one adapter per kind of system, Dataverse shipped as the first. Every

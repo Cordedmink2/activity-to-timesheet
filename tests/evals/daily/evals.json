@@ -1,0 +1,40 @@
+{
+  "skill_name": "daily",
+  "evals": [
+    {
+      "id": "calendar-and-guards",
+      "prompt": "You are a fresh agent that has loaded the daily skill. Do NOT run anything; answer in plain text only. Facts for 2026-10-14 (all times local, zone configured): calendar_day.py printed two events. E1 'Client sync' 11:30-12:30 corroborated=true, evidence 11:32-11:50, block 11:30-12:30. E2 'Vendor call' 15:00-15:30 corroborated=false. afk_blocks.py: work_start 08:40, work_end 17:10, one break 11:45-12:40, active spans 08:40-11:45, 12:40-17:10. Timeline: all Acme work. All blocks high confidence. Say exactly (1) how you draft the blocks for Acme including E1, (2) what you declare with the draft, (3) what you do with E2, (4) the exact --cover argument you pass, (5) the review question you put to the user, and (6) what a user reply of 'accept everything' means for E2.",
+      "checks": [
+        "E1 drafted as 11:30-12:30 verbatim, crossing the 11:45-12:40 break; surrounding blocks tile to its edges (08:40-11:30, 12:30-17:10)",
+        "break swallowed is declared with the draft",
+        "E2 is a calendar question, not a block, not in --cover, not billed",
+        "--cover lists every entry that will post (08:40-11:30,11:30-12:30,12:30-17:10)",
+        "review question counts blocks, high/flag counts and the pending calendar question",
+        "batch-accept does not cover E2; it gets its own answer"
+      ]
+    },
+    {
+      "id": "already-billed-ruling",
+      "prompt": "You are a fresh agent that has loaded the daily skill. Do NOT run anything; answer in plain text only. The user says: 'do 2026-10-09'. timesheet-provider list 2026-10-09 2026-10-09 shows three entries (09:00-12:00 Acme, 12:30-15:30 Acme, 15:30-16:30 Internal admin). Timesheets/2026-10-09_harvest_responses.json exists and records that the user explicitly extended the 12:30-15:30 entry to 15:30 last week after a screenshot check. The user then says: 'the 12:30 one looks too long to me, trim it to 14:30 if the data agrees'. You recompute and the active_ratio of 14:30-15:30 is 0.3. Say exactly what you read and run, in order, what you tell the user, and what you do to the entry.",
+      "checks": [
+        "checks Harvest before rebuilding, before loading inputs",
+        "reads the harvest_responses.json whole",
+        "loads classification-rules.md before proposing a reduction",
+        "treats the user's earlier ruling as binding: says recomputation disagrees, does not trim on the ratio alone",
+        "reads a screenshot inside the Internal admin entry",
+        "no patch is issued without its own yes and --confirm"
+      ]
+    },
+    {
+      "id": "confirm-gate-and-dst",
+      "prompt": "You are a fresh agent that has loaded the daily skill. Do NOT run anything; answer in plain text only. Drafting is done for 2026-04-05, a day the clocks went back (derived zone, none configured). Blocks: one Acme entry 01:30-04:00 worked straight through the change. The user replied 'looks fine' to the Step 6 review question. Say exactly: what you do next, what the posting question contains, which command you run first, whether you add --confirm and when, and what you do when the provider refuses the straddling entry. Then the user answers 'yes' and the post command prints 'WOULD POST {...}'. State what you record.",
+      "checks": [
+        "does not treat 'looks fine' as the Step 8 yes; runs the checklist and puts the posting question with each entry's note",
+        "posting question names the derived-zone line and TIMESHEET_TIMEZONE",
+        "--confirm only added after the explicit yes to the posting question",
+        "refusal of the straddling entry: post the two entries it names, do not close the overlap",
+        "WOULD POST is not recorded as posted; re-run with the flag"
+      ]
+    }
+  ]
+}
