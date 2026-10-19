@@ -14,7 +14,7 @@ from __future__ import annotations
 import datetime as dt
 
 import timezone
-from provider.errors import ProviderError, Refused
+from provider.errors import ProviderError, Refused, with_context
 from provider.harvest import client, guards
 
 TO_WIRE = {"project_id": "project_id", "task_id": "task_id", "date": "spent_date",
@@ -123,7 +123,7 @@ def list_entries(date_from: str, date_to: str) -> list[dict]:
     try:
         user_id = client.request("GET", "/users/me")["id"]
     except ProviderError as e:
-        raise type(e)(f"{str(e).splitlines()[0]} (reading the user)") from None
+        raise with_context(e, "reading the user") from None
     raw: list[dict] = []
     page = 1
     while True:
@@ -132,7 +132,7 @@ def list_entries(date_from: str, date_to: str) -> list[dict]:
                 "user_id": user_id, "from": date_from, "to": date_to,
                 "per_page": 100, "page": page})
         except ProviderError as e:
-            raise type(e)(f"{str(e).splitlines()[0]} (reading entries, page {page})") from None
+            raise with_context(e, f"reading entries, page {page}") from None
         raw.extend(resp.get("time_entries", []))
         if not resp.get("next_page"):
             break

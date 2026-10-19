@@ -1,6 +1,6 @@
 ---
 name: daily
-description: Fill in, review, regenerate, or backfill a daily timesheet from ActivityWatch data and log the time to Harvest. User-invoked.
+description: Fill in, review, regenerate, or backfill a daily timesheet from ActivityWatch data and log the time to the timesheet provider (Harvest by default). User-invoked.
 compatibility: Runs bundled Python scripts, so it needs Python 3.10+ on the PATH and a harness that can execute local commands. Reads a running ActivityWatch server (default http://localhost:5600) or a daily_exports/ dump of one. Logging time needs Harvest credentials. Screenshot capture is Windows-only.
 disable-model-invocation: true
 ---

@@ -1005,3 +1005,18 @@ def test_the_default_listing_is_unchanged_by_the_flag_existing(live_harvest):
     r = run_cli(tp, ["list", "2026-08-12"])
     assert r.code == 0
     assert r.lines[0].split()[0] == "101"
+
+
+@pytest.mark.parametrize("argv", [["list", "2026-08-12"], ["refresh"]])
+def test_a_missing_credential_keeps_the_whole_set_it_with_block(monkeypatch, tmp_path, argv):
+    """§ 5: the context an adapter adds to a failure (which page, which read) must not cost
+    the user the `Set it with:` line and the setup steps that follow it. `list` and
+    `refresh` once kept only the first line of the message when they added that context."""
+    monkeypatch.setenv("TIMESHEET_PROVIDER", "harvest")
+    (tmp_path / ".mcp").mkdir()
+    monkeypatch.setenv("TIMESHEET_WORKSPACE", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    r = run_cli(tp, argv)
+    assert r.code == 3
+    assert r.err.startswith("ERR missing configuration:")
+    assert "Set it with:" in r.err and "Exported install instead?" in r.err

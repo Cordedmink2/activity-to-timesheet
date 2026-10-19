@@ -125,6 +125,31 @@ def test_every_work_kind_the_glossary_defines_is_reachable_from_the_rules():
     assert not unused, f"work kinds defined but never assigned by any rule: {unused}"
 
 
+# --- the provider boundary (#35) -------------------------------------------------------
+
+PROVIDER = SKILL / "scripts" / "provider"
+
+# Harvest's own wire format: its endpoints and the field names of its requests and replies.
+HARVEST_WIRE = ("spent_date", "started_time", "ended_time", "time_entries",
+                "project_assignments", "task_assignments", "hourly_rate",
+                "HARVEST_ACCOUNT_ID", "HARVEST_API_KEY", "api.harvestapp.com")
+
+
+def test_the_neutral_side_of_the_provider_boundary_speaks_no_harvest_wire_format():
+    """The dispatcher, the error classes and the config helper serve every adapter. A Harvest
+    field reaching them would be one provider's shape leaking into the contract, which is the
+    drift #35 moved the scripts to stop. Only `provider/harvest/` may speak Harvest."""
+    offenders = []
+    for path in sorted(PROVIDER.glob("*.py")):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            hit = next((w for w in HARVEST_WIRE if w in line), None)
+            if hit:
+                offenders.append(f"  {path.relative_to(REPO).as_posix()}:{lineno}: {hit}")
+    assert not offenders, ("Harvest wire format above the adapter:\n" + "\n".join(offenders)
+                           + "\nMove it into provider/harvest/; the neutral modules pass the "
+                           "contract's own names (docs/provider-contract.md).")
+
+
 # --- the work-item source: the same line, drawn for the read seam (#37) ------------------
 #
 # Dataverse is shipped, as one adapter of the work-item source. What may not ship is one

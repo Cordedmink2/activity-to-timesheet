@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **A catalog refresh that comes back with no projects is a failure, not an empty catalog** (#35).
   It used to be written, so every later lookup quietly fell through to the history fallback.
+- **A missing credential keeps its whole setup message on `list` and `refresh`** (#35). Adding
+  which read failed used to cut the message to its first line, which dropped `Set it with:` and the
+  setup steps under it.
 - **A lookup whose history fallback fails is never reported as "no such project"** (#35). The
   failure keeps its own class (3, 4 or 5), where a miss after a *completed* fallback is exit 6.
 
