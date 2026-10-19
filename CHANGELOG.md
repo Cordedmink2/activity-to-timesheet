@@ -46,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every rule write reported itself unconfirmed.
 
 ### Added
+- **A category rule that went quiet is flagged** (#99). `category_rules.py --dormant <date>`
+  asks the activity source which rules labelled something in the previous fortnight and label
+  nothing on the day, and the daily run raises each one at the end, with the date it last
+  matched. Read-only: rules are rebuilt by setup, never rewritten here. Tested against a real
+  ActivityWatch server.
 - **An Edge profile name is a category term with no extension** (#66). Edge writes the profile
   into the window title itself, so `category_rules.py --inspect` now prints a `PROFILE` line
   per name with the gate's verdict, and setup step 3 offers them. Chrome writes no profile
