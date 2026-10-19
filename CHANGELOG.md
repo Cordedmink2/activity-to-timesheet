@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and existing rules are unchanged.
 
 ### Changed
+- **The intent is accepted and the recovered decisions are complete** (#42, #43, #44, #61). The
+  foundational intent now carries seven agreed refusals and a "Not now" line. ADR-0007 is accepted
+  and says what it decides: the boundaries are drawn on what a mistake costs, not on direction.
+  The status paragraph moved there from `CONTEXT.md`. ADR-0001 and ADR-0003, lost on 28 August,
+  are rewritten; 0003 records honestly that its rationale was not recovered.
 - **The test suite can run against a real ActivityWatch server.** `pytest --real-aw` serves
   every test day from a genuine `aw-server` binary in a throwaway database instead of the
   suite's fake, and CI runs it against ActivityWatch 0.14.1 on every push. Its first run found
