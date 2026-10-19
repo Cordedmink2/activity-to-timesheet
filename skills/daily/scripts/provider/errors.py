@@ -34,3 +34,11 @@ class Unreachable(ProviderError):
 class NoMatch(ProviderError):
     """`lookup` completed both reads and found nothing; `refresh --wait` timed out."""
     exit_code = 6
+
+
+def with_context(e: ProviderError, context: str) -> ProviderError:
+    """The same failure class, with `context` added to its first line and every line after it
+    kept. § 5 puts the `Set it with:` block under the first line; keeping only that first line
+    told a user what was missing and nothing about how to supply it."""
+    first, _, rest = str(e).partition("\n")
+    return type(e)(f"{first} ({context})" + (f"\n{rest}" if rest else ""))

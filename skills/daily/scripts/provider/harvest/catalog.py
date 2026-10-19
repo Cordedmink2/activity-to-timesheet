@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 
 import skill_config
-from provider.errors import Misconfigured, NoMatch, ProviderError, Refused
+from provider.errors import Misconfigured, NoMatch, ProviderError, Refused, with_context
 from provider.harvest import client
 
 PAGE_GLOB = "harvest_assignments*.json"
@@ -197,8 +197,7 @@ def _fetch_all(progress: list[str]) -> list[dict]:
             payload = client.request("GET", "/users/me/project_assignments",
                                      query={"per_page": 100, "page": page})
         except ProviderError as e:
-            raise type(e)(f"{str(e).splitlines()[0]} (reading page {page}; "
-                          "existing catalog left untouched)") from None
+            raise with_context(e, f"reading page {page}; existing catalog left untouched") from None
         progress.append(f"  page {page}: {len(payload.get('project_assignments', []))} "
                         "project assignments")
         pages.append(payload)
