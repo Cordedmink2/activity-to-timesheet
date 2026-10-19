@@ -58,6 +58,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite's fake, and CI runs it against ActivityWatch 0.14.1 on every push. Its first run found
   the quoting bug above and that the fake never clipped events to the requested range, which
   had the suite pinning an overnight `work_end` no real install prints.
+- **The provider's command-line contract is written down** (#33). `docs/provider-contract.md`
+  fixes the one `timesheet-provider` command and its five subcommands, the output of each,
+  the exit codes, the single confirmation gate, and which parts a later plugin split renames
+  and which stay inside the adapter — with a mapping from every current script invocation, so
+  moving the Harvest adapter behind it (#35) is mechanical. Design only: no script moved, and
+  a repo-level test fails the document if it names a provider wire-format field.
 
 ## [0.11.1] - 2026-09-29
 
