@@ -60,6 +60,7 @@ from pathlib import Path
 
 import skill_config
 from aw_client import SourceError, get, post_setting, query, unreachable, window_day
+from timezone import resolve_zone, utc_bounds
 
 # How much of the day the sample covers. A week rather than a day so a client worked on
 # only on Tuesdays still has titles to gate against; the whole point of the gate is that a
@@ -72,6 +73,10 @@ DEFAULT_DAYS = 7
 # a one-client consultant legitimately runs hotter than a five-client one, and the
 # `## Preferences` line in the workspace template is where a user's own value belongs.
 DEFAULT_MAX_SHARE = 0.35
+
+# How many days before the target day `--dormant` looks back for a rule's last match (#99):
+# two working weeks, so a fortnight's leave reads as quiet rather than as every rule dead.
+DEFAULT_LOOKBACK = 14
 
 # A client's rule is a curated handful — its code, its products, its name, and for a user who
 # works every client from one browser profile, the addresses only that client's work opens
@@ -836,6 +841,73 @@ def status(directory: Path) -> int:
     return 0
 
 
+def labelled_by_day(classes: list[dict], bucket: str,
+                    periods: list[tuple[str, str]]) -> list[dict[str, float]]:
+    """Per period, seconds the activity source's own `categorize` puts under each class path.
+
+    One query over every period, with the rules as the source holds them, so a rule shadowed
+    by another is judged the way the user's day is actually labelled. `Uncategorized` is
+    kept: it is what says the day had activity at all.
+    """
+    rules = [f"[[{', '.join(_query_string(part) for part in entry['name'])}], "
+             f'{{"type": "regex", "regex": {_query_string(class_regex(entry) or "")}, '
+             f'"ignore_case": {"true" if (entry.get("rule") or {}).get("ignore_case") else "false"}}}]'
+             for entry in classes if class_regex(entry)]
+    answer = query([f"{start}/{end}" for start, end in periods], [
+        f"events = query_bucket({_query_string(bucket)});",
+        f"events = categorize(events, [{', '.join(rules)}]);",
+        'RETURN = merge_events_by_keys(events, ["$category"]);',
+    ])
+    days = []
+    for period in answer:
+        seconds: dict[str, float] = {}
+        for event in period:
+            name = ">".join((event.get("data") or {}).get("$category") or [])
+            seconds[name] = seconds.get(name, 0.0) + float(event.get("duration") or 0)
+        days.append(seconds)
+    return days
+
+
+def dormant(local_date: dt.date, zone, lookback: int) -> int:
+    """Which rules labelled something in the `lookback` days before `local_date` and label
+    nothing on it (#99). Read-only: it reports, and the rebuild is the `setup` skill's.
+
+    `SKIP` when the day itself has no window activity — every rule matches nothing on a day
+    nobody worked, and that is not every rule going dead. A rule that matched nothing in the
+    whole window is not reported either: that is the gate's `unverified` at setup, a known
+    state rather than a change.
+    """
+    classes = [c for c in read_classes() if class_regex(c)]
+    dates = [local_date - dt.timedelta(days=n) for n in range(lookback, -1, -1)]
+    periods = [utc_bounds(d, zone) for d in dates]
+    _, bucket, _ = window_day(periods[-1][0], periods[-1][1],
+                              "no rule can be checked against this day")
+    days = labelled_by_day(classes, bucket, periods)
+    today = days[-1]
+    if not any(seconds > 0 for seconds in today.values()):
+        print(f"SKIP {local_date} has no window activity, so no rule can be said to have "
+              f"stopped matching on it")
+        return 0
+    flagged = 0
+    for entry in classes:
+        name = class_name(entry)
+        if today.get(name, 0) > 0:
+            continue
+        last = next((d for d, seconds in zip(reversed(dates[:-1]), reversed(days[:-1]))
+                     if seconds.get(name, 0) > 0), None)
+        if last is None:
+            continue
+        flagged += 1
+        print(f"DORMANT {name} — matched nothing on {local_date}; last matched {last}. A "
+              f"renamed browser profile, a changed site title or a code no longer typed looks "
+              f"like this: check the term in .context.md, and rebuild with the `setup` "
+              f"skill's category step if it changed")
+    if not flagged:
+        print(f"OK every rule that matched in the {lookback} days before {local_date} "
+              f"still matches on it")
+    return 0
+
+
 def main():
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
@@ -851,6 +923,15 @@ def main():
     ap.add_argument("--status", action="store_true",
                     help="Say whether the rules are still current for the workspace "
                          "context file. Reads no activity source.")
+    ap.add_argument("--dormant", metavar="YYYY-MM-DD",
+                    help="Flag every rule that matched in the days before this local date "
+                         "and matches nothing on it. Reads only; writes nothing.")
+    ap.add_argument("--lookback", type=int, default=DEFAULT_LOOKBACK,
+                    help=f"With --dormant: how many days back a rule's last match counts "
+                         f"(default {DEFAULT_LOOKBACK})")
+    ap.add_argument("--utc-offset", type=float, default=None,
+                    help="With --dormant: the local zone offset in hours, for this run "
+                         "only. Omit to use the configured TIMESHEET_TIMEZONE.")
     ap.add_argument("--days", type=int, default=DEFAULT_DAYS,
                     help=f"How many days of window titles to sample (default {DEFAULT_DAYS})")
     ap.add_argument("--max-share", type=float, default=DEFAULT_MAX_SHARE,
@@ -861,10 +942,21 @@ def main():
                          "the configured TIMESHEET_WORKSPACE for this run")
     args = ap.parse_args()
 
-    chosen = [bool(args.candidates), args.inspect, args.status]
+    chosen = [bool(args.candidates), args.inspect, args.status, bool(args.dormant)]
     if sum(chosen) != 1:
-        print("ERR give exactly one of --candidates, --inspect or --status", file=sys.stderr)
+        print("ERR give exactly one of --candidates, --inspect, --status or --dormant",
+              file=sys.stderr)
         return 2
+    local_date = None
+    if args.dormant:
+        try:
+            local_date = dt.datetime.strptime(args.dormant, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"ERR bad date '{args.dormant}', expected YYYY-MM-DD", file=sys.stderr)
+            return 2
+        if args.lookback < 1:
+            print("ERR --lookback must be at least 1", file=sys.stderr)
+            return 2
 
     try:
         # `--inspect` resolves no workspace on purpose: it writes nothing, and creating a
@@ -873,6 +965,8 @@ def main():
         if args.inspect:
             return inspect(args.days, args.max_share,
                            state_dir(args.workspace, create=False))
+        if local_date is not None:
+            return dormant(local_date, resolve_zone(args.utc_offset), args.lookback)
         if args.status:
             # Read-only, and run at the start of every day: it must not mint a directory in
             # whatever folder the session started in, nor fail because it could not.
