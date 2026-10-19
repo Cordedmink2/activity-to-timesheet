@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single-quoted string, which the Rust server ActivityWatch ships rejects with HTTP 400, so
   every rule write reported itself unconfirmed.
 
+### Added
+- **An Edge profile name is a category term with no extension** (#66). Edge writes the profile
+  into the window title itself, so `category_rules.py --inspect` now prints a `PROFILE` line
+  per name with the gate's verdict, and setup step 3 offers them. Chrome writes no profile
+  name, so URL in title stays required there; Firefox is stated as unverified. Bracketed codes
+  and existing rules are unchanged.
+
 ### Changed
 - **The test suite can run against a real ActivityWatch server.** `pytest --real-aw` serves
   every test day from a genuine `aw-server` binary in a throwaway database instead of the

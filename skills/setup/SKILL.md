@@ -142,6 +142,8 @@ Where the user added the web watcher, `GET <activity-url>/api/0/buckets/` also h
 
 ### 3. A browser profile dedicated to one client carries that client's tag
 
+**Which browser decides how.** Say which one you are configuring. **Edge** already writes the profile's name into every window title (`… - ClientA - Alex - Microsoft Edge`), so a profile name is a category term with nothing installed: the `PROFILE` lines of step 4.1 list each one with the gate's verdict, and the tag below is an optional upgrade for Edge. **Chrome** writes no profile name — two profiles can show byte-identical titles — so URL in title and its tag are **required** there. **Firefox** has not been verified for either; say so and claim no support. Bracketed codes and rules already written keep working unchanged. Detail: `references/profile-names.md`.
+
 **Do** — run `--inspect` (step 4.1) first, so its lines are in hand, then the interview's rounds 1 and 2. Round 2 decides which of their profiles belongs to exactly one client. **A profile tag goes on those and nowhere else.** A general or default profile — the one they use for everything, their own admin, research, the tools they share across clients — carries none, and its time is attributed from what is on the page instead. A short, collision-resistant **client code** is settled for every client either way; give the user this once per single-client profile, with that profile's own code substituted:
 
 > **Add this client's code to this profile.** The code is a short label, like ACME. It tells your timesheet that everything in this profile is for that client.

@@ -34,7 +34,8 @@ Three modes:
   * `--inspect`              what the activity source holds now, each rule marked managed
                              or not and carrying the share of the sample it matches — the
                              read behind adopting rules the plugin did not author — and,
-                             as `SEEN` lines, the profile tags the titles really carry, and
+                             as `SEEN` lines, the profile tags the titles really carry, as `PROFILE` lines the Edge
+                             profile names the titles carry unaided, each with the gate's verdict, and
                              as `HOST` lines, the addresses the browser titles carry
   * `--status`               whether the rules are still current for the workspace context
                              file. Reads two local files and nothing over the wire
@@ -91,6 +92,10 @@ REGEX_SPECIAL = re.compile(r"([\\.^$|?*+()\[\]{}])")
 TAGGED_TITLE = re.compile(r"^.* - (\[[A-Za-z0-9-]{2,12}\])(?: and \d+ more pages?)?"
                           r"(?: - ([^-]+(?: - [^-]+)?) - Microsoft\W*Edge| - Google Chrome)?$",
                           re.IGNORECASE)
+
+# What Edge itself ends a title with, no extension involved: `- <profile> - Microsoft Edge`.
+EDGE_SUFFIX = re.compile(r"^(.*) - Microsoft\W*Edge$", re.IGNORECASE)
+BARE_TAG = re.compile(r"^\[[A-Za-z0-9-]{2,12}\](?: and \d+ more pages?)?$")
 
 # The address the extension appends: `{title}-{hostname}{path}…`, one whitespace-free token
 # that also carries the last word of the page title, since the extension joins the two with
@@ -301,6 +306,51 @@ def print_seen(sample: list[Window]) -> None:
                 f"{_named(slot)} ({n})" for slot, n in
                 sorted(slots.items(), key=lambda item: (-item[1], item[0] or "")))
         print(f"SEEN {tag} — {titles}, {where}")
+
+
+def edge_profile_names(sample: list[Window]) -> collections.Counter:
+    """Each Edge profile name the titles carry on their own, with the titles it was read from.
+
+    Edge ends a title `- <profile> - Microsoft Edge`; Chrome prints no profile, so a title
+    from any other browser contributes nothing, and neither does a title whose last slot is
+    only a profile tag. A name may hold ` - ` itself (`Name - Account`), and so may a page
+    title, so the two-segment reading is taken only where the same two segments end more
+    than one distinct title — a page part does not repeat that way, a profile does. A name
+    seen once is read as its last segment alone; the gate still judges what it matches.
+    """
+    tails: list[tuple[str, str]] = []
+    for app, title in sample:
+        found = EDGE_SUFFIX.match(title) if BROWSER_APP.search(app) else None
+        if not found:
+            continue
+        parts = [part.strip() for part in found.group(1).split(" - ")]
+        last = parts[-1]
+        if len(parts) < 2 or not last or BARE_TAG.match(last):
+            continue
+        before = parts[-2]
+        tails.append((last if BARE_TAG.match(before) else f"{before} - {last}", last))
+    pairs = collections.Counter(pair for pair, _ in tails)
+    return collections.Counter(pair if pairs[pair] > 1 else last for pair, last in tails)
+
+
+def print_profiles(sample: list[Window], max_share: float) -> None:
+    """One `PROFILE` line per Edge profile name in the titles, most-seen first, each with the
+    verdict the gate would give it as a term — the same `judge()` a candidate goes through,
+    so a name that is everywhere is marked refused here rather than chosen and bounced.
+
+    A second source of category terms beside the extension's tag, and the only one that
+    needs no setup in the browser. Chrome's titles carry none (#66).
+    """
+    names = edge_profile_names(sample)
+    if not names:
+        print("PROFILE none in the sampled titles")
+        return
+    for name, count in sorted(names.items(), key=lambda item: (-item[1], item[0])):
+        verdict = judge({"client": name, "terms": [name]}, sample, max_share)
+        gate = (f"gate: write, matches {len(verdict['matched'])} of {len(sample)} sampled "
+                f"titles" if verdict["verdict"] == "write"
+                else f"gate: refuse, {verdict['reason']}")
+        print(f'PROFILE "{name}" — {count} title{"" if count == 1 else "s"} in Edge; {gate}')
 
 
 def _named(slot: str | None) -> str:
@@ -714,6 +764,7 @@ def inspect(days: int, max_share: float, directory: Path) -> int:
     # Before the rules: a build with no settings endpoint refuses below, and the tags are
     # read from the sample alone.
     print_seen(sample)
+    print_profiles(sample, max_share)
     print_hosts(sample)
     classes = read_classes()
     if not classes:
