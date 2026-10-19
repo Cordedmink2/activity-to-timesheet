@@ -43,6 +43,37 @@ The script's design assumes:
 - Format is tabular text or JSON — readable line-by-line by downstream classifiers
 - Auth uses whatever CLI the user has configured for their backend (e.g. `pac` CLI for Dataverse, `gh` for GitHub Issues)
 
+### Dataverse (the one adapter that ships)
+
+If you create work tickets in a **Dataverse / Dynamics 365** org that sync to Harvest as projects, you
+can enable ticket-number → title lookups by setting two values:
+
+```
+DATAVERSE_URL=https://yourorg.crm6.dynamics.com/
+PAC_AUTH_PROFILE=YourPacAuthProfileName
+```
+
+These two are deliberately **not** declared plugin configuration: they belong to one org's setup
+rather than to every install, so `/plugin configure billables` never asks for them. Where they go
+depends on which install you have:
+
+- **Plugin install:** set them as ordinary environment variables. Not in a `.env` inside the plugin
+  folder — a `/plugin update` overwrites that folder, and the skill's own diagnostic tells you to
+  delete any `.env` it finds there, because on a plugin install one silently outranks the
+  configuration dialog.
+- **Exported install**: the skill root's `.env`, alongside the Harvest keys.
+
+The profile must be a **named** one — the refresh selects it with `pac auth select --name`, and
+`pac auth create` without `--name` creates an unnamed profile it can never select. Authenticate with
+`pac auth create --name YourPacAuthProfileName --environment https://yourorg.crm6.dynamics.com/`, or
+name an existing profile without re-authenticating: `pac auth name --index <N> --name <name>`.
+
+This requires the [Power Platform CLI](https://learn.microsoft.com/power-platform/developer/cli/introduction)
+(`pac`) installed and authenticated. **Leave both blank to skip it** — everything else works
+Harvest-only.
+
+If you instead connect Dataverse through an MCP server (e.g. via the `dataverse` plugin's `dv-connect` skill), register it **scoped locally to this workspace** — run `claude mcp add -s local …` from this folder, never user scope — so a single-env server can't follow you into your other client repos.
+
 ## Creating a backend work item to bill against
 
 A block that belongs to new work with no project yet is `references/new-client-work.md`'s procedure — the work item is created in the user's backend and syncs to the provider as a new project. What this file adds is the read-replica lag above: the new project surfaces in the assignment catalog minutes later, so poll with `wait_for_project(code)` rather than refreshing once.

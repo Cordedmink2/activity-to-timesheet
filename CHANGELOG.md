@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its own `lock-screen` row instead of folding it into the uncategorized work either side,
   and names the `afk_blocks.py --window` check that decides it; the reference no longer says
   to exclude it unread.
+- **The README is an install and a pointer at `/billables:setup`** (#38). The eleven-step
+  walkthrough is gone — `setup` owns those steps and checks each one. The non-Claude-Code
+  install is its own README section; the Dataverse catalog moved to the `daily` skill's
+  `references/catalog-refresh.md`; the repo map moved to `docs/CONTRIBUTING.md`.
 - **A workday with no screenshots at all is called out** (#34). The day skeleton now counts
   the date's capture ticks and names the last one; on a day with real activity and none, it
   says the capture task was dead all day and that no block has a screenshot fallback. A day

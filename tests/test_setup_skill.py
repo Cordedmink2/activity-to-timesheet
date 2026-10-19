@@ -472,9 +472,9 @@ def test_each_browser_extension_id_is_the_same_wherever_it_is_written(extension)
     """`ExtensionInstallAllowlist` takes the ID and nothing else, so a copy that drifts
     sends an administrator allow-listing an extension nobody ships — and the user's
     browser watcher stays blocked with the ticket marked done. The reference owns each ID,
-    on the line naming its extension; the skill's step and the README repeat them for the
-    reader who never opens the reference, and until this test nothing read the three
-    together."""
+    on the line naming its extension; the skill's step repeats them for the reader who
+    never opens the reference. The README carried a third copy until #38 cut its setup
+    walkthrough down to a pointer at this skill."""
     reference = (SETUP / "references" / "endpoint-security.md").read_text(encoding="utf-8")
     assert len(set(CHROME_EXTENSION_ID.findall(reference))) == len(EXTENSIONS), (
         "the endpoint-security reference names a different number of extension IDs from "
@@ -485,7 +485,7 @@ def test_each_browser_extension_id_is_the_same_wherever_it_is_written(extension)
     assert len(ids) == 1, (
         f"the endpoint-security reference names {len(ids)} IDs beside {extension!r}")
     (extension_id,) = ids
-    for doc in (SETUP_MD, REPO / "README.md"):
+    for doc in (SETUP_MD,):
         assert extension_id in doc.read_text(encoding="utf-8"), (
             f"{doc.relative_to(REPO)} does not carry the {extension} ID the reference "
             f"names, {extension_id}")
