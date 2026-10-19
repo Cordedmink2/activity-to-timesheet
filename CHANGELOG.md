@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   walkthrough is gone — `setup` owns those steps and checks each one. The non-Claude-Code
   install is its own README section; the Dataverse catalog moved to the `daily` skill's
   `references/catalog-refresh.md`; the repo map moved to `docs/CONTRIBUTING.md`.
+- **A meeting attended on another monitor is noticed** (#79). Each corroborated calendar
+  event now carries `evidence_share` — how much of it the meeting windows cover — and a low
+  one sends the run to the Teams call timer in a screenshot, which gives the meeting's real
+  start by subtraction. The screenshot subagent is now asked for call timers.
 - **A calendar event can settle a client** (#55). Its subject and attendees rank with the
   Teams title and below a work item; when a subject is not enough,
   `calendar_day.py <date> --detail <id>` prints that one event's body and location, and is

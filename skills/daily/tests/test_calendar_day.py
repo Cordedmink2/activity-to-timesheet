@@ -186,7 +186,7 @@ def test_the_output_is_local_clocks_sorted_by_start_with_the_fields_the_rules_re
     assert [e["id"] for e in out["events"]] == ["earlier", "later"]
     first = out["events"][0]
     assert set(first) == {"id", "subject", "start", "end", "show_as", "response", "attendees",
-                          "corroborated", "evidence", "block"}
+                          "corroborated", "evidence", "evidence_share", "block"}
     assert (first["start"], first["end"]) == ("09:00:00", "09:45:00")
     assert first["show_as"] == "busy" and first["response"] == "accepted"
     assert first["attendees"] == ["Ana Client", "Ben Colleague"]
@@ -656,12 +656,13 @@ def test_the_wrapper_prints_the_contract_for_a_date_through_an_adapter_it_is_giv
              "end": "09:45:00", "show_as": "busy", "response": "accepted",
              "attendees": ["Ana Client", "Ben Colleague"],
              "corroborated": True,
-             "evidence": {"start": "09:02:00", "end": "09:50:00"},
+             "evidence": {"start": "09:02:00", "end": "09:50:00"}, "evidence_share": 0.96,
              "block": {"start": "09:00:00", "end": "09:50:00"}},
             {"id": "tentative", "subject": "Māori language week planning", "start": "13:00:00",
              "end": "13:30:00", "show_as": "tentative", "response": "tentative",
              "attendees": ["Ana Client", "Ben Colleague"],
-             "corroborated": False, "evidence": None, "block": None},
+             "corroborated": False, "evidence": None, "evidence_share": None,
+             "block": None},
         ],
         # #78: what the day held and the filter removed is named, so a filtered-to-nothing
         # calendar never reads as an empty one.
@@ -955,3 +956,34 @@ def test_the_adapter_is_handed_the_id_as_its_second_argument(tmp_path):
     assert cd.adapter_argv(tmp_path / "a.py", MAY, "x/1")[-2:] == ["2026-05-28", "x/1"]
     assert cd.adapter_argv(tmp_path / "a.ps1", MAY, "x/1")[-2:] == ["2026-05-28", "x/1"]
     assert cd.adapter_argv(tmp_path / "a.py", MAY)[-1] == "2026-05-28"
+
+
+# --------------------------------------------------------------------------------------
+# A meeting attended on another monitor (#79): the windows show only what was foregrounded,
+# so the share of the event they cover is printed, and a low one sends the run to the timer.
+# --------------------------------------------------------------------------------------
+
+def test_a_meeting_mostly_on_another_monitor_reports_a_low_evidence_share(
+        fake_adapter, calendar_on, live_aw):
+    """The standup is 09:00-09:45; its window is foregrounded for 09:30-09:39 only. It is
+    corroborated, but 9 of 45 minutes is not how long it ran — the share says so."""
+    d = day().active("08:30", "10:00")
+    d.window("09:30", "09:39", TEAMS, "Meeting | Standup — ACME | Microsoft Teams")
+    live_aw(d)
+    standup = run_cli(cd, [MAY.isoformat(), "--adapter", str(fake_adapter(CANNED))]
+                      ).json()["events"][0]
+    assert standup["corroborated"] is True
+    assert standup["evidence_share"] == 0.2
+
+
+def test_the_evidence_share_counts_only_the_time_inside_the_event():
+    s = dt.datetime(2026, 5, 28, 9, tzinfo=dt.timezone.utc)
+    runs: list[cd.Run] = [(None, s - dt.timedelta(minutes=10), s + dt.timedelta(minutes=30)),
+            (None, s + dt.timedelta(minutes=50), s + dt.timedelta(minutes=70))]
+    v = cd.verdict(s, s + dt.timedelta(minutes=60), runs)
+    assert v["evidence_share"] == 0.67      # 30 + 10 of 60 minutes
+
+
+def test_an_uncorroborated_event_has_no_share():
+    s = dt.datetime(2026, 5, 28, 9, tzinfo=dt.timezone.utc)
+    assert cd.verdict(s, s + dt.timedelta(hours=1), [])["evidence_share"] is None

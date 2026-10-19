@@ -79,6 +79,10 @@ A corroborated event carries the **evidence** — the span of meeting window see
 so it may start before the event — and a proposed **block**: the event's span, extended to
 the end of the evidence when that runs later. An overrun the machine saw is billed; time
 after the scheduled end with no meeting window is not, whatever the AFK watcher made of it.
+The **evidence_share** is how much of the event the meeting windows cover: the window
+watcher sees only the foreground, so a meeting attended on another monitor is corroborated
+by the minutes it was clicked on, and a low share says the evidence came from those minutes
+rather than from the meeting (#79).
 An uncorroborated event carries neither. Both verdicts are arithmetic here so the rules read
 them and never re-derive them; what each verdict *means* for the day — a block drafted over
 a break, a question apart from the draft — is the rules' to say.
@@ -90,6 +94,7 @@ a break, a question apart from the draft — is the rules' to say.
                "show_as", "response", "attendees",
                "corroborated": true,
                "evidence": {"start": "09:03:00", "end": "09:52:00"},   null when not
+               "evidence_share": 0.96,   window time inside the event / its length
                "block":    {"start": "09:00:00", "end": "09:52:00"}},  null when not
               ...]}
 
@@ -371,9 +376,14 @@ def verdict(start: dt.datetime, end: dt.datetime, runs: list[Run],
     seen = [(s, e) for s, e in usable if e > start and s < end] if end > start else []
     inside = sum((min(e, end) - max(s, start)).total_seconds() for s, e in seen)
     if not seen or inside < min_evidence:
-        return {"corroborated": False, "evidence": None, "block": None}
+        return {"corroborated": False, "evidence": None, "evidence_share": None, "block": None}
     evidence = (min(s for s, _ in seen), max(e for _, e in seen))
-    return {"corroborated": True, "evidence": evidence,
+    # How much of the event the windows actually cover (#79). The window watcher sees only
+    # the foreground, so a meeting attended on another monitor is corroborated by the few
+    # minutes it was clicked on — a low share is that shape, and the call timer in a
+    # screenshot is what recovers its real span.
+    share = round(inside / (end - start).total_seconds(), 2)
+    return {"corroborated": True, "evidence": evidence, "evidence_share": share,
             "block": (start, max(end, evidence[1]))}
 
 
@@ -428,6 +438,7 @@ def filtered_day(payload, local_date: dt.date, zone, window_events: list[dict],
             "attendees": event["attendees"],
             "corroborated": judged["corroborated"],
             "evidence": _clocks(judged["evidence"], zone),
+            "evidence_share": judged["evidence_share"],
             "block": _clocks(judged["block"], zone),
         }))
     kept.sort(key=lambda pair: pair[0])
