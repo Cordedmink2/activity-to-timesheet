@@ -530,6 +530,10 @@ WORK_DOCS = ("msedge.exe", f"Docs-docs.example.com/home - Work{EDGE}")
 WORK_WIKI = ("msedge.exe", f"Wiki-wiki.example.com/start - Work{EDGE}")
 CHROME_NEW_TAB = ("chrome.exe", "New Tab - Google Chrome")
 CHROME_PAGE = ("chrome.exe", "Example Domain - Google Chrome")
+# A Chrome title with a page part and one more segment: the shape a widened browser match
+# would read as a profile name (`Team`), so the sample must hold it more than once.
+CHROME_TEAM_BOARD = ("chrome.exe", "Board-team.example.com/board - Team - Google Chrome")
+CHROME_TEAM_MAIL = ("chrome.exe", "Inbox-team.example.com/inbox - Team - Google Chrome")
 
 
 def inspected(rows: list[tuple[str, str]], live_aw) -> str:
@@ -579,13 +583,15 @@ def test_an_offered_profile_name_that_matches_too_much_is_refused_by_the_gate(
 def test_a_chrome_only_sample_offers_no_profile_name(live_aw, workspace):
     """Chrome's titles carry no profile, so nothing is offered and the extension stays
     the only way to tell its profiles apart."""
-    out = inspected([CHROME_NEW_TAB, CHROME_PAGE], live_aw)
+    out = inspected([CHROME_NEW_TAB, CHROME_PAGE, CHROME_TEAM_BOARD, CHROME_TEAM_MAIL],
+                    live_aw)
     assert 'PROFILE "' not in out
     assert "PROFILE none in the sampled titles" in out
 
 
 def test_a_mixed_edge_and_chrome_sample_offers_only_the_edge_names(live_aw, workspace):
-    out = inspected([CLIENT_A_BOARD, CLIENT_A_MAIL, CHROME_NEW_TAB, CHROME_PAGE], live_aw)
+    out = inspected([CLIENT_A_BOARD, CLIENT_A_MAIL, CHROME_NEW_TAB, CHROME_PAGE,
+                     CHROME_TEAM_BOARD, CHROME_TEAM_MAIL], live_aw)
     offered = [l for l in out.splitlines() if l.startswith("PROFILE ")]
     assert [l.split(" — ")[0] for l in offered] == ['PROFILE "ClientA - Alex"']
     assert "Google Chrome" not in "".join(offered)
@@ -595,6 +601,13 @@ def test_a_tagged_title_still_yields_its_profile_name_and_not_the_tag(live_aw, w
     out = inspected([ACME_TAGGED, ACME_TAGGED_ALONE, PERSONAL], live_aw)
     assert 'PROFILE "Acme - Dana" — 2 titles in Edge' in out
     assert 'PROFILE "[ACME]' not in out
+
+
+def test_a_title_whose_last_slot_is_only_a_tag_yields_no_profile_name(live_aw, workspace):
+    tag_last = ("msedge.exe", f"Page-x.example.com - [ACME]{EDGE}")
+    out = inspected([tag_last, WORK_DOCS], live_aw)
+    assert 'PROFILE "[ACME]' not in out
+    assert 'PROFILE "Work" — 1 title in Edge' in out
 
 
 def test_the_profile_names_are_offered_where_the_rules_cannot_be_read(live_aw, workspace):
