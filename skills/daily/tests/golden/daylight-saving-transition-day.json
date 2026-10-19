@@ -48,9 +48,13 @@
       "covered_active_min": 480.0,
       "total_active_min": 480.0,
       "uncovered": []
+    },
+    "captures": {
+      "count": 0,
+      "last": null
     }
   },
-  "afk_text": "AFK analysis for 2026-04-05  (zone Pacific/Auckland, break>=1050s)\n  bucket:      aw-watcher-afk_TESTHOST\n  work start:  00:40:00\n  WORK END:    17:00:00   <- end of day; do not bill past this\n  active time: 480.0 min total\n  window tail: last window event ends 17:00:00 (+0 min vs work end)\n  breaks (>= 17 min):\n     01:45:00 - 09:15:00  (510.0 min)\n     12:30:00 - 13:20:00  (50.0 min)\n  active spans (short afk folded in):\n     00:40:00 - 01:45:00  (65.0 min)\n     09:15:00 - 12:30:00  (195.0 min)\n     13:20:00 - 17:00:00  (220.0 min)\n  coverage of proposed blocks vs AFK active_spans:\n     blocks cover 480.0 of 480.0 active min\n     (all active spans covered)\n",
+  "afk_text": "AFK analysis for 2026-04-05  (zone Pacific/Auckland, break>=1050s)\n  bucket:      aw-watcher-afk_TESTHOST\n  work start:  00:40:00\n  WORK END:    17:00:00   <- end of day; do not bill past this\n  active time: 480.0 min total\n  captures:    none for this date  <- capture task dead all day; no screenshot fallback for any block\n  window tail: last window event ends 17:00:00 (+0 min vs work end)\n  breaks (>= 17 min):\n     01:45:00 - 09:15:00  (510.0 min)\n     12:30:00 - 13:20:00  (50.0 min)\n  active spans (short afk folded in):\n     00:40:00 - 01:45:00  (65.0 min)\n     09:15:00 - 12:30:00  (195.0 min)\n     13:20:00 - 17:00:00  (220.0 min)\n  coverage of proposed blocks vs AFK active_spans:\n     blocks cover 480.0 of 480.0 active min\n     (all active spans covered)\n",
   "window_reports": {
     "00:40-01:45": {
       "window": "00:40-01:45",

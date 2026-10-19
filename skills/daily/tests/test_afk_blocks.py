@@ -16,7 +16,7 @@ import pytest
 SCRIPTS = os.path.join(os.path.dirname(__file__), "..", "scripts")
 sys.path.insert(0, SCRIPTS)
 import afk_blocks as ab
-from support import day, fixed
+from support import day, fixed, run_cli
 
 DAY = dt.date(2026, 5, 28)
 D = day(offset=0)
@@ -268,3 +268,62 @@ def test_a_break_from_a_data_hole_is_distinguishable_from_a_recorded_afk_break()
              for s, e, _ in ab.find_breaks(
                  spans, D.at("09:00"), D.at("13:00"), ab.DEFAULT_THRESHOLD)}
     assert kinds == {("10:00", "10:30"): "afk", ("11:00", "12:00"): "gap"}
+
+
+# --------------------------------------------------------------------------------------
+# Captures beside the skeleton (#34): a workday with no screenshots at all is the capture
+# task dead, and the run has to hear it at the skeleton, not infer it from a missing index.
+# --------------------------------------------------------------------------------------
+
+def _shots(root, date, *ticks, monitors=1):
+    folder = root / date
+    folder.mkdir(parents=True, exist_ok=True)
+    for t in ticks:
+        for m in range(1, monitors + 1):
+            (folder / f"{t}_m{m}.png").write_bytes(b"png")
+
+
+def test_a_workday_with_no_captures_says_the_capture_task_was_dead(live_aw, shots_dir):
+    live_aw(day(dt.date(2026, 6, 19)).active("09:00", "17:00"))
+    out = run_cli(ab, ["2026-06-19"])
+    assert out.code == 0, out.err
+    line = next(ln for ln in out.lines if "captures:" in ln)
+    assert "none" in line and "no screenshot fallback for any block" in line
+    assert run_cli(ab, ["2026-06-19", "--json"]).json()["captures"] == {
+        "count": 0, "last": None}
+
+
+def test_an_empty_folder_reads_the_same_as_no_folder(live_aw, shots_dir):
+    (shots_dir / "2026-06-19").mkdir()
+    live_aw(day(dt.date(2026, 6, 19)).active("09:00", "17:00"))
+    assert run_cli(ab, ["2026-06-19", "--json"]).json()["captures"]["count"] == 0
+
+
+def test_captures_report_ticks_not_files_and_the_last_one(live_aw, shots_dir):
+    _shots(shots_dir, "2026-06-19", "09-00-05", "12-30-05", "13-15-20", monitors=2)
+    (shots_dir / "2026-06-19" / "capture.log").write_text("x", encoding="utf-8")
+    live_aw(day(dt.date(2026, 6, 19)).active("09:00", "17:00"))
+    got = run_cli(ab, ["2026-06-19", "--json"]).json()["captures"]
+    assert got == {"count": 3, "last": "13:15:20"}
+    line = next(ln for ln in run_cli(ab, ["2026-06-19"]).lines if "captures:" in ln)
+    assert "3" in line and "13:15:20" in line and "fallback" not in line
+
+
+def test_a_day_with_no_activity_stays_quiet_about_captures(live_aw, shots_dir):
+    live_aw(day(dt.date(2026, 6, 19)))
+    out = run_cli(ab, ["2026-06-19"])
+    assert "captures" not in out.out
+    assert run_cli(ab, ["2026-06-19", "--json"]).json()["captures"] is None
+
+
+def test_the_skeleton_looks_for_captures_where_the_capture_task_writes(monkeypatch, tmp_path):
+    """Repeated, not imported (an entry point), so held equal here instead."""
+    import importlib
+    import screenshot_capture
+    real = importlib.reload(ab).screenshots_dir      # undo `_hermetic`'s redirect
+    for value in (None, str(tmp_path / "configured"), "~/Shots"):
+        if value is None:
+            monkeypatch.delenv("TIMESHEET_SCREENSHOTS_DIR", raising=False)
+        else:
+            monkeypatch.setenv("TIMESHEET_SCREENSHOTS_DIR", value)
+        assert real() == screenshot_capture.resolve_screenshots_dir([])

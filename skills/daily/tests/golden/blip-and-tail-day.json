@@ -50,9 +50,13 @@
       "covered_active_min": 505.0,
       "total_active_min": 506.0,
       "uncovered": []
+    },
+    "captures": {
+      "count": 0,
+      "last": null
     }
   },
-  "afk_text": "AFK analysis for 2026-08-11  (offset UTC+12, break>=1050s)\n  bucket:      aw-watcher-afk_TESTHOST\n  work start:  08:00:00\n  WORK END:    19:31:00   <- end of day; do not bill past this\n  BLIP:        work_end is a momentary flicker; last substantive activity ended 17:20:00 -> end the final block there\n  active time: 506.0 min total\n  window tail: last window event ends 22:00:00 (+149 min vs work end)  <- left-in-focus trap, NOT work\n  breaks (>= 17 min):\n     12:15:00 - 13:10:00  (55.0 min)\n     17:20:00 - 19:30:00  (130.0 min)\n  active spans (short afk folded in):\n     08:00:00 - 12:15:00  (255.0 min)\n     13:10:00 - 17:20:00  (250.0 min)\n     19:30:00 - 19:31:00  (1.0 min)\n  coverage of proposed blocks vs AFK active_spans:\n     blocks cover 505.0 of 506.0 active min\n     (all active spans covered)\n",
+  "afk_text": "AFK analysis for 2026-08-11  (offset UTC+12, break>=1050s)\n  bucket:      aw-watcher-afk_TESTHOST\n  work start:  08:00:00\n  WORK END:    19:31:00   <- end of day; do not bill past this\n  BLIP:        work_end is a momentary flicker; last substantive activity ended 17:20:00 -> end the final block there\n  active time: 506.0 min total\n  captures:    none for this date  <- capture task dead all day; no screenshot fallback for any block\n  window tail: last window event ends 22:00:00 (+149 min vs work end)  <- left-in-focus trap, NOT work\n  breaks (>= 17 min):\n     12:15:00 - 13:10:00  (55.0 min)\n     17:20:00 - 19:30:00  (130.0 min)\n  active spans (short afk folded in):\n     08:00:00 - 12:15:00  (255.0 min)\n     13:10:00 - 17:20:00  (250.0 min)\n     19:30:00 - 19:31:00  (1.0 min)\n  coverage of proposed blocks vs AFK active_spans:\n     blocks cover 505.0 of 506.0 active min\n     (all active spans covered)\n",
   "window_reports": {
     "08:00-12:15": {
       "window": "08:00-12:15",
