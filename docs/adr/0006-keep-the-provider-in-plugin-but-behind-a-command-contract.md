@@ -70,7 +70,9 @@ worth nothing while there is one plugin.
   importing the activity-source client" carries that argument, and
   `skills/daily/tests/test_module_boundaries.py` is what holds the direction from here on.
 - `reconcile` reaches the adapter across a sibling directory by path today. It moves onto the same
-  contract `daily` uses (#31).
+  contract `daily` uses (#31). *Updated, #35 landed:* the dispatcher is `skills/daily/scripts/provider/bin/timesheet-provider`,
+  the Harvest adapter is `skills/daily/scripts/provider/harvest/`, the gate is implemented once in the
+  dispatcher (#22), and `reconcile` runs `timesheet-provider list` by path exactly as `daily` does.
 - The export channel constrains the seam. Any future adoption of `bin/` has to answer for it, or
   accept that the export loses the provider.
 - **One platform fact is still missing, and the split needs it.** Whether one plugin's scripts can

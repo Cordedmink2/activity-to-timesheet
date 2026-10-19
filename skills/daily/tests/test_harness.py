@@ -15,7 +15,8 @@ import pytest
 
 import afk_blocks as ab
 import aw_client
-import harvest_client
+from provider.harvest import client as harvest_client
+from provider.errors import Unreachable, Misconfigured
 import skill_config
 from support import NO_BODY, day, harvest_server, run_cli
 
@@ -36,7 +37,7 @@ def test_an_unstubbed_harvest_call_cannot_reach_the_real_api():
     """The dangerous one: unguarded, a POST here creates a real billable time entry."""
     assert "harvestapp.com" not in harvest_client.API_BASE
     harvest_client._CREDS_CACHE = ("x", "y")      # get past creds to the network layer
-    with pytest.raises(RuntimeError, match="network error"):
+    with pytest.raises(Unreachable):
         harvest_client.request("GET", "/users/me")
 
 
@@ -46,7 +47,7 @@ def test_the_real_credentials_file_is_never_read():
     One repointed path is enough because `skill_config` is the only module that reads it.
     """
     assert not skill_config.ENV_PATH.exists()
-    with pytest.raises(SystemExit):
+    with pytest.raises(Misconfigured):
         harvest_client.load_creds()
 
 

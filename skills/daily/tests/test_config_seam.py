@@ -4,7 +4,7 @@ Settings used to arrive from three places with no stated rule about which won: t
 `.env`, the process environment, and a per-command flag. Each script merged whichever
 subset it cared about in its own way — `load_creds()` re-implemented the `.env`/OS-env
 walk that `config()` already did, `screenshot_capture` layered `argv[0]` on top by hand,
-`harvest_lookup` layered `--mcp-dir` on top a different way. Three readers, three chances
+the adapter's lookup layered `--catalog-dir` on top a different way. Three readers, three chances
 for the rule to drift.
 
 `skill_config` is now the reader, and its module docstring carries the precedence rule;
@@ -31,8 +31,10 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import aw_client                       # noqa: E402
-import harvest_client as hc            # noqa: E402
+from provider.harvest import client as hc  # noqa: E402
+from provider.errors import Misconfigured  # noqa: E402
 import refresh_catalogs                # noqa: E402
+from provider.harvest import catalog   # noqa: E402
 import skill_config                    # noqa: E402
 import timezone                        # noqa: E402
 from support import SETTING_KEYS, bundled_script_names  # noqa: E402
@@ -251,16 +253,16 @@ def test_missing_credentials_name_both_ways_to_supply_them(isolated):
 
     Plugin route first — it is the one that keeps the token out of a file — and the
     exported install's `.env` second, because that install has no harness to ask and its
-    user would otherwise be told to run a command that does not exist for them.
+    user would otherwise be told to run a command that does not exist for them. The shape is
+    the contract's (section 5): the variables named, the setup step, and never a value.
     """
     hc._CREDS_CACHE = None
-    with pytest.raises(SystemExit) as exc:
+    with pytest.raises(Misconfigured) as exc:
         hc.load_creds()
     message = str(exc.value)
-    assert message.startswith("ERROR: Harvest credentials not found.")
-    assert "/plugin configure" in message
+    assert message.startswith("missing configuration: HARVEST_ACCOUNT_ID, HARVEST_API_KEY")
+    assert "Set it with:  /plugin configure" in message
     assert ".env.example" in message
-    assert "HARVEST_ACCOUNT_ID" in message and "HARVEST_API_KEY" in message
     # Where it *stops*, which none of the lines above can see: every assertion here is a
     # substring, and a substring survives anything appended after it. The message now has
     # a conditional tail — `note_for_an_unreached_shell()` — so without this the suite's
@@ -406,6 +408,7 @@ def test_a_platform_with_one_shell_is_still_told_the_plugin_may_not_be_enabled(
 
 @pytest.mark.parametrize("missing", [
     pytest.param(lambda: hc.load_creds(), id="credentials"),
+    pytest.param(lambda: catalog.catalog_dir(None), id="catalog"),
     pytest.param(lambda: timezone.resolve_zone(None), id="timezone"),
     pytest.param(lambda: refresh_catalogs.mcp_dir(), id="workspace"),
 ])
@@ -429,7 +432,7 @@ def test_every_message_a_user_meets_this_way_carries_the_cause(missing, plugin_i
     monkeypatch.setattr(skill_config.sys, "platform", "win32")
     monkeypatch.setenv(skill_config.IN_A_SESSION, "1")
     monkeypatch.delenv(skill_config.PUBLISHED_MARK, raising=False)
-    with pytest.raises(SystemExit) as exc:
+    with pytest.raises((SystemExit, Misconfigured)) as exc:
         missing()
     assert "Bash tool" in str(exc.value)
 

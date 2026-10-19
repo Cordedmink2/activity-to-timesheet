@@ -1,21 +1,22 @@
 """
-refresh_catalogs.py — refresh the Harvest project-assignment and Dataverse active-incident
-caches used by the billables `daily` skill.
+refresh_catalogs.py — refresh the Dataverse active-incident cache used by the billables
+`daily` skill: the **work-item** catalog, which is the read side's and not the timesheet
+provider's (docs/provider-contract.md § 3.5; #37 gives it its own boundary).
 
-Usage: python refresh_catalogs.py [--harvest-only | --dataverse-only]
+Usage: python refresh_catalogs.py --dataverse-only
 
-Credentials come from the shared `harvest_client.load_creds()` helper, and the workspace
-and Dataverse settings from `skill_config` — the one seam every setting resolves through,
-whose docstring states the precedence between a flag, the skill `.env` and the OS env.
+The provider's own catalog is `timesheet-provider refresh`. This script no longer touches
+the provider, reads no provider credential and imports nothing from the adapter. The
+workspace and Dataverse settings come from `skill_config` — the one seam every setting
+resolves through, whose docstring states the precedence between a flag, the skill `.env`
+and the OS env.
 
 Writes:
-  - Work/.mcp/harvest_assignments.json          (page 1)
-  - Work/.mcp/harvest_assignments_p2.json … _p7.json (subsequent pages)
   - Work/.mcp/dv_active_incidents.txt           (tabular output from pac env fetch)
 """
 
 import argparse
-import json
+import io
 import os
 import re
 import shutil
@@ -23,7 +24,6 @@ import subprocess
 import sys
 import tempfile
 
-from harvest_client import request as harvest_request, use_utf8
 from skill_config import (setting, find_workspace, fail_missing,
                           note_for_an_unreached_shell)
 
@@ -32,7 +32,7 @@ def mcp_dir():
     """The `.mcp/` directory this run writes its catalogs into.
 
     Writer and reader share `find_workspace()` so a refresh cannot write catalogs into one
-    directory while `harvest_lookup.py` reads another. Unresolved is fatal: writing to a
+    directory while a reader looks in another. Unresolved is fatal: writing to a
     guessed path would report success while the reader kept seeing stale data.
 
     Resolved here rather than at module scope, which is where the fatality used to live.
@@ -57,8 +57,8 @@ def mcp_dir():
 def dataverse_settings():
     """`(DATAVERSE_URL, PAC_AUTH_PROFILE)`, either of which may be None.
 
-    The Dataverse incident catalog is OPTIONAL. Leave both unset to skip it entirely — the
-    Harvest refresh still runs. Set both to enable ticket-number resolution from your
+    The Dataverse incident catalog is OPTIONAL. Leave both unset to skip it entirely —
+    nothing else is affected. Set both to enable ticket-number resolution from your
     Dataverse org via the `pac` CLI. Where they go depends on the install: environment
     variables for a plugin, the skill `.env` for an export. README §9 states which and why.
     """
@@ -78,99 +78,6 @@ INCIDENT_FETCHXML = """<fetch>
   </entity>
 </fetch>
 """
-
-
-def refresh_harvest():
-    """Refresh the cached Harvest project-assignment catalog (best-effort).
-
-    The endpoint is eventually consistent (see references/catalog-refresh.md → "Read-replica
-    lag"): a just-created project may be missing and `total_entries` is not a reliable
-    freshness signal. To bill a brand-new project, use wait_for_project() rather than trusting
-    a single refresh.
-    """
-    mcp = mcp_dir()
-    mcp.mkdir(parents=True, exist_ok=True)
-
-    # Fetch every page into memory BEFORE touching the existing files, so an API
-    # failure mid-refresh leaves the old catalog intact rather than half-deleted.
-    pages = []
-    page = 1
-    while True:
-        try:
-            payload = harvest_request(
-                "GET",
-                "/users/me/project_assignments",
-                query={"per_page": 100, "page": page},
-            )
-        except RuntimeError as e:
-            sys.exit(f"ERROR: Harvest API on page {page}: {e} (existing catalog left untouched)")
-        pages.append(payload)
-        if not payload.get("next_page"):
-            break
-        page += 1
-
-    # Write every page to a temp name BEFORE removing anything. Deleting first meant a
-    # failed write — disk full, a sync client holding the directory, a permissions change
-    # — left no catalog at all, and every later lookup then fell through to the live
-    # time-entries API without saying so.
-    staged = []
-    try:
-        for i, payload in enumerate(pages, start=1):
-            out_name = "harvest_assignments.json" if i == 1 else f"harvest_assignments_p{i}.json"
-            tmp = mcp / (out_name + ".new")
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2)
-            staged.append((tmp, mcp / out_name, len(payload.get("project_assignments", []))))
-    except OSError:
-        for tmp, _, _ in staged:
-            tmp.unlink(missing_ok=True)
-        raise
-
-    # Clear stale page files — if a prior run produced more pages than this one,
-    # leftover _p{n}.json files would be read as stale data by consumers that
-    # glob harvest_assignments*.json. (The `.new` staging files do not match that glob.)
-    for old in mcp.glob("harvest_assignments*.json"):
-        old.unlink()
-
-    for i, (tmp, final, n) in enumerate(staged, start=1):
-        tmp.replace(final)
-        print(f"  ✓ Page {i}: {n} project assignments → {final.name}")
-
-    total = payload.get("total_entries", "?")
-    print(f"  Done. Total entries reported by Harvest: {total} (best-effort; see docstring on replica lag)")
-
-
-def wait_for_project(code, attempts=20, delay=15):
-    """Poll /users/me/project_assignments until `code` appears; return its assignment dict.
-
-    Use this before billing to a freshly-created project/case — the bulk catalog refresh is
-    eventually-consistent and may not show a brand-new code for a few minutes. Each attempt is
-    an independent read (replica selection varies over time), so retrying across a span of
-    minutes is what actually surfaces the new row. Returns the project_assignment dict, or None
-    if it never showed up within attempts*delay seconds.
-    """
-    import time
-
-    for i in range(attempts):
-        page = 1
-        while True:
-            payload = harvest_request(
-                "GET",
-                "/users/me/project_assignments",
-                query={"per_page": 100, "page": page},
-            )
-            for pa in payload.get("project_assignments", []):
-                # `or {}`, not a .get default: a `project` key present but null returns
-                # None, and this poll runs against brand-new projects, which is exactly
-                # when Harvest is likeliest to serve a half-populated row.
-                if ((pa.get("project") or {}).get("code") or "") == code:
-                    return pa
-            if not payload.get("next_page"):
-                break
-            page += 1
-        if i < attempts - 1:
-            time.sleep(delay)
-    return None
 
 
 def _active_pac_index(pac_cmd):
@@ -196,7 +103,7 @@ def refresh_dataverse():
     if not dv_url or not pac_profile:
         print(
             "  Skipping Dataverse refresh — DATAVERSE_URL and/or PAC_AUTH_PROFILE not set.\n"
-            "  (This is an optional feature; the Harvest catalog above is all most users need.\n"
+            "  (This is an optional feature; the provider catalog is all most users need.\n"
             "  To enable it, see README step 9 — where the two values go depends on your install.)"
         )
         return
@@ -260,22 +167,20 @@ def refresh_dataverse():
 
 
 def main():
-    use_utf8()
-    parser = argparse.ArgumentParser(description="Refresh Harvest + Dataverse catalogs for the billables daily skill.")
-    parser.add_argument("--harvest-only", action="store_true")
-    parser.add_argument("--dataverse-only", action="store_true")
-    args = parser.parse_args()
-
-    if args.harvest_only and args.dataverse_only:
-        sys.exit("Pick one of --harvest-only or --dataverse-only, not both.")
-
-    if not args.dataverse_only:
-        print("Refreshing Harvest project assignments…")
-        refresh_harvest()
-
-    if not args.harvest_only:
-        print("Refreshing Dataverse active incidents…")
-        refresh_dataverse()
+    # Not a shared helper: that lived with the provider's client, and this script spawns
+    # `pac`, which inherits PYTHONIOENCODING. A captured stream is left alone.
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
+    parser = argparse.ArgumentParser(
+        description="Refresh the Dataverse active-incident catalog for the billables daily "
+                    "skill. The timesheet provider's catalog is `timesheet-provider refresh`.")
+    parser.add_argument("--dataverse-only", action="store_true", required=True,
+                        help="the work-item catalog; the only thing this script refreshes")
+    parser.parse_args()
+    print("Refreshing Dataverse active incidents…")
+    refresh_dataverse()
 
 
 if __name__ == "__main__":

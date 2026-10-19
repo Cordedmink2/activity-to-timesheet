@@ -55,7 +55,8 @@ calendar is an adapter rather than a rewrite.
 
 **Timesheet provider**, or just **provider** — the service that holds billed time and invoices
 from it. The only one of the three that is *written* to, which is why the confirmation gate lives
-against it. Harvest today, reached with the credentials in declared plugin configuration.
+against it — once, in the dispatcher behind the `timesheet-provider` command. Harvest today,
+reached through its adapter, the only code that reads the credentials in declared plugin configuration.
 Everything the provider names — its projects, its tasks, its clients — is *its* vocabulary, not
 this project's. Those strings reach a run from configuration or the user's workspace. They are
 never a default in a shipped file, because one account's task list is one user's fact.

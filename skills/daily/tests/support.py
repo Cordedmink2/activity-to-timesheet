@@ -8,7 +8,7 @@ Three jobs, in order of how much trouble they save:
    end-to-end coverage of `main()` — URL construction, bucket discovery, JSON parsing,
    error paths — without a single mock of the code under test. The two are redirected
    differently: the activity source through its setting, `TIMESHEET_ACTIVITY_URL`, and
-   Harvest by repointing the `harvest_client.API_BASE` constant. `aw_client` used to have
+   Harvest by repointing the adapter client's `API_BASE` constant. `aw_client` used to have
    a matching constant and no longer does — it resolves its address per request.
 
 2. **A day-builder DSL.** AW event streams are the input to every interesting
@@ -61,7 +61,7 @@ def bundled_script_names() -> list[str]:
 SETTING_KEYS = (
     "HARVEST_ACCOUNT_ID", "HARVEST_API_KEY", "TIMESHEET_TIMEZONE",
     "TIMESHEET_ACTIVITY_URL", "TIMESHEET_WORKSPACE", "TIMESHEET_SCREENSHOTS_DIR",
-    "TIMESHEET_OUTLOOK_CALENDAR",
+    "TIMESHEET_OUTLOOK_CALENDAR", "TIMESHEET_PROVIDER",
     "DATAVERSE_URL", "PAC_AUTH_PROFILE",
 )
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -644,7 +644,7 @@ def task(tid: int, name: str, billable: bool) -> dict:
 def project(pid: int, code: str, name: str = "Some project", tasks=(),
             client: str | None = None) -> dict:
     """One project assignment row, shaped as `/users/me/project_assignments` returns it.
-    `client` is the client's name, which `harvest_lookup` matches on as well as the code
+    `client` is the client's name, which the adapter's lookup matches on as well as the code
     and the name; a row without one is what most fixtures need."""
     row: dict = {"project": {"id": pid, "code": code, "name": name},
                  "task_assignments": list(tasks)}
@@ -655,7 +655,7 @@ def project(pid: int, code: str, name: str = "Some project", tasks=(),
 
 def assignments_page(number: int, last: int, rows=()) -> dict:
     """One page of the catalog, with Harvest's `next_page` wiring: `None` on the last
-    page, the next number otherwise. `refresh_catalogs` follows that chain, and a fixture
+    page, the next number otherwise. the adapter's `refresh` follows that chain, and a fixture
     that got it wrong would either stop a page early or never stop."""
     return {"project_assignments": list(rows),
             "page": number,
@@ -675,7 +675,7 @@ def paged_assignments(pages: list[dict], fail_on: int | None = None) -> dict:
 
 
 def write_catalog(directory, files: dict[str, object]) -> None:
-    """Write cached catalog pages the way `refresh_catalogs` leaves them on disk: one JSON
+    """Write cached catalog pages the way the Harvest adapter's `refresh` leaves them on disk: one JSON
     file per page, `harvest_assignments.json` then `harvest_assignments_p<n>.json`. A test
     of the read path starts from these rather than from a refresh."""
     for name, payload in files.items():
@@ -686,10 +686,19 @@ def write_catalog(directory, files: dict[str, object]) -> None:
 # Shared fixtures for the write scripts
 # --------------------------------------------------------------------------------------
 
-# A well-formed create, without the confirmation gate: project, task, date, start, end,
-# notes. A test appends `--confirm` when it means to post. One copy, because a test that
-# asserts on the body sent reads its expectation off these values.
-CREATE_ARGS = ["48084036", "20753151", "2026-08-12", "09:00", "10:30", "Drafted the spec"]
+# A well-formed `post`, without the confirmation gate, in the contract's own spelling. A test
+# appends `--confirm` when it means to post. One copy, because a test that asserts on the
+# body sent reads its expectation off these values.
+CREATE_ARGS = ["post", "--project-id", "48084036", "--task-id", "20753151",
+               "--date", "2026-08-12", "--start", "09:00", "--end", "10:30",
+               "--notes", "Drafted the spec"]
+
+
+def create_args(date="2026-08-12", start="09:00", end="10:30", notes="Drafted the spec",
+                project="48084036", task="20753151") -> list[str]:
+    """A `post` command line with any of its values replaced."""
+    return ["post", "--project-id", project, "--task-id", task, "--date", date,
+            "--start", start, "--end", end, "--notes", notes]
 
 
 def resource_warnings_from(fn) -> list:
@@ -730,7 +739,7 @@ def run_cli(module, args: list) -> CliResult:
     """Run `module.main()` with `args` as its command line, in this process.
 
     Handles both `main()` conventions in the skill: `afk_blocks` / `activity_timeline`
-    *return* an exit code, while `harvest_post` / `harvest_patch` / `harvest_list` call
+    *return* an exit code, while a script such as `refresh_catalogs` calls
     `sys.exit()`. A `sys.exit("message")` is folded back into stderr with code 1, which
     is what the shell would show.
     """

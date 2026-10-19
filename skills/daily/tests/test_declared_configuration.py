@@ -29,8 +29,8 @@ import activity_timeline as tl
 import afk_blocks as ab
 import aw_client as aw
 import timezone as tz
-import harvest_patch as hpatch
-import harvest_post as hpost
+from provider import dispatcher as tp
+from support import create_args
 from support import aw_server, day, run_cli
 
 MAY = dt.date(2026, 5, 28)
@@ -335,7 +335,7 @@ def test_neither_script_runs_a_day_against_a_zone_nobody_chose(module, live_aw, 
 
 
 def test_a_create_will_not_post_against_a_zone_nobody_chose(unconfigured):
-    """The upgrade this ticket carries. `harvest_post.py` asked for no configuration at
+    """The upgrade this ticket carries. `post` asked for no configuration at
     all until it had to know whether the clocks changed on the date being billed, so a
     user who never set a timezone — which was possible, because the two reading scripts
     are where the message used to come from — now meets it here as well.
@@ -343,9 +343,10 @@ def test_a_create_will_not_post_against_a_zone_nobody_chose(unconfigured):
     The same message, deliberately: a second wording for one missing value is a second
     thing to keep true. It is refused before the preview, not only before the post, so a
     run cannot be shown an entry it will then be unable to create."""
-    r = run_cli(hpost, ["48084036", "20753151", "2026-08-12", "09:00", "10:00", "n"])
-    assert r.code != 0
+    r = run_cli(tp, create_args(start="09:00", end="10:00", notes="n"))
+    assert r.code == 3, "a missing setting is the contract's class 3"
     assert r.out == "", "nothing may be previewed that cannot then be posted"
+    assert r.err.startswith("ERR ")
     assert "TIMESHEET_TIMEZONE" in r.err and "/plugin configure" in r.err
     assert "Traceback" not in r.err
 
@@ -355,8 +356,8 @@ def test_a_patch_that_could_move_a_clock_will_not_run_against_a_zone_nobody_chos
     """The same upgrade, one release later, for the same reason (#32): a patch can arrive
     at the entry the create refuses, so it has to know when the clocks change too. Same
     message, and before the preview here as well."""
-    r = run_cli(hpatch, ["2988748904", "--start", "01:30", "--end", "04:15"])
-    assert r.code != 0
+    r = run_cli(tp, ["patch", "2988748904", "--start", "01:30", "--end", "04:15"])
+    assert r.code == 3
     assert r.out == "", "nothing may be previewed that cannot then be applied"
     assert "TIMESHEET_TIMEZONE" in r.err and "/plugin configure" in r.err
     assert "Traceback" not in r.err
@@ -371,9 +372,9 @@ def test_a_patch_that_cannot_move_a_clock_still_asks_for_nothing(unconfigured):
     zone: what is asserted is *which* value it stops for, not that it got further. Without
     the first two assertions an absent message is also satisfied by an empty stderr, and
     this would pass against a script that had stopped running at all."""
-    r = run_cli(hpatch, ["2988748904", "--notes", "Reworded for the client", "--confirm"])
-    assert r.code != 0
-    assert "Harvest credentials not found" in r.err, "the one value a note patch needs"
+    r = run_cli(tp, ["patch", "2988748904", "--notes", "Reworded for the client", "--confirm"])
+    assert r.code == 3
+    assert "missing configuration: HARVEST_ACCOUNT_ID" in r.err, "the one value a note patch needs"
     assert "TIMESHEET_TIMEZONE" not in r.err
     assert "Traceback" not in r.err
 
@@ -382,7 +383,7 @@ def test_the_create_does_not_offer_a_flag_it_would_then_reject(unconfigured):
     """`--utc-offset` is the escape hatch the two reading scripts name, and this one has
     no flags but its confirmation gate. Naming it here would answer a user who is already
     stuck with one more thing to try that comes back as a usage error."""
-    r = run_cli(hpost, ["48084036", "20753151", "2026-08-12", "09:00", "10:00", "n"])
+    r = run_cli(tp, create_args(start="09:00", end="10:00", notes="n"))
     # The precondition first: an absence alone is also satisfied by an empty stderr, so
     # without this the test passes against a script that asks for no zone at all.
     assert "TIMESHEET_TIMEZONE" in r.err

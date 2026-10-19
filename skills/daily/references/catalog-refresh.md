@@ -2,41 +2,30 @@
 
 The skill relies on cached catalogs in the workspace's `.mcp/`. They're cached because the underlying APIs are slow (provider pagination, work-item-store queries) and the data changes slowly. Refresh when stale.
 
-Two catalogs, and they answer different questions. The **assignment catalog** says which projects the user may bill to and which tasks each offers — it is the authority behind every `project_id` / `task_id` / `billable` decision the rubric makes. A **work-item catalog** is optional and user-specific: it turns a work-item number seen in a window title into a description.
+Two catalogs, and they answer different questions. The **assignment catalog** (the provider's, behind `timesheet-provider lookup`) says which projects the user may bill to and which tasks each offers — it is the authority behind every `project_id` / `task_id` / `billable` decision the rubric makes. A **work-item catalog** is optional and user-specific: it turns a work-item number seen in a window title into a description.
 
 ## When to refresh
 
-- Cached file is missing → refresh
-- `.mtime` is older than 7 days → refresh
+`timesheet-provider refresh --age` says how stale the provider's catalog is without reading the adapter's storage: `AGE <days>` (whole days since it was last written) or `ABSENT`.
+
+- `ABSENT` → refresh
+- `AGE` of 7 or more → refresh (surface an `AGE` over 30 to the user first, unless `.context.md` preferences say refresh silently)
 - The user mentions a project / work item the catalog doesn't have → refresh
-- A classification fails to find a matching `project.code` even though the work-item pattern looks valid → refresh
+- A classification fails to find a matching project even though the work-item pattern looks valid — `lookup` returns no match for the code → refresh
 
 ## The assignment catalog
 
-The provider today is Harvest, and this section describes its API, so it names it. What the rest of the skill needs *out* of the catalog is provider-neutral: for each project the user may bill to, its `id`, `code`, `name`, its `client.name`, and its `task_assignments[]` with each task's name and `billable` flag. A rule written against those fields survives a change of provider; one written against a task's literal name does not.
+The provider today is Harvest. What the rest of the skill needs *out* of the catalog is provider-neutral, and it is what `lookup` returns: for each project the user may bill to, its `code`, `project_id`, `name`, its `client`, and its `tasks[]` with each task's `id`, `name` and `billable`. A rule written against those survives a change of provider; one written against a task's literal name does not.
 
-**Endpoint:** `GET https://api.harvestapp.com/api/v2/users/me/project_assignments?per_page=100&page=<N>`
+`timesheet-provider refresh` re-reads the user's assignments, **every page**, and rewrites the catalog `timesheet-provider lookup` reads; it prints `OK <n> projects` on stdout and a line per page on stderr. A member-scope token is enough — `refresh` and `lookup` need no admin scope. A failed refresh leaves the existing catalog exactly as it was and says so; a catalog that comes back with no projects at all is a failure, not a catalog written empty.
 
-**Why this endpoint specifically:** many users' Harvest PATs are *member-scope* (`expenses:read:own`, `timers:read:own/write:own`). Admin endpoints like `/projects` and `/clients` return 403 for member-scope tokens. The `/users/me/project_assignments` endpoint is self-scoped and returns the same shape — project + client + task_assignments — for projects the authenticated user is personally assigned to. Works on both member and admin tokens.
+Where the catalog is stored, its endpoint, its headers, its paging and its page files are the adapter's, and live in the adapter's own notes (`scripts/provider/harvest/`), not here: nothing above the adapter reads them. The credentials come from wherever they were configured (see `references/first-run.md` § "First-run: configuration"); the adapter reads them and nothing else does, so configuring them once covers every command, and a catalog-hit `lookup` needs none.
 
-**Auth headers:**
-```
-Harvest-Account-ID: <user's account id>
-Authorization: Bearer <HARVEST_API_KEY>
-User-Agent: <something descriptive>
-```
-
-The credentials come from wherever they were configured — the plugin's declared configuration, or an exported install's `.env` (see `references/first-run.md` § "First-run: configuration"). `scripts/refresh_catalogs.py` resolves them through the same shared `harvest_client.load_creds()` helper the other provider scripts use, so configuring them once covers everything.
-
-**Pagination:** loop pages at `per_page=100` until `next_page` is null. Most consultants have <1000 assignments total.
-
-**Output:** save raw page JSON to `.mcp/harvest_assignments_p<N>.json` (and `harvest_assignments.json` for page 1). Don't reformat — downstream readers expect the provider's own shape.
-
-**Read-replica lag (important).** This endpoint is eventually consistent: identical back-to-back requests can hit a fresh replica or a lagging one, and the lagging one can even report the new `total_entries` while still serving stale rows. So a single refresh — and the row count — are NOT reliable for a *just-created* project. No client-side trick fixes a bulk pull. To bill against a brand-new project, call `refresh_catalogs.wait_for_project(code)`, which polls across minutes (each read re-rolls the replica) and returns the assignment dict once the code surfaces. Don't treat a one-off miss as failure.
+**Read-replica lag (important).** The provider's catalog is eventually consistent: a just-created project can take minutes to surface, and neither a single refresh nor a row count is reliable for it. To bill against a brand-new project, run `timesheet-provider refresh --wait <code>`: it polls across minutes (`--attempts`, default 20; `--delay` seconds, default 15), writes the catalog it found and prints `OK <code>` once the code surfaces, or exits 6 with `ERR <code> did not appear` if it never does. It posts nothing. Don't treat a one-off miss as failure.
 
 ## User-specific work-item catalogs (optional)
 
-If the user maintains a work-item dump (e.g. an active-incidents list from a CRM, a Jira/Linear export), `scripts/refresh_catalogs.py` can refresh it. The exact query is user-specific — see `.context.md` for the user's work-item-source configuration.
+If the user maintains a work-item dump (e.g. an active-incidents list from a CRM, a Jira/Linear export), `python scripts/refresh_catalogs.py --dataverse-only` can refresh it — it is the read side's catalog, not the provider's. The exact query is user-specific — see `.context.md` for the user's work-item-source configuration.
 
 The script's design assumes:
 - Output goes to `.mcp/<catalog>.txt` or `.mcp/<catalog>.json`
@@ -76,12 +65,12 @@ If you instead connect Dataverse through an MCP server (e.g. via the `dataverse`
 
 ## Creating a backend work item to bill against
 
-A block that belongs to new work with no project yet is `references/new-client-work.md`'s procedure — the work item is created in the user's backend and syncs to the provider as a new project. What this file adds is the read-replica lag above: the new project surfaces in the assignment catalog minutes later, so poll with `wait_for_project(code)` rather than refreshing once.
+A block that belongs to new work with no project yet is `references/new-client-work.md`'s procedure — the work item is created in the user's backend and syncs to the provider as a new project. What this file adds is the read-replica lag above: the new project surfaces in the assignment catalog minutes later, so poll with `refresh --wait <code>` rather than refreshing once.
 
 ## Sanity checks after refresh
 
-- Assignment catalog has >10 entries → looks reasonable for most consultants
+- `refresh` reports more than 10 projects → looks reasonable for most consultants
 - Work-item catalog file has the expected row count and column headers → looks reasonable
 - If either looks empty / wrong, restore the previous file from backup before overwriting
 
-`scripts/refresh_catalogs.py` does all the above in one go.
+`timesheet-provider refresh` does the provider's half in one go, and `refresh_catalogs.py --dataverse-only` the work-item half.

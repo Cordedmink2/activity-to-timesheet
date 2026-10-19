@@ -101,6 +101,10 @@ def test_a_model_cannot_start_a_month_sweep_on_its_own():
 # another spelling.
 WRITE_TOKENS = ("harvest_post", "harvest_patch", "--confirm", "WOULD POST", "WOULD PATCH")
 
+# After #35 the writes are subcommands of one command, so the denylist is also held against
+# `post` / `patch` *used as subcommands*: `reconcile` may name `list` and nothing else.
+WRITE_SUBCOMMANDS = re.compile(r"timesheet-provider\"?\s+(post|patch|refresh)\b")
+
 
 @pytest.mark.parametrize("token", WRITE_TOKENS)
 def test_nothing_in_it_reaches_a_script_that_writes_to_the_provider(token):
@@ -111,6 +115,15 @@ def test_nothing_in_it_reaches_a_script_that_writes_to_the_provider(token):
         f"the reconcile skill names {token!r}. Reconciliation reads a month and proposes a "
         "worklist — a day it finds is handed to the `daily` skill, which owns the write and "
         "the gate in front of it.")
+
+
+def test_it_runs_the_provider_command_for_list_and_nothing_else():
+    """The write tokens above are the old spelling; the contract's is a subcommand. `list` is
+    the one reconcile may name - `post` and `patch` write, and `refresh` rewrites the catalog."""
+    named = WRITE_SUBCOMMANDS.findall(shipped_text())
+    assert not named, f"the reconcile skill runs provider subcommands other than `list`: {named}"
+    assert re.search(r'timesheet-provider"?\s+list\b', shipped_text()), (
+        "the month sweep no longer reads the billed days through the provider's `list`")
 
 
 def test_it_hands_a_gap_day_to_the_skill_that_owns_billing():
@@ -213,7 +226,7 @@ def test_every_script_it_names_is_one_the_sibling_skill_actually_ships():
 
 def test_every_flag_it_types_is_one_a_sibling_script_parses():
     """The other half of the same pin (#31). This skill is a second copy of the `daily`
-    flags — `harvest_list.py --by-day`, `--window`, and `--full` as the one never to pass —
+    flags — `timesheet-provider list --by-day`, `--window`, and `--full` as the one never to pass —
     and the `daily` suite's inventory check reads `skills/daily/SKILL.md` alone. Rename a
     flag there and that suite fails loudly while this skill goes on instructing a run to
     pass a flag that no longer exists, which fails on every gap day as a usage error.

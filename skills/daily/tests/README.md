@@ -123,7 +123,7 @@ record of whatever the code happened to do.
 `support.aw_server` and `support.harvest_server` are real `http.server` instances on
 localhost, not mocks of the code under test — so `main()` gets exercised end to end,
 including URL construction, bucket discovery and the unreachable-server path. Both record
-every request, which is how the "`harvest_post` must never send a bare `hours` field"
+every request, which is how the "`post` must never send a bare `hours` field to Harvest"
 invariant is pinned: assert on the body that was sent, not on what the script printed.
 
 A route's payload is JSON-serialised, so a route that must answer with no body at all —
@@ -131,7 +131,7 @@ Harvest's reply to a DELETE — returns `support.NO_BODY` rather than `None`, wh
 out as the four bytes `null`. The provider's project catalog has builders of its own:
 `project()` / `task()` / `assignments_page()` shape the rows as the API returns them,
 `paged_assignments()` turns a list of pages into routes for the fake (with an optional
-page that fails), and `write_catalog()` writes pages to disk the way `refresh_catalogs`
+page that fails), and `write_catalog()` writes pages to disk the way the Harvest adapter's `refresh`
 leaves them, for tests of the read path.
 
 `support.CREATE_ARGS` is the one well-formed create, without the gate; append `--confirm`

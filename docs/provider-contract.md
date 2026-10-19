@@ -399,9 +399,10 @@ patch(entry_id: str, fields: dict) -> str      # entry id; called only when conf
 lookup(query, task, catalog_dir, cache_only, days) -> list[match]
 list_entries(date_from, date_to) -> list[entry]
 refresh(wait_for=None, attempts=20, delay=15) -> int   # projects written
+catalog_age() -> float | None                  # days since the catalog was written; None if absent
 ```
 
-The three exceptions map onto exit 4, 5 and 3. The interface is internal to this plugin until a
+`catalog_age()` is what `refresh --age` asks, so no caller reads the catalog's files. The exceptions (`provider/errors.py`: `Usage`, `Misconfigured`, `Refused`, `Unreachable`, `NoMatch`) map onto exit 2, 3, 4, 5 and 6; an adapter raises the last four. The interface is internal to this plugin until a
 split, which would turn it into the executable's own argument surface — and this document is
 that surface already.
 

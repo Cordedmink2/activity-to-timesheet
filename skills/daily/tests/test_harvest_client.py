@@ -1,11 +1,8 @@
 """Harvest's own contracts. Where a setting *comes from* is `test_config_seam.py`."""
-import os, sys
 import pytest
 
-SCRIPTS = os.path.join(os.path.dirname(__file__), "..", "scripts")
-sys.path.insert(0, SCRIPTS)
-from harvest_client import parse_time_to_minutes
-from harvest_list import to_24h
+from provider.harvest.client import parse_time_to_minutes
+from provider.harvest.entries import _to_24h as to_24h
 
 
 @pytest.mark.parametrize("raw,expected", [
@@ -39,10 +36,11 @@ def test_parse_invalid_raises(raw):
         parse_time_to_minutes(raw)
 
 
-def test_to_24h_delegates_and_keeps_contract():
+def test_to_24h_normalises_what_harvest_answers_in():
+    """Harvest answers in 12-hour spellings; the contract's listing is 24-hour."""
     assert to_24h("8:15am") == "08:15"
     assert to_24h("12:21pm") == "12:21"
     assert to_24h("08:15") == "08:15"
-    assert to_24h(None) == "--:--"      # missing input
-    assert to_24h("") == "--:--"
+    assert to_24h(None) is None         # no clock interval: the dispatcher prints `--:--`
+    assert to_24h("") is None
     assert to_24h("garbage") == "garbage"  # unparseable returns original

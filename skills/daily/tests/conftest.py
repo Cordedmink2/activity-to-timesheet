@@ -38,7 +38,7 @@ for p in (str(SCRIPTS), str(TESTS)):
         sys.path.insert(0, p)
 
 import afk_blocks                    # noqa: E402
-import harvest_client                # noqa: E402
+from provider.harvest import client as harvest_client  # noqa: E402
 import skill_config                  # noqa: E402
 import timezone                      # noqa: E402
 from support import (SETTING_KEYS, Day, aw_server, day,  # noqa: E402,F401

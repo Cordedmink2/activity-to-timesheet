@@ -26,10 +26,10 @@ import pytest
 import activity_timeline as tl
 import afk_blocks as ab
 import aw_client
-import harvest_client
-import harvest_patch as hp
-import harvest_post as hpost
-from support import CREATE_ARGS, day, resource_warnings_from, run_cli
+from provider import dispatcher as tp
+from provider.errors import Refused
+from provider.harvest import client as harvest_client
+from support import CREATE_ARGS, create_args, day, resource_warnings_from, run_cli
 
 
 # --------------------------------------------------------------------------------------
@@ -55,34 +55,25 @@ def test_timeline_rejects_an_empty_window(live_aw):
     assert "ERR bad --window" in r.err
 
 
-def test_post_rejects_a_non_numeric_project_id():
-    """`int(project_id)` on a fat-fingered argument raised a bare ValueError. The
-    documented contract is `ERR …` + exit 1, and this path runs *before* any HTTP, so a
-    traceback here is pure noise between the model and its own typo."""
-    r = run_cli(hpost, ["ACM-CR202", "20753151", "2026-08-12", "09:00", "10:00", "notes",
-                        "--confirm"])
-    assert r.code == 1
+def test_post_rejects_a_project_code_where_an_id_belongs():
+    """A *code* is the plausible mistake. The contract says an adapter checks its own
+    identifiers' shape and points at `lookup`; it is a refusal (4), `ERR` and no traceback,
+    and it happens before any HTTP."""
+    r = run_cli(tp, create_args(project="ACM-CR202", notes="n") + ["--confirm"])
+    assert r.code == 4
     assert r.err.startswith("ERR")
-    assert "project" in r.err.lower()
+    assert "project_id" in r.err and "lookup" in r.err
 
 
-def test_post_rejects_a_non_numeric_task_id():
-    r = run_cli(hpost, ["48084036", "Gen - Development", "2026-08-12", "09:00", "10:00", "n",
-                        "--confirm"])
-    assert r.code == 1
+def test_post_rejects_a_task_name_where_an_id_belongs():
+    r = run_cli(tp, create_args(task="Gen - Development", notes="n") + ["--confirm"])
+    assert r.code == 4
     assert r.err.startswith("ERR")
 
 
-def test_patch_rejects_a_non_numeric_hours_value():
-    """`--hours abc` went through `float()` unguarded during argument parsing."""
-    r = run_cli(hp, ["2988748904", "--hours", "abc", "--confirm"])
-    assert r.code == 1
-    assert r.err.startswith("ERR")
-
-
-def test_patch_rejects_a_non_numeric_project_id():
-    r = run_cli(hp, ["2988748904", "--project-id", "ACM-CR202", "--confirm"])
-    assert r.code == 1
+def test_patch_rejects_a_project_code_where_an_id_belongs():
+    r = run_cli(tp, ["patch", "2988748904", "--project-id", "ACM-CR202", "--confirm"])
+    assert r.code == 4
     assert r.err.startswith("ERR")
 
 
@@ -99,7 +90,7 @@ def test_a_harvest_error_response_is_closed_after_its_body_is_read(live_harvest)
     live_harvest({("GET", "/users/me"): (500, {"error": "boom"})})
 
     def attempt():
-        with pytest.raises(RuntimeError):
+        with pytest.raises(Refused):
             harvest_client.request("GET", "/users/me")
 
     assert resource_warnings_from(attempt) == []
@@ -151,63 +142,26 @@ def test_text_mode_still_says_so_in_words(live_aw):
 # Importable under captured stdout
 # --------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("name", ["harvest_post", "harvest_patch", "harvest_list",
-                                  "activity_timeline", "harvest_lookup"])
+@pytest.mark.parametrize("name", ["provider.dispatcher", "activity_timeline"])
 def test_scripts_import_under_a_stdout_that_cannot_be_reconfigured(name, monkeypatch):
     """`sys.stdout.reconfigure(...)` does not exist on a plain file-like object, so a
-    script that called it unguarded raised on *import* under pytest's capture — or under
-    any harness that swaps the stream — and became untestable. Three Harvest CLIs did
-    exactly that, which is why they had no tests at all.
-
-    None of these reconfigure at import any more; the call moved into `main()` when
-    imports were made side-effect-free. The guard is still the property, so it is asserted
-    where it now lives, in `test_the_encoding_fix_is_applied_by_every_cli_that_needs_it`
-    below. This stays as the weaker, broader claim it always was underneath — that the
-    module is importable at all under a swapped stream — which is what makes every test in
-    this file possible.
+    script that called it unguarded raised on *import* under pytest's capture - or under
+    any harness that swaps the stream - and became untestable. The call lives in `main()`;
+    the guard is still the property, and it is what makes every test in this file possible.
     """
     monkeypatch.setattr(sys, "stdout", io.StringIO())
     monkeypatch.setattr(sys, "stderr", io.StringIO())
     importlib.reload(importlib.import_module(name))
 
 
-# Every script whose `main()` has to make the console UTF-8 before it prints, and how.
-# The four that shell out need `PYTHONIOENCODING` for the child as well, so they call the
-# shared `harvest_client.use_utf8()`; the three below reconfigure their own streams rather
-# than importing the Harvest client into a script that never bills. Two of them spawn
-# nothing; `calendar_day` spawns an adapter, but reads it as UTF-8 by contract rather than
-# by setting the child's encoding, so it has no use for the helper either.
-UTF8_VIA_HELPER = ["harvest_post", "harvest_patch", "harvest_list", "refresh_catalogs"]
-UTF8_INLINE = ["activity_timeline", "harvest_lookup", "calendar_day"]
-
-
-@pytest.mark.parametrize("name", UTF8_VIA_HELPER)
-def test_the_encoding_fix_is_applied_by_every_cli_that_needs_it(name, monkeypatch):
-    """Asserted at the call, because nothing else can see it.
-
-    `run_cli` hands `main()` a `StringIO`, which is not a `TextIOWrapper`, so the body of
-    `use_utf8()` correctly does nothing under test — meaning the suite stayed green when
-    the call was deleted from a `main()` entirely. The defect that returns is the one in
-    `docs/skills/daily/decision-log.md` § "Three CLIs crashed on import under captured stdout": a Windows console
-    on a codepage, a client name with a macron in it, and a `UnicodeEncodeError` partway
-    through a report the user is reading.
-
-    This was covered incidentally while the call sat at module scope and the test above
-    reloaded the module. Moving it into `main()` took that away, so it is asserted here
-    directly rather than left to a side effect of an import test.
-    """
-    module = importlib.import_module(name)
-    called = []
-    monkeypatch.setattr(harvest_client, "use_utf8", lambda: called.append(name))
-    monkeypatch.setattr(module, "use_utf8", lambda: called.append(name))
-    run_cli(module, ["--help"])
-    assert called, (
-        f"{name}.main() never applies the UTF-8 console fix, so a non-ASCII client name "
-        "raises UnicodeEncodeError partway through its output on a Windows codepage")
+# Every entry point whose `main()` has to make the console UTF-8 before it prints, and how.
+# `refresh_catalogs` spawns `pac`, which inherits PYTHONIOENCODING, so it sets that as well
+# as reconfiguring its streams; the dispatcher and the other three reconfigure their own.
+UTF8_INLINE = ["provider.dispatcher", "refresh_catalogs", "activity_timeline", "calendar_day"]
 
 
 @pytest.mark.parametrize("name", UTF8_INLINE)
-def test_the_scripts_that_spawn_nothing_still_fix_their_own_streams(name, monkeypatch):
+def test_every_entry_point_fixes_its_own_streams(name, monkeypatch):
     """The other half, which has no helper to spy on. Asserted on the streams themselves:
     `main()` is handed real text wrappers on a legacy codepage — what a Windows console
     is — and has to have made them UTF-8 by the time it prints anything. Inside `main()`,
@@ -221,8 +175,10 @@ def test_the_scripts_that_spawn_nothing_still_fix_their_own_streams(name, monkey
     monkeypatch.setattr(sys, "stdout", out)
     monkeypatch.setattr(sys, "stderr", err)
     monkeypatch.setattr(sys, "argv", [name, "--help"])
-    with pytest.raises(SystemExit):
-        module.main()
+    try:
+        module.main()            # the dispatcher returns 0 for --help; argparse raises
+    except SystemExit:
+        pass
     assert (out.encoding, err.encoding) == ("utf-8", "utf-8"), (
         f"{name}.main() never reconfigures its streams, so a non-ASCII character raises "
         "UnicodeEncodeError on a Windows codepage")
@@ -238,7 +194,7 @@ def test_the_scripts_that_spawn_nothing_still_fix_their_own_streams(name, monkey
 # the whole gate: a script reached by a model that was never told to bill still writes
 # nothing. So these are tests about a promise the frontmatter cannot keep everywhere.
 
-PATCH_ARGS = ["2988748904", "--notes", "Reworded for the client"]
+PATCH_ARGS = ["patch", "2988748904", "--notes", "Reworded for the client"]
 
 
 def previewed_body(result, verb: str) -> dict:
@@ -253,7 +209,7 @@ def test_post_writes_nothing_without_the_confirmation_flag(live_harvest):
     nobody asked for. Asserted against the recorded requests rather than the exit code,
     because a script that posted and *then* printed a preview would pass on the latter."""
     srv = live_harvest({("POST", "/time_entries"): (201, {"id": 4001})})
-    r = run_cli(hpost, CREATE_ARGS)
+    r = run_cli(tp, CREATE_ARGS)
 
     assert srv.sent("POST", "/time_entries") == [], "no flag, no write"
     assert r.code == 0, "a missing confirmation is the normal case, not a failure"
@@ -268,13 +224,21 @@ def test_a_post_preview_is_exactly_the_body_a_confirmed_run_sends(live_harvest):
     """
     srv = live_harvest({("POST", "/time_entries"): (201, {"id": 4002})})
 
-    preview = run_cli(hpost, CREATE_ARGS)
-    confirmed = run_cli(hpost, CREATE_ARGS + ["--confirm"])
+    preview = run_cli(tp, CREATE_ARGS)
+    confirmed = run_cli(tp, CREATE_ARGS + ["--confirm"])
 
     assert preview.code == 0
     assert confirmed.lines == ["OK 4002"], "the flag leaves the success contract alone"
-    assert previewed_body(preview, "WOULD POST") == \
-        srv.sent("POST", "/time_entries")[0]["body"]
+    # The preview speaks the contract's names and the wire speaks Harvest's, so "the same
+    # body" means: the previewed body is what the adapter was handed, and the wire body is
+    # the adapter's mapping of exactly that.
+    previewed = previewed_body(preview, "WOULD POST")
+    assert previewed == {"project_id": "48084036", "task_id": "20753151", "date": "2026-08-12",
+                         "start": "09:00", "end": "10:30", "notes": "Drafted the spec"}
+    assert srv.sent("POST", "/time_entries")[0]["body"] == {
+        "project_id": 48084036, "task_id": 20753151, "spent_date": previewed["date"],
+        "started_time": previewed["start"], "ended_time": previewed["end"],
+        "notes": previewed["notes"]}
 
 
 def test_a_post_preview_cannot_be_read_as_a_posted_entry(live_harvest):
@@ -283,7 +247,7 @@ def test_a_post_preview_cannot_be_read_as_a_posted_entry(live_harvest):
     created; the preview says so in words instead, and names the flag that would post it.
     """
     live_harvest({("POST", "/time_entries"): (201, {"id": 4003})})
-    r = run_cli(hpost, CREATE_ARGS)
+    r = run_cli(tp, CREATE_ARGS)
 
     assert not r.out.startswith("OK ")
     assert "--confirm" in r.out
@@ -293,7 +257,7 @@ def test_patch_writes_nothing_without_the_confirmation_flag(live_harvest):
     """A patch is the more dangerous of the two: it overwrites a line that has already
     been reviewed and may already have been invoiced, and there is no undo."""
     srv = live_harvest({("PATCH", "/time_entries/2988748904"): {"id": 2988748904}})
-    r = run_cli(hp, PATCH_ARGS)
+    r = run_cli(tp, PATCH_ARGS)
 
     assert srv.sent("PATCH", "/time_entries") == []
     assert r.code == 0
@@ -303,13 +267,13 @@ def test_patch_writes_nothing_without_the_confirmation_flag(live_harvest):
 def test_a_patch_preview_is_exactly_the_body_a_confirmed_run_sends(live_harvest):
     srv = live_harvest({("PATCH", "/time_entries/2988748904"): {"id": 2988748904}})
 
-    preview = run_cli(hp, PATCH_ARGS)
-    confirmed = run_cli(hp, PATCH_ARGS + ["--confirm"])
+    preview = run_cli(tp, PATCH_ARGS)
+    confirmed = run_cli(tp, PATCH_ARGS + ["--confirm"])
 
     assert preview.code == 0
     assert confirmed.lines == ["OK 2988748904"]
-    assert previewed_body(preview, "WOULD PATCH") == \
-        srv.sent("PATCH", "/time_entries")[0]["body"]
+    assert previewed_body(preview, "WOULD PATCH") == {"notes": "Reworded for the client"}
+    assert srv.sent("PATCH", "/time_entries")[0]["body"] == {"notes": "Reworded for the client"}
 
 
 def test_a_patch_preview_names_the_entry_it_would_have_changed(live_harvest):
@@ -317,7 +281,7 @@ def test_a_patch_preview_names_the_entry_it_would_have_changed(live_harvest):
     lets the reviewer check it against the entry they meant before handing over the flag.
     """
     live_harvest({("PATCH", "/time_entries/2988748904"): {"id": 2988748904}})
-    r = run_cli(hp, PATCH_ARGS)
+    r = run_cli(tp, PATCH_ARGS)
 
     assert not r.out.startswith("OK ")
     assert "2988748904" in r.lines[0]
@@ -326,25 +290,25 @@ def test_a_patch_preview_names_the_entry_it_would_have_changed(live_harvest):
 
 def test_the_confirmation_flag_is_not_a_field_to_update(live_harvest):
     """`--confirm` says *whether* to write, never *what* to write. Counted as a field it
-    would make `harvest_patch.py <id> --confirm` an empty PATCH — which Harvest answers 200
+    would make `patch <id> --confirm` an empty PATCH — which Harvest answers 200
     to, so the caller is told an edit landed when none was ever described."""
     srv = live_harvest({("PATCH", "/time_entries/2988748904"): {"id": 2988748904}})
-    r = run_cli(hp, ["2988748904", "--confirm"])
+    r = run_cli(tp, ["patch", "2988748904", "--confirm"])
 
-    assert r.code != 0
+    assert r.code == 2
     assert "at least one field" in r.err
     assert srv.sent("PATCH", "/time_entries") == []
 
 
 def test_the_confirmation_flag_may_be_typed_anywhere_in_either_script(live_harvest):
-    """One gate, one grammar. `harvest_post.py` strips the flag wherever it appears and
-    says so in its own comment ("before or after the positionals"); `harvest_patch.py`
-    read the entry id off argv[1] first, so the same habit sent the flag itself in as the
+    """One gate, one grammar. The dispatcher strips the flag wherever it appears, before
+    anything is read positionally, for both writes; the two scripts it replaced once
+    disagreed, and `harvest_patch.py` read the entry id off argv[1] first, so the same habit sent the flag itself in as the
     id and failed with `Unknown flag: 2988748904` — an error naming the argument that was
     correct. Two scripts sharing a documented gate cannot disagree about where it goes.
     """
     srv = live_harvest({("PATCH", "/time_entries/2988748904"): {"id": 2988748904}})
-    r = run_cli(hp, ["--confirm"] + PATCH_ARGS)
+    r = run_cli(tp, ["patch", "--confirm"] + PATCH_ARGS[1:])
 
     assert r.lines == ["OK 2988748904"], f"leading --confirm was not understood: {r.err}"
     assert len(srv.sent("PATCH", "/time_entries")) == 1
@@ -358,7 +322,7 @@ def test_a_dangling_field_flag_cannot_swallow_the_confirmation_flag(live_harvest
     timesheet. The flag is not a value, so it is removed before anything reads positionally.
     """
     srv = live_harvest({("PATCH", "/time_entries/2988748904"): {"id": 2988748904}})
-    r = run_cli(hp, ["2988748904", "--notes", "--confirm"])
+    r = run_cli(tp, ["patch", "2988748904", "--notes", "--confirm"])
 
     assert r.code != 0, f"a forgotten value was accepted as a command: {r.out}"
     assert "--notes" in (r.err + r.out)
@@ -370,8 +334,8 @@ def test_a_command_that_could_never_post_is_an_error_rather_than_a_preview():
     as "here is what I would have done" would invite the caller to re-run it with the flag,
     and the reversed range would then be caught on the second attempt instead of the first
     — with the caller having read a preview of an entry that was never postable."""
-    r = run_cli(hpost, ["48084036", "20753151", "2026-08-12", "10:00", "09:00", "n"])
-    assert r.code == 1
+    r = run_cli(tp, create_args(start="10:00", end="09:00", notes="n"))
+    assert r.code == 2
     assert "must be before" in r.err
     assert r.out == ""
 
@@ -380,8 +344,8 @@ def test_an_unconfirmed_patch_that_could_never_apply_is_an_error_rather_than_a_p
     """The same order holds for an update: the reversed range is refused before the gate is
     consulted, so nothing is previewed. Without this the two scripts could hold the guard
     on opposite sides of the gate and every other test here would still pass."""
-    r = run_cli(hp, ["2988748904", "--start", "10:00", "--end", "09:00"])
-    assert r.code == 1
+    r = run_cli(tp, ["patch", "2988748904", "--start", "10:00", "--end", "09:00"])
+    assert r.code == 2
     assert "must be before" in r.err
     assert r.out == ""
 
@@ -396,21 +360,19 @@ def test_an_unconfirmed_patch_that_could_never_apply_is_an_error_rather_than_a_p
 def test_post_refuses_a_reversed_time_range():
     """Harvest silently stores 10:00-09:00 as a 23-hour entry. The script is the only
     thing standing between a typo and a 23-hour line on a client invoice."""
-    r = run_cli(hpost, ["48084036", "20753151", "2026-08-12", "10:00", "09:00", "n",
-                        "--confirm"])
-    assert r.code == 1
+    r = run_cli(tp, create_args(start="10:00", end="09:00", notes="n") + ["--confirm"])
+    assert r.code == 2
     assert "must be before" in r.err
 
 
 def test_post_refuses_a_zero_length_entry():
-    r = run_cli(hpost, ["48084036", "20753151", "2026-08-12", "09:00", "09:00", "n",
-                        "--confirm"])
-    assert r.code == 1
+    r = run_cli(tp, create_args(start="09:00", end="09:00", notes="n") + ["--confirm"])
+    assert r.code == 2
 
 
 def test_patch_refuses_a_reversed_time_range():
-    r = run_cli(hp, ["2988748904", "--start", "10:00", "--end", "09:00", "--confirm"])
-    assert r.code == 1
+    r = run_cli(tp, ["patch", "2988748904", "--start", "10:00", "--end", "09:00", "--confirm"])
+    assert r.code == 2
     assert "must be before" in r.err
 
 
