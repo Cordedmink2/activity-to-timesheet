@@ -1293,7 +1293,7 @@ prose, not whether a run behaves the same.
 
 **What the instrument says — thin.** Scenarios are in `tests/evals/daily/evals.json`
 (calendar and guards; an already-billed day with a prior ruling; the confirmation gate on a
-fall-back day). Only the first two were run (iteration-1, one rep per arm; the third and reps 2-3 hit the subagent cap): one fresh no-filesystem subagent per arm, baseline
+fall-back day). All three were run once per arm (iteration-1, one rep per arm; reps 2-3 hit the subagent cap): one fresh no-filesystem subagent per arm, baseline
 (pre-trim) against trimmed, read by hand against its six checks. Both arms scored 6/6 and gave
 the same `--cover` argument, the same declared break and the same treatment of the
 uncorroborated event. That is n=1 per arm, one scenario, on a model that is not the usual
@@ -1302,10 +1302,14 @@ scenarios and at least 3 reps; the one-shot run allowed two subagents in total
 (`delegation.oneshot_max_children`), so the rest was not run. Scenario 2 (already-billed ruling), n=1 per arm: both arms
 checked Harvest first, read the responses file whole, treated the recorded ruling as binding,
 left the entry at 15:30 and read a screenshot inside Internal admin; neither mentioned
-`--confirm`. No difference. **Not shown:** that Step 8's yes-gate and Step 9's DST refusal
-behave the same after the trim (scenario 3 never ran), or that any of this holds at 3 reps;
-nothing here is a rung above 3. Re-run scenarios 2 and 3 with 3 reps per arm before treating this as
-more than a reasoned change; if either arm differs, put that step's cut back.
+`--confirm`. No difference. Scenario 3 (confirm gate and DST), n=1 per arm: both arms ran
+the post command without `--confirm` first, added it only after the explicit yes, followed the
+refusal by posting the two named entries without closing the overlap, and recorded WOULD POST as
+not posted. Wording differences only: arm B also said 'looks fine' approved the Step 6 draft, not
+posting; arm A did not say so explicitly but still put the Step 8 question first. No behavioural
+difference. **Not shown:** that any of this holds at 3 reps; nothing here is a rung above 3.
+Re-run all three scenarios with reps 2-3 per arm (needs a run with a higher subagent cap) before
+treating this as more than a reasoned change; if either arm differs, put that step's cut back.
 
 **Rejected: deleting rationale outright.** The mechanism has a home in the references, so a
 rule measured useful is not lost, and CONTRIBUTING's "Rules with more than one copy" rows that
