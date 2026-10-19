@@ -511,3 +511,15 @@ def test_a_long_web_title_and_url_are_truncated_for_the_reader(live_aw):
     row = payload["web"][0]
     assert len(row["title"]) == 60 and row["title"] == title[:60]
     assert len(row["url"]) == 80 and row["url"] == url[:80]
+
+
+@pytest.mark.parametrize("label, seen", [("Acme", "Acme"), ("Work>Acme", "Work>Acme")])
+def test_a_category_is_labelled_by_its_whole_name_path(live_aw, label, seen):
+    """#68: the label every consumer matches on is the joined path, so a `Work >` parent
+    changes it. That is why setup and the README both write flat, client-named categories.
+    Under `--real-aw` the categories round-trip through ActivityWatch's own settings store."""
+    live_aw(day(dt.date(2026, 6, 19)).active("09:00", "10:00")
+            .window("09:00", "10:00", "Code.exe", "acme-portal - Visual Studio Code")
+            .classify(label, "acme"))
+    rollup = run_cli(at, ["2026-06-19", "--json"]).json()["rollup_min_by_category"]
+    assert rollup == {seen: 60.0}
