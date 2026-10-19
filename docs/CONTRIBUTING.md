@@ -113,6 +113,18 @@ explanation, walk the matching section of those two files as well, and `referenc
 for anything the old "Files in this skill" held. `SKILL.md` is held under 5,000 words
 (`wc -w`), so a copy added there is paid for by one removed.
 
+Row-by-row walk after #57 (every row that names `SKILL.md` Step N or the old "Files in this
+skill"; checked against the trimmed file):
+
+- Flag inventory, toggle, category-rule and backup rows citing "Files in this skill": copy now `references/scripts.md` (rows updated).
+- Meeting window (`MEETING_TITLE`): `SKILL.md` Step 3 soft-boundary line (names `Meeting |`) and Step 2's `calendar_day.py` bullet both still hold it; mechanism copy also in `references/day-reading.md`.
+- Staleness verdicts `CURRENT`/`STALE`/`BROKEN`, `SEEN`/`UNVERIFIED`: Step 2 bullets still in `SKILL.md` (guard); `tests/test_daily_skill.py` unchanged and green.
+- `--cover` takes every entry Step 9 will post; `work_end` is a ceiling; corroborated event over its `block` span; calendar questions; Check the date against Harvest: guard text still in `SKILL.md` (Steps 1, 3, 6, 8); fuller mechanism in `references/day-reading.md` / `references/review-and-posting.md`.
+- Transition instant / fall-back refusal and the derived-zone label: `SKILL.md` "Timezone", Step 8 posting question and Step 9 clocks-go-back bullet still hold the guard.
+- Screenshots never settle active/idle; check the other monitors: `SKILL.md` Step 3 calendar paragraph and Step 5 hold the one-line rule; folder mechanics moved to `references/day-reading.md` (rows updated).
+- Work-kind/task names, tunable defaults, `--max-share`, "Running the scripts": `SKILL.md` still holds them ("Tunable defaults", Step 4, "Running the scripts").
+- Step 11 defect-upstream rule: `SKILL.md` Step 11 still names `references/reporting-issues.md`.
+
 Duplication here is mostly deliberate — a guard restated in the pre-post checklist
 catches what a guard buried in Step 6 does not. The hazard is scope drift: each copy
 reads fine alone and the contradiction exists only across them.

@@ -1293,15 +1293,18 @@ prose, not whether a run behaves the same.
 
 **What the instrument says — thin.** Scenarios are in `tests/evals/daily/evals.json`
 (calendar and guards; an already-billed day with a prior ruling; the confirmation gate on a
-fall-back day). Only the first was run: one fresh no-filesystem subagent per arm, baseline
+fall-back day). Only the first two were run (iteration-1, one rep per arm; the third and reps 2-3 hit the subagent cap): one fresh no-filesystem subagent per arm, baseline
 (pre-trim) against trimmed, read by hand against its six checks. Both arms scored 6/6 and gave
 the same `--cover` argument, the same declared break and the same treatment of the
 uncorroborated event. That is n=1 per arm, one scenario, on a model that is not the usual
 runner, and it exercises the guards the trim kept nearly verbatim. The card asked for 2–3
 scenarios and at least 3 reps; the one-shot run allowed two subagents in total
-(`delegation.oneshot_max_children`), so the rest was not run. **Not shown:** that Step 1's
-already-covered ruling rule and Step 8's yes-gate behave the same after the trim, the two cuts
-that most changed wording. Re-run scenarios 2 and 3 with 3 reps per arm before treating this as
+(`delegation.oneshot_max_children`), so the rest was not run. Scenario 2 (already-billed ruling), n=1 per arm: both arms
+checked Harvest first, read the responses file whole, treated the recorded ruling as binding,
+left the entry at 15:30 and read a screenshot inside Internal admin; neither mentioned
+`--confirm`. No difference. **Not shown:** that Step 8's yes-gate and Step 9's DST refusal
+behave the same after the trim (scenario 3 never ran), or that any of this holds at 3 reps;
+nothing here is a rung above 3. Re-run scenarios 2 and 3 with 3 reps per arm before treating this as
 more than a reasoned change; if either arm differs, put that step's cut back.
 
 **Rejected: deleting rationale outright.** The mechanism has a home in the references, so a
