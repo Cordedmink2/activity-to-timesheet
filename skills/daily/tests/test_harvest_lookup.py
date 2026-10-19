@@ -1,4 +1,6 @@
 """The Harvest adapter's catalog lookup, read through the adapter's own function."""
+from pathlib import Path
+
 import pytest
 
 import skill_config
@@ -134,7 +136,7 @@ def test_explicit_catalog_dir_wins_over_configured_workspace(tmp_path, monkeypat
     env = tmp_path / ".env"
     env.write_text(f"TIMESHEET_WORKSPACE={tmp_path / 'ws'}\n", encoding="utf-8")
     monkeypatch.setattr(skill_config, "ENV_PATH", env)
-    assert str(catalog.catalog_dir("/explicit")) == "/explicit"
+    assert catalog.catalog_dir("/explicit") == Path("/explicit")   # not str(): Windows spells it \\explicit
 
 
 def test_a_blank_catalog_dir_does_not_beat_the_configured_workspace(tmp_path, monkeypatch):
