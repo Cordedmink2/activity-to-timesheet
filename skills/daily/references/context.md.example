@@ -90,6 +90,31 @@ List the externals you regularly chat with so they auto-classify to a client.
 
 ---
 
+## Work-item source
+
+Optional. Where your work items (cases, tickets, stories) live, so a catalog of them can be
+refreshed with `python scripts/refresh_catalogs.py`. **Delete this section if you have none**:
+the refresh then says no source is configured and writes nothing. Everything specific to your
+account is here and nowhere in the plugin. `references/catalog-refresh.md` § "The work-item
+source" says what each line means.
+
+- Adapter: `<adapter name — dataverse is the one that ships>`
+- Environment URL: `<the environment's URL>`
+- Auth profile: `<the name of the authenticated `pac auth` profile for it>`
+- Entity: `<the table the work items are rows of>`
+- Number column: `<the column holding the work-item number>`
+- Title column: `<the column holding its title>`
+- Modified column: `<the column holding its last-modified time>`
+- State column: `<the column that is 0 while the item is open>`
+
+### Case creation
+
+<How a new work item is made in your system: the helper or form, which fields are yours to
+supply and which the system assigns, the customer-to-prefix convention, and anything you
+have been bitten by (a reference that must not be in both the title and the PO field).>
+
+---
+
 ## Active client projects
 
 One section per client. Include every signal that would let the skill identify
@@ -106,7 +131,7 @@ Signals:
 - Work-item prefixes: `<PREFIX>` (e.g. numbers like `<PREFIX>1234` are this client's)
 - `<token>` appears in URL or window title
 - Edge profile `<ProfileName>` (window title ends `... - <ProfileName> - <YourName> - Microsoft Edge`)
-- Dynamics 365 at `<env-url>.crm6.dynamics.com`
+- Your CRM or ticketing system at `<env-url>`
 - ChatGPT project named `<Project Name>` (Firefox tab title `ChatGPT - <Project Name>`, URL contains `g-p-…-<slug>`)
 - Azure DevOps org `<dev.azure.com/orgname>`
 - SharePoint subdomains: `<subdomain>.sharepoint.com`

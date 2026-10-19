@@ -1,7 +1,7 @@
 # CONTEXT.md
 
 The vocabulary this project uses. Three services are in play today: ActivityWatch records what
-happened on the machine, Dataverse holds the work items the machine was busy with, Harvest holds
+happened on the machine, the work-item source (Dataverse, for one adapter) holds the work items the machine was busy with, Harvest holds
 the billed time. A fourth, the user's calendar, is opt-in and records what they were scheduled to be
 doing. All of them are meant to be swappable, and the terms below are how the rules talk about
 them — so that a second provider is an adapter rather than a rewrite.
@@ -30,7 +30,9 @@ rule; [ADR-0007](./docs/adr/0007-two-boundaries-the-provider-writes-the-sources-
 write-up of why they are drawn on what a mistake costs rather than on service, and records how far
 each side is abstracted today.
 
-## The services
+## The services — which seam reads, which writes
+
+Four services, two boundaries. The **timesheet provider** is the one *write* seam: credentials and the confirmation gate live there, once. The **activity source**, the **work-item source** and the **calendar** are *read* seams: no gate, no credential of their own. Each entry below says which it is.
 
 **Activity source** — the local service recording window titles, AFK state and browser tabs. Read
 only. ActivityWatch today, reached at the configured `TIMESHEET_ACTIVITY_URL`. Unlike the provider,
@@ -39,11 +41,12 @@ categories throughout, and `references/activitywatch.md` documents its API direc
 exists so that work has somewhere to start, not because it is done.
 
 **Work-item source** — the system the user's work items live in, and the thing a **work-item
-catalog** is pulled from. Read only, and it needs no credentials the way the provider does.
-Dataverse today. Like the activity source and unlike the provider, this one is *not* yet abstracted:
-one environment's entity names, columns and case-creation convention are shipped rather than
-configured, which is the same "one user's facts" failure the provider boundary already fixed. It is
-named here so the fix has a word to use.
+catalog** is pulled from. A read seam: no gate, and no credentials the way the provider has
+them. It has its own boundary (`scripts/work_items/`, #37), with one adapter per kind of system;
+Dataverse is the one that ships. Everything one account owns — its environment URL, its entity and
+column names, how a work item is created — is the user's, in `.context.md` § "Work-item source",
+and never a default in a shipped file. With no source configured a run says so rather than
+writing an empty catalog that looks healthy.
 
 **Calendar** — the user's schedule of meetings. Read only, opt-in, and absent unless configured.
 Evidence of *intent*, not of activity: it says where the user was meant to be, and the activity

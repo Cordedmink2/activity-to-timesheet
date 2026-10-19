@@ -32,7 +32,7 @@ deliberately rather than reconsidered here — a prefactor is the wrong place to
 which of a user's two configured values wins.
 
 A value that is blank or whitespace-only counts as *unset* at every layer, so it falls
-through to the next one — see `has_value()`. `DATAVERSE_URL=` left behind in a copied
+through to the next one — see `has_value()`. `TIMESHEET_WORKSPACE=` left behind in a copied
 `.env.example` means "I don't use this", and a scheduler that passes an empty string for
 an omitted argument must not thereby discard the configured value. This is a deliberate
 widening: the `.env` layer already discarded blanks, because `_parse_env_file` strips,

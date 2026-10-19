@@ -84,10 +84,9 @@ were a day with nothing in it.
   a `WOULD POST` line is the expected output of an unconfirmed run rather than a failure to fix.
 - **How far each side is abstracted today** (moved here from `CONTEXT.md` under #61; it is status,
   not vocabulary). The provider half is done to the line `tests/test_provider_neutrality.py`
-  enforces: no account's strings ship. It is not yet behind its command contract — that is #35,
-  against `docs/provider-contract.md`. The activity-source and work-item-source halves are not
-  abstracted: the rules name ActivityWatch's buckets, event schema and categories throughout, and the
-  work-item source has no boundary of its own until #37.
+  enforces: no account's strings ship. It sits behind its command contract (#35, `docs/provider-contract.md`). The
+  activity-source half is not abstracted: the rules name ActivityWatch's buckets, event schema and
+  categories throughout. The work-item source has its own boundary, `scripts/work_items/` (#37): one adapter per kind of system, Dataverse the one that ships, no gate and no credential, every account fact read from the user's `.context.md`; `tests/test_provider_neutrality.py` enforces its vocabulary line too.
 
 ## Alternatives considered
 

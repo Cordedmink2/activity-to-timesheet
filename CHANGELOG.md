@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.2] - 2026-10-19
 
+### Upgrading
+- **The work-item source's settings move out of the declared configuration and into your
+  `.context.md`** (#37). If you set `DATAVERSE_URL` and `PAC_AUTH_PROFILE` — in the skill `.env`
+  or as environment variables — they are no longer read. Add this to `Timesheets/.context.md`
+  (the `daily` skill's `references/context.md.example` has the template), then delete the two
+  old settings:
+
+  | Old setting | Now |
+  |---|---|
+  | `DATAVERSE_URL` | `- Environment URL:` under `## Work-item source` |
+  | `PAC_AUTH_PROFILE` | `- Auth profile:` under `## Work-item source` |
+  | *(was built into the script)* the entity, and the number, title, modified-on and state columns | `- Entity:`, `- Number column:`, `- Title column:`, `- Modified column:`, `- State column:` |
+  | *(was built into `new-client-work.md`)* the case-creation convention | the `### Case creation` subsection |
+
+  Also add `- Adapter: dataverse`. The catalog is now `.mcp/work_item_catalog.txt`, not
+  `.mcp/dv_active_incidents.txt`, and `refresh_catalogs.py` takes no `--dataverse-only` flag.
+  A run that finds the old settings and no section says so and stops (exit 3), naming each
+  setting and where it goes; with a section it carries on and says the old ones are ignored.
+
 ### Changed
+- **The work-item source has its own boundary** (#37). The Dataverse half of
+  `refresh_catalogs.py` moved into `scripts/work_items/`: a read boundary with no gate and no
+  credentials (ADR-0007), one adapter per kind of system, Dataverse shipped as the first. Every
+  account-specific part — environment URL, entity and column names, the case-creation
+  convention — is in your `.context.md` § "Work-item source" instead of the shipped files.
+  `tests/test_provider_neutrality.py` now covers this seam.
+- **No work-item source configured is said, not hidden** (#37). The run says none is configured
+  and writes nothing, instead of leaving an empty catalog that looks healthy; a source that
+  returns no work items is a failure (exit 4) that keeps the existing catalog.
+
 - **The Harvest adapter now sits behind the provider contract** (#35, #22).
   `docs/provider-contract.md` is implemented: one command,
   `python "<daily>/scripts/provider/bin/timesheet-provider" <post|patch|lookup|list|refresh>`,

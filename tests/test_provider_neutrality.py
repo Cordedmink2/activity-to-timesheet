@@ -148,3 +148,99 @@ def test_the_neutral_side_of_the_provider_boundary_speaks_no_harvest_wire_format
     assert not offenders, ("Harvest wire format above the adapter:\n" + "\n".join(offenders)
                            + "\nMove it into provider/harvest/; the neutral modules pass the "
                            "contract's own names (docs/provider-contract.md).")
+
+
+# --- the work-item source: the same line, drawn for the read seam (#37) ------------------
+#
+# Dataverse is shipped, as one adapter of the work-item source. What may not ship is one
+# *account's* Dataverse: its environment, its table and column names, its case-creation
+# convention. Those are the user's facts and live in their `.context.md`.
+
+import re  # noqa: E402
+
+WORK_ITEM_SOURCE = SKILLS / "daily" / "scripts" / "work_items"
+ADAPTERS = WORK_ITEM_SOURCE / "adapters"
+
+# The settings the work-item source used to be configured by. They are retired: only the
+# adapter may name them (to recognise the old shape), and nothing else ships them.
+RETIRED_SETTINGS = ("DATAVERSE_URL", "PAC_AUTH_PROFILE")
+
+# What names the system rather than the adapter's own code: the CLI it shells out to,
+# its host, its query language and the account-shaped words of its schema.
+DATAVERSE_IDENTIFIERS = (
+    re.compile(r"\bpac\b"),
+    re.compile(r"\.crm\d*\.dynamics\.com", re.I),
+    re.compile(r"\bdataverse\b", re.I),
+    re.compile(r"\bfetchxml\b", re.I),
+    re.compile(r"\bincidents?\b", re.I),
+    re.compile(r"\bticketnumber\b|\bstatecode\b|\bmodifiedon\b|\bcasetypecode\b"),
+)
+
+# Prose that explains the boundary to a user is allowed to name the adapter that ships.
+# These are the files where that is the subject, rather than a rule a run follows.
+ALLOWED_TO_NAME_THE_SYSTEM = {
+    "CONTEXT.md", "README.md", "CHANGELOG.md",
+    "docs/provider-contract.md", "docs/CONTRIBUTING.md",
+    "skills/daily/references/catalog-refresh.md",   # documents the adapter's own section
+    "skills/daily/references/context.md.example",   # the template that adapter reads
+    "skills/daily/references/first-run.md",         # the one pac recovery step
+}
+
+
+def shipped_files():
+    """Everything a user receives that a run reads: skills' markdown and scripts, the
+    template, the env example. Tests, docs/ and the changelog are the project's own."""
+    for skill in skill_dirs():
+        yield skill / "SKILL.md"
+        yield from sorted((skill / "references").glob("*"))
+        yield from sorted((skill / "scripts").rglob("*.py"))
+        env = skill / ".env.example"
+        if env.is_file():
+            yield env
+
+
+def test_no_dataverse_identifier_ships_outside_the_adapter():
+    offenders = []
+    for path in shipped_files():
+        rel = path.relative_to(REPO).as_posix()
+        if path.is_relative_to(ADAPTERS) and path.name != "__init__.py":
+            continue
+        if rel in ALLOWED_TO_NAME_THE_SYSTEM:
+            continue
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for pattern in DATAVERSE_IDENTIFIERS:
+                if pattern.search(line):
+                    offenders.append(f"  {rel}:{lineno}: {line.strip()[:90]}")
+                    break
+    assert not offenders, (
+        "Dataverse identifiers outside the work-item adapter:\n" + "\n".join(offenders)
+        + "\nThe seam and the rules name the work-item source, not the system behind it; "
+          "the system's names belong in `scripts/work_items/adapters/`.")
+
+
+def test_the_adapter_ships_no_accounts_environment_entity_or_column():
+    """The positive half: the adapter must take every account fact from the user's
+    `.context.md`, so no literal URL and no schema name may be written into it."""
+    for path in sorted(ADAPTERS.glob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        assert not re.search(r"https?://", text), f"{path.name} writes a URL"
+        for name in ("incident", "ticketnumber", "statecode", "modifiedon", "customerid"):
+            assert name not in text.lower(), f"{path.name} writes the column/entity {name!r}"
+
+
+def test_the_retired_settings_are_named_only_by_the_adapter_that_recognises_them():
+    offenders = []
+    for path in shipped_files():
+        rel = path.relative_to(REPO).as_posix()
+        if path == ADAPTERS / "dataverse.py" or rel in ALLOWED_TO_NAME_THE_SYSTEM:
+            continue
+        text = path.read_text(encoding="utf-8")
+        offenders += [f"  {rel}: {key}" for key in RETIRED_SETTINGS if key in text]
+    assert not offenders, "retired work-item settings shipped as live:\n" + "\n".join(offenders)
+
+
+def test_the_neutrality_scan_has_something_to_scan():
+    """A walk that finds nothing passes everything."""
+    assert any(p.name == "source.py" for p in shipped_files())
+    assert any(p.name == "dataverse.py" for p in ADAPTERS.glob("*.py"))
+    assert (WORK_ITEM_SOURCE / "adapters" / "__init__.py").is_file()

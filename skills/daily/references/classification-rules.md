@@ -21,7 +21,7 @@ If any window title, URL, or terminal task name within the block contains a stri
 
 1. Look up the prefix under `.context.md` § "Active client projects" — each client's signal list carries its work-item prefixes — to identify the client. A prefix that resolves to more than one client there is settled by `timesheet-provider lookup <prefix> --json`, grouped by `client`, not by picking the first match.
 2. Look up the same string with `timesheet-provider lookup <code> --json` to get the `project_id` and the `tasks[]`.
-3. If the user maintains a work-item catalog file (e.g. a dump of active incidents), look up the title there for the entry note.
+3. If the user maintains a work-item catalog file (the work-item catalog `refresh_catalogs.py` writes), look up the title there for the entry note.
 4. Direct hit → HIGH confidence.
 
 **Caveat — a work item existing ≠ today's billing target.** A work-item catalog lists *all* known items; thematic match isn't billing match. The user may be supporting a colleague's work item, doing release-level work that bills to a different project, or working on something not yet tracked. When the work item isn't named explicitly in window/URL titles, ask — don't pick the most "thematically matching" row from the catalog.

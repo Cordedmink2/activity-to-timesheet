@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-import refresh_catalogs as rc
 import skill_config
 from provider import dispatcher as tp
 from provider.errors import NoMatch, Refused
@@ -49,7 +48,7 @@ def test_a_failure_on_page_two_leaves_every_existing_catalog_file_byte_for_byte_
         "harvest_assignments.json": assignments_page(1, 2, [project(1, "OLD-1", "Kept page one")]),
         "harvest_assignments_p2.json": assignments_page(2, 2, [project(2, "OLD-2", "Kept page two")]),
     })
-    _write(mcp, "dv_active_incidents.txt", "unrelated catalog\n")
+    _write(mcp, "work_item_catalog.txt", "unrelated catalog\n")
     before = _snapshot(mcp)
 
     live_harvest(paged_assignments([assignments_page(1, 2, [project(9, "NEW-9")]),
@@ -106,23 +105,6 @@ def test_page_one_is_unsuffixed_and_later_pages_each_hold_their_own_payload(work
     assert sorted(p.name for p in mcp.iterdir()) == sorted(names)
     for name, expected in zip(names, pages):
         assert json.loads((mcp / name).read_text(encoding="utf-8")) == expected
-
-
-def test_the_dataverse_refresh_reports_a_skip_when_the_org_is_not_configured(workspace):
-    """Dataverse is optional. If the unconfigured guard stops working, `refresh_dataverse`
-    reaches the `pac` CLI with a None environment — a user who never opted in gets an
-    error, and their active `pac` auth profile gets switched out from under them.
-    """
-    r = run_cli(rc, ["--dataverse-only"])
-    assert r.code == 0
-    assert "Skipping Dataverse refresh" in r.out
-
-
-def test_refresh_catalogs_no_longer_touches_the_provider(workspace):
-    """The provider's catalog is `timesheet-provider refresh`; the two flags the contract
-    retires do not exist on this script, and it asks for no provider credential."""
-    assert run_cli(rc, ["--harvest-only"]).code == 2
-    assert run_cli(rc, []).code == 2
 
 
 def test_a_catalog_that_comes_back_empty_is_a_failure_not_an_empty_catalog(workspace, live_harvest):

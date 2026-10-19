@@ -294,7 +294,7 @@ the local catalog `lookup` reads. **Stdout on success:** one line, `OK <n> proje
   anything — the deferred block is still billed through `post`, behind the gate.
 - **`refresh` is the provider's catalog only.** The work-item catalog (`pac`, the active-incident
   list) is **not** a provider operation: it is the read side's, and #37 gives it its own boundary.
-  Until #37 lands it stays `refresh_catalogs.py --dataverse-only`. The `--harvest-only` and
+  It is `refresh_catalogs.py`, behind the work-item source boundary (#37). The `--harvest-only` and
   `--dataverse-only` flags therefore **do not exist** on this command: the first is `refresh`
   itself, and the second is not the provider's to run.
 
@@ -450,8 +450,8 @@ exercise these scripts and move with them in #35.
 | `python scripts/harvest_list.py <from> [<to>]` | `TP list <from> [<to>]` | Per-entry columns unchanged; exit 1 → 2/3/4/5. |
 | `python scripts/harvest_list.py <from> <to> --by-day` | `TP list <from> <to> --by-day` | Unchanged; this is the month sweep `reconcile` runs. |
 | `python scripts/refresh_catalogs.py --harvest-only` | `TP refresh` | Output is now `OK <n> projects`; per-page progress is stderr. |
-| `python scripts/refresh_catalogs.py` (both) | `TP refresh`, then `python scripts/refresh_catalogs.py --dataverse-only` | Two commands until #37 (§ 3.5). |
-| `python scripts/refresh_catalogs.py --dataverse-only` | unchanged | Not the provider's; #37 owns it. |
+| `python scripts/refresh_catalogs.py` (both) | `TP refresh`, then `python scripts/refresh_catalogs.py` | Two commands: the work-item source is its own boundary (#37, § 3.5). |
+| `python scripts/refresh_catalogs.py --dataverse-only` | `python scripts/refresh_catalogs.py` | Not the provider's; the flag went with #37. |
 | `refresh_catalogs.wait_for_project('<code>')` (`new-client-work.md`, `catalog-refresh.md`) | `TP refresh --wait '<code>'` | A function call becomes a command; exit 6 means it never appeared. |
 | `python scripts/harvest_list.py <today> <today>` as the credentials check (`SKILL.md` Prerequisite 5, `first-run.md` step 4) | `TP list <today> <today>` | Success is **exit 0**, with the empty-range notice a success; exit 3 is "credentials not found", **4 is "the credential was refused"** (a revoked token), 5 is the network. The caller can now tell the three apart from the exit code, where it read the text before. |
 
@@ -466,7 +466,7 @@ exercise these scripts and move with them in #35.
 | `skills/daily/references/classification-rules.md` project lookup (step 2) | read the project code's id and tasks out of the catalog file | `TP lookup <code> --json`: `project_id` and `tasks[]` |
 | `skills/daily/references/classification-rules.md` task authority and billable rule | the provider's per-project task list, and its per-task billable flag, named as the authority | the `tasks[]` `TP lookup` returns and its `billable` (text: `(billable)` / `(NON-billable)`) |
 | `skills/daily/references/catalog-refresh.md` "Output" | the page files' names, and "downstream readers expect the provider's own shape" | removed: storage is the adapter's (§ 6.2); the paragraph says `TP refresh` writes the catalog `TP lookup` reads |
-| `skills/daily/references/new-client-work.md` | `scripts/refresh_catalogs.py` for the bulk work-item catalog | stays `refresh_catalogs.py --dataverse-only` until #37 |
+| `skills/daily/references/new-client-work.md` | `scripts/refresh_catalogs.py` for the bulk work-item catalog | is `refresh_catalogs.py` (#37) |
 | `skills/daily/SKILL.md` Tunable defaults and Step 4 (task selection) | the project's own task list, and the billable rule, named by the provider's fields | "the tasks `TP lookup` lists for this project", and its `billable` |
 | `skills/daily/SKILL.md` Step 4 (work-item strings) | "matches only on" the provider's client field | lookup's `matched_on: client` |
 | `skills/daily/SKILL.md` "Files in this skill", `refresh_catalogs.py` entry | the catalog's file glob as what it refreshes | `TP refresh` writes the catalog `TP lookup` reads; no file named |
