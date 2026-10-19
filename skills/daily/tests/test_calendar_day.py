@@ -446,6 +446,120 @@ def test_a_block_and_its_evidence_render_in_the_skeletons_notation():
 
 
 # --------------------------------------------------------------------------------------
+# Subject-titled Teams windows (#80, #90) and evidence that is too thin to bill (#89)
+# --------------------------------------------------------------------------------------
+#
+# Real Teams builds title a meeting window by its subject with no prefix at all, and on
+# joining show a brief `Meeting join | <subject> | …` window. The shapes below are the
+# redacted titles from the two field reports, with this suite's placeholder names.
+
+SUBJECT_TITLED = "Sprint review | Northwind | user@example.com | Microsoft Teams"
+JOIN_TITLED = "Meeting join | Sprint review | Northwind | user@example.com | Microsoft Teams"
+OTHER_MEETING = "Quarterly planning | Northwind | user@example.com | Microsoft Teams"
+
+
+def test_a_subject_titled_teams_window_corroborates_the_event_it_names():
+    """#80 / #90: `<Subject> | <Tenant> | <email> | Microsoft Teams`, no prefix. The window
+    names the event, so the event is corroborated with evidence and block as for a prefixed
+    title — the 68-minute meeting #90 lost to a regex."""
+    d = day().active("14:20", "15:45")
+    d.window("14:33", "15:38", TEAMS, SUBJECT_TITLED)
+    assert verdict_of(event("14:30", "15:15"), d) == (True, span("14:33", "15:38"),
+                                                     span("14:30", "15:38"))
+
+
+def test_a_meeting_join_window_corroborates_the_event_it_names():
+    d = day().active("08:00", "09:00")
+    d.window("08:13", "08:21", TEAMS, JOIN_TITLED)
+    assert verdict_of(event("08:15", "08:30"), d) == (True, span("08:13", "08:21"),
+                                                     span("08:15", "08:30"))
+
+
+def test_the_subject_is_compared_ignoring_case_and_surrounding_space():
+    d = day().active("09:00", "10:00")
+    d.window("09:02", "09:40", TEAMS, "  SPRINT Review  | Northwind | Microsoft Teams")
+    assert verdict_of(event("09:00", "09:45", subject=" sprint review "), d)[0] is True
+
+
+def test_a_subject_titled_window_naming_a_different_meeting_does_not_corroborate():
+    """Anchored on the event: another meeting's window inside this slot is not this one."""
+    d = day().active("09:00", "10:00")
+    d.window("09:00", "09:45", TEAMS, OTHER_MEETING)
+    assert verdict_of(event("09:00", "09:45"), d) == (False, None, None)
+
+
+def test_a_window_outside_the_meeting_client_titled_like_the_subject_does_not_corroborate():
+    """#89: corroboration must come from the meeting client. A document or folder that
+    happens to share the subject's first words is not attendance."""
+    d = day().active("12:00", "13:30")
+    d.window("12:00", "13:30", "explorer.exe", "Sprint review | notes - File Explorer")
+    assert verdict_of(event("12:00", "13:30"), d) == (False, None, None)
+
+
+def test_twelve_seconds_of_meeting_window_does_not_license_a_ninety_minute_block():
+    """#89: a 12-second intersection cleared the 5-second noise floor and corroborated a
+    90-minute event, replacing three clients' work with one meeting block. Evidence under
+    a minute inside the event is a focus change, not attendance."""
+    d = day().active("12:00", "13:30")
+    d.window("12:00", "13:24:30", "Code.exe", "sync.py - acme-integration - Visual Studio Code")
+    d.window("13:24:30", "13:24:42", TEAMS, SUBJECT_TITLED)
+    d.window("13:24:42", "13:30", "Code.exe", "sync.py - acme-integration - Visual Studio Code")
+    assert verdict_of(event("12:00", "13:30"), d) == (False, None, None)
+
+
+def test_the_minimum_evidence_is_a_flag(fake_adapter, calendar_on, live_aw):
+    d = day().active("08:30", "10:00")
+    d.window("09:10:00", "09:10:40", TEAMS, "Meeting | Standup — ACME | Microsoft Teams")
+    live_aw(d)
+    adapter = str(fake_adapter(CANNED))
+    default = run_cli(cd, [MAY.isoformat(), "--adapter", adapter])
+    lowered = run_cli(cd, [MAY.isoformat(), "--adapter", adapter, "--min-evidence", "30"])
+    assert default.json()["events"][0]["corroborated"] is False
+    assert lowered.json()["events"][0]["corroborated"] is True
+
+
+# --------------------------------------------------------------------------------------
+# What the filter dropped is visible (#78)
+# --------------------------------------------------------------------------------------
+
+def test_a_meeting_never_responded_to_is_kept_when_the_machine_saw_it():
+    """#78: a recurring meeting attended every week but never formally answered carries no
+    response, and was dropped while the user's own reminders were kept. Attendance the
+    activity source saw outranks the missing RSVP."""
+    d = day().active("09:00", "11:00")
+    d.window("09:29", "10:48", TEAMS, SUBJECT_TITLED)
+    for response in ("none", "not_responded"):
+        assert verdict_of(event("09:30", "10:30", response=response), d)[0] is True
+
+
+def test_a_meeting_never_responded_to_with_no_window_is_dropped_and_reported():
+    out = cd.filtered_day({"events": [event("09:30", "10:30", id="weekly", response="none",
+                                            subject="Client weekly")]},
+                          MAY, AUCKLAND, [])
+    assert out["events"] == []
+    assert out["dropped"] == [{"id": "weekly", "subject": "Client weekly",
+                               "start": "09:30:00", "end": "10:30:00",
+                               "reason": "not responded to, and no meeting window seen"}]
+
+
+def test_every_dropped_event_on_the_day_is_listed_with_its_reason():
+    """A filtered-to-nothing calendar must not look like an empty one: each event the day
+    held and the filter removed is named, with why."""
+    out = cd.filtered_day({"events": [
+        event("08:00", "08:30", id="a", response="declined"),
+        event("09:00", "09:30", id="b", show_as="free"),
+        event("10:00", "10:30", id="c", cancelled=True),
+        event("00:00", "00:00", id="d", all_day=True),
+        event("11:00", "11:30", id="kept"),
+        event("09:00", "09:30", id="tomorrow", start="2026-05-29T09:00:00+12:00",
+              end="2026-05-29T09:30:00+12:00"),
+    ]}, MAY, AUCKLAND, [])
+    assert [e["id"] for e in out["events"]] == ["kept"]
+    assert {e["id"]: e["reason"] for e in out["dropped"]} == {
+        "a": "declined", "b": "shown as free", "c": "cancelled", "d": "all-day"}
+
+
+# --------------------------------------------------------------------------------------
 # The adapter command
 # --------------------------------------------------------------------------------------
 
@@ -548,6 +662,12 @@ def test_the_wrapper_prints_the_contract_for_a_date_through_an_adapter_it_is_giv
              "end": "13:30:00", "show_as": "tentative", "response": "tentative",
              "attendees": ["Ana Client", "Ben Colleague"],
              "corroborated": False, "evidence": None, "block": None},
+        ],
+        # #78: what the day held and the filter removed is named, so a filtered-to-nothing
+        # calendar never reads as an empty one.
+        "dropped": [
+            {"id": "declined", "subject": "Sprint review", "start": "11:00:00",
+             "end": "11:30:00", "reason": "declined"},
         ],
     }
 

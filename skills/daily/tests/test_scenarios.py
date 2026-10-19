@@ -186,13 +186,17 @@ def test_a_day_with_no_break_is_one_span_hiding_dead_stretches(live_aw):
         assert got["window_reports"][dead]["active_ratio"] < 0.4, dead
 
 
-def test_work_past_midnight_ends_on_a_clock_time_earlier_than_it_started(live_aw):
-    """Times render as HH:MM:SS with no date, so a post-midnight end reads as `01:12:00`.
-    Anything comparing the two strings to sanity-check the day gets the wrong answer."""
-    got = probe(BY_NAME["overnight-day"], live_aw)
-    afk = got["afk_json"]
-    assert (afk["work_start"], afk["work_end"]) == ("19:30:00", "01:12:00")
-    assert afk["work_end"] < afk["work_start"]      # the trap, pinned
+def test_work_past_midnight_stops_at_midnight_and_the_rest_is_the_next_days(live_aw):
+    """The activity source clips every event to the range asked for — aw-server-rust and the
+    Python server alike — so the day ends at local midnight and the 00:00–01:12 tail is the
+    *next* date's to bill. This test used to pin a `work_end` of `01:12:00`, which only the
+    fake, which did not clip, ever produced; `--real-aw` showed no install prints it."""
+    d = BY_NAME["overnight-day"].build()
+    live_aw(d)
+    today = run_cli(ab, [d.date_str(), "--json"]).json()
+    assert (today["work_start"], today["work_end"]) == ("19:30:00", "00:00:00")
+    tomorrow = run_cli(ab, [(d.date + dt.timedelta(days=1)).isoformat(), "--json"]).json()
+    assert (tomorrow["work_start"], tomorrow["work_end"]) == ("00:00:00", "01:12:00")
 
 
 def test_a_day_with_no_activity_reports_that_rather_than_failing(live_aw):

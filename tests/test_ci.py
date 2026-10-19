@@ -60,6 +60,16 @@ def test_the_checks_workflow_runs_on_both_platforms():
         assert runner in text, f"the checks workflow never runs on {runner}"
 
 
+def test_the_checks_workflow_runs_the_suite_against_a_pinned_real_activitywatch():
+    """The fake ActivityWatch is a model; `--real-aw` is the check on it. Two defects the
+    fake hid — events not clipped to the range, a query quoting the Rust server rejects —
+    were found the first time it ran. Pinned to a release, so a red run is ours to read."""
+    text = CHECKS.read_text(encoding="utf-8")
+    assert "--real-aw" in text, "nothing checks the fake against a real ActivityWatch"
+    assert re.search(r"aw:\s*\[\s*\"v\d+\.\d+\.\d+\"", text), (
+        "the real ActivityWatch is not pinned to a release version")
+
+
 def test_the_checks_workflow_gates_pushes_to_main_and_pull_requests():
     text = CHECKS.read_text(encoding="utf-8")
     assert re.search(r"^\s+pull_request:", text, re.M), "pull requests are not checked"

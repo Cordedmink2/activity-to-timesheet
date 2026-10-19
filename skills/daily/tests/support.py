@@ -458,6 +458,27 @@ def _overlaps(event: dict, start: str | None, end: str | None) -> bool:
     return e > lo and s < hi
 
 
+def _clipped(event: dict, start: str | None, end: str | None) -> dict:
+    """An overlapping event trimmed to the range, as both real servers return it.
+
+    aw-server-rust clips in `get_events` and aw-core's Python datastore does the same
+    ("Trim events that are out of range (as done in aw-server-rust)"). The fake used to hand
+    back whole events, so an event running past local midnight reached the scripts intact and
+    the suite pinned a `work_end` of 01:12 that no real install has ever printed — found by
+    running the scenarios under `--real-aw`.
+    """
+    if not start or not end:
+        return event
+    s = dt.datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
+    e = s + dt.timedelta(seconds=event["duration"])
+    lo = dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
+    hi = dt.datetime.fromisoformat(end.replace("Z", "+00:00"))
+    if s >= lo and e <= hi:
+        return event
+    s, e = max(s, lo), min(e, hi)
+    return {**event, "timestamp": iso_z(s), "duration": (e - s).total_seconds()}
+
+
 def aw_rule_matches(rule: dict, data: dict) -> bool:
     """Whether ActivityWatch's own `categorize` puts an event under `rule`.
 
@@ -476,12 +497,24 @@ def aw_rule_matches(rule: dict, data: dict) -> bool:
 # The two lines of a categorize query the fake reads: which bucket, and which classes.
 _QUERY_BUCKET = re.compile(r"""query_bucket\(["']([^"']+)["']\)""")
 _QUERY_CLASSES = re.compile(r"categorize\(events, (.*)\);$")
+# A `'` that opens a string: outside any double-quoted literal. Good enough for the queries
+# the scripts send, whose double-quoted literals never contain a bare `'`.
+_SINGLE_QUOTED = re.compile(r"""^(?:[^"']|"(?:[^"\\]|\\.)*")*'""")
+
+
+class _QueryRefused(Exception):
+    """A query the real server's parser rejects; the fake answers it with a 400."""
 
 
 def _answer_query(buckets: dict[str, list[dict]], body: dict) -> list[list[dict]]:
     """`POST /api/0/query/` for the one query shape the scripts send: a bucket, categorized,
     merged by `$category`. Everything else is a 400, as an unparseable query is there."""
     lines = body["query"]
+    # aw-server-rust, which every current ActivityWatch ships, has no single-quoted string:
+    # `'$category'` is a parse error and a 400. The Python server accepted it, so a query
+    # written for that one passed here and failed on a real install. Found by `--real-aw`.
+    if any(_SINGLE_QUOTED.search(line) for line in lines):
+        raise _QueryRefused("single-quoted string")
     bid = next(m.group(1) for line in lines if (m := _QUERY_BUCKET.search(line)))
     # The query language's string literal un-escapes `\"` and nothing else, so a backslash
     # reaches the regex as written: double every one before reading the text as JSON, then
@@ -553,12 +586,16 @@ def aw_server(buckets: dict[str, list[dict]], settings: dict | None = None,
         if path == "/api/0/query/" and method == "POST":
             if query_status != 200:
                 return query_status, {"error": "not found"}
-            return 200, _answer_query(buckets, body)
+            try:
+                return 200, _answer_query(buckets, body)
+            except _QueryRefused as exc:
+                return 400, {"message": f"ParsingError: {exc}"}
         if path.startswith("/api/0/buckets/") and path.endswith("/events"):
             bid = path[len("/api/0/buckets/"):-len("/events")]
             if bid not in buckets:
                 return 404, {"error": "no such bucket"}
-            evs = [e for e in buckets[bid] if _overlaps(e, query.get("start"), query.get("end"))]
+            evs = [_clipped(e, query.get("start"), query.get("end")) for e in buckets[bid]
+                   if _overlaps(e, query.get("start"), query.get("end"))]
             # AW hands back newest-first; the scripts must not assume chronological order.
             return 200, sorted(evs, key=lambda e: e["timestamp"], reverse=True)
         return 404, {"error": f"unrouted {path}"}

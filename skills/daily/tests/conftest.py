@@ -42,6 +42,7 @@ import skill_config                  # noqa: E402
 import timezone                      # noqa: E402
 from support import (SETTING_KEYS, Day, aw_server, day,  # noqa: E402,F401
                      harvest_server, run_cli, with_heartbeats)
+from real_aw import ENV_BINARY, FAKE_ONLY, RealServer, resolve_binary  # noqa: E402
 
 # Port 0 is not a port. A connection to it cannot be routed anywhere, by anything, which
 # is a stronger guarantee than "a port nothing happens to be listening on right now" —
@@ -122,9 +123,18 @@ def live_aw(monkeypatch):
     the scripts *deriving* it from the machine instead (#30).
     """
     started = []
+    real = _REAL_AW.get("server")
 
     def _start(d: Day, configure_zone: bool = True, **kw):
-        srv = aw_server(d.buckets(), d.settings(), **kw)
+        # Under `--real-aw` the day is served by the genuine binary behind a recording
+        # proxy (see `real_aw.py`), unless the test asks the fake to misbehave in a way
+        # a real server cannot be made to.
+        if real is not None and not (FAKE_ONLY & kw.keys()):
+            real.reset()
+            real.load(d.buckets(), d.settings())
+            srv = real.proxy()
+        else:
+            srv = aw_server(d.buckets(), d.settings(), **kw)
         srv.__enter__()
         started.append(srv)
         monkeypatch.setenv("TIMESHEET_ACTIVITY_URL", srv.base)
@@ -210,6 +220,33 @@ def pytest_addoption(parser):
                           "Review the diff by hand: it is the record of what changed.")
     parser.addoption("--bench", action="store_true", default=False,
                      help="Run the benchmark tests (skipped by default).")
+    parser.addoption("--real-aw", nargs="?", const="env", default=None, metavar="AW_SERVER",
+                     help="Serve every `live_aw` day from a real aw-server binary instead of "
+                          f"the fake (a path, or bare to read {ENV_BINARY}). See real_aw.py.")
+
+
+# The session's real server under `--real-aw`, or nothing. A dict rather than a fixture so
+# `live_aw` keeps its signature and every test using it is covered without being edited.
+_REAL_AW: dict[str, RealServer] = {}
+
+
+def pytest_configure(config):
+    flag = config.getoption("--real-aw", default=None)
+    if flag is not None:
+        _REAL_AW["server"] = RealServer(resolve_binary(flag))
+
+
+def pytest_unconfigure(config):
+    server = _REAL_AW.pop("server", None)
+    if server is not None:
+        server.close()
+
+
+def pytest_report_header(config):
+    server = _REAL_AW.get("server")
+    if server is not None:
+        return f"activity source: REAL aw-server {server.version} ({server.binary})"
+    return None
 
 
 def pytest_collection_modifyitems(config, items):

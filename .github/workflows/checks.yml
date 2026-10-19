@@ -49,3 +49,37 @@ jobs:
 
       - name: Type check
         run: pyright
+
+  # The same activity-source tests, served by the genuine ActivityWatch server rather than
+  # the suite's fake (`skills/daily/tests/real_aw.py`). The fake is a model of the server;
+  # this is what checks the model. Pinned to a release so a red run means the plugin or the
+  # fake moved, not ActivityWatch — bump the version deliberately and read what changes.
+  real-activitywatch:
+    name: pytest --real-aw (ActivityWatch ${{ matrix.aw }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        aw: ["v0.14.1"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install the test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Fetch the ActivityWatch server
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ matrix.aw }}" -R ActivityWatch/activitywatch \
+            -p "activitywatch-${{ matrix.aw }}-linux-x86_64.zip" -D "$RUNNER_TEMP"
+          unzip -q "$RUNNER_TEMP"/activitywatch-*.zip -d "$RUNNER_TEMP/aw"
+          echo "BILLABLES_AW_SERVER=$RUNNER_TEMP/aw/activitywatch/aw-server-rust/aw-server-rust" >> "$GITHUB_ENV"
+
+      - name: Tests against the real server
+        run: python -m pytest -q skills/daily/tests --real-aw
