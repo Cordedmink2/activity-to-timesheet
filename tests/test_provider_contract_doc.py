@@ -82,3 +82,35 @@ def test_the_guard_catches_what_it_is_for():
     leaky = "Send `started_time` and `spent_date`.\nDuration in Hours.\nOne hourly rate, ours.\n"
     assert occurrences(leaky) == [(1, "spent_date"), (1, "started_time"), (2, "hours")]
     assert occurrences("date, start and end, in the user's zone") == []
+
+
+# What a caller reading the provider's catalog directly looks like in the shipped prose: the
+# catalog's files and its fields. Kept out of WIRE_FORMAT_NAMES's job — that list guards the
+# contract document; this one finds the callers #35 has to re-point.
+CATALOG_READS = re.compile(
+    r"task_assignments|harvest_assignments|project_assignments|project\.code|client\.name"
+    r"|\.billable\b|\.mtime\b")
+
+
+def shipped_prose():
+    for path in sorted((REPO / "skills").rglob("*.md")):
+        if "tests" not in path.relative_to(REPO).parts:
+            yield path
+
+
+def test_every_shipped_file_that_reads_the_catalog_has_a_mapping_row():
+    """§ 8.2 claims to be exhaustive for direct catalog reads (#101 review). A file that reads the
+    catalog by its storage or field names and has no row is one #35 would leave reading a format
+    the contract makes internal."""
+    text = DOC.read_text(encoding="utf-8")
+    section = text[text.index("### 8.2"):text.index("### 8.3")]
+    missing = [p.relative_to(REPO).as_posix() for p in shipped_prose()
+               if CATALOG_READS.search(p.read_text(encoding="utf-8"))
+               and f"`{p.relative_to(REPO).as_posix()}`" not in section]
+    assert not missing, ("these files read the provider's catalog directly and § 8.2 has no row "
+                         "for them:\n  " + "\n  ".join(missing))
+
+
+def test_the_catalog_read_scan_finds_a_read():
+    assert CATALOG_READS.search("read the names out of `.mcp/harvest_assignments.json`")
+    assert not CATALOG_READS.search("offer the task names `TP lookup` lists")

@@ -282,6 +282,7 @@ the local catalog `lookup` reads. **Stdout on success:** one line, `OK <n> proje
   This is how a caller decides whether to refresh — the thresholds (7 days, the 30-day prompt)
   are the caller's policy, not the contract's — because the catalog's files are the adapter's
   and a caller reading their timestamps would be reading the storage (§ 6.2).
+- `--age` with `--wait` is a usage error, exit 2.
 - **A catalog that comes back with no projects at all is a failure** (exit 4), not a catalog
   written empty: it would make every later lookup fall through to the live fallback unannounced.
 - **`--wait CODE`** is `refresh_catalogs.wait_for_project()` as a command: it polls the
@@ -422,6 +423,8 @@ discovered by accident:
 5. **A patch preview can need the provider** (§ 3.2). That is today's behaviour, kept because the
    alternative — previewing a change the check would refuse — is the failure the gate exists to
    prevent.
+6. **`refresh --age`** (§ 3.5), so a caller can tell a stale catalog without reading the adapter's
+   storage. Added in review: the first draft left freshness to the file's modification time.
 
 ## 8. Mapping from every current invocation (#35's work list)
 
@@ -463,6 +466,15 @@ exercise these scripts and move with them in #35.
 | `skills/daily/references/classification-rules.md` task authority and billable rule | the provider's per-project task list, and its per-task billable flag, named as the authority | the `tasks[]` `TP lookup` returns and its `billable` (text: `(billable)` / `(NON-billable)`) |
 | `skills/daily/references/catalog-refresh.md` "Output" | the page files' names, and "downstream readers expect the provider's own shape" | removed: storage is the adapter's (§ 6.2); the paragraph says `TP refresh` writes the catalog `TP lookup` reads |
 | `skills/daily/references/new-client-work.md` | `scripts/refresh_catalogs.py` for the bulk work-item catalog | stays `refresh_catalogs.py --dataverse-only` until #37 |
+| `skills/daily/SKILL.md` Tunable defaults and Step 4 (task selection) | the project's own task list, and the billable rule, named by the provider's fields | "the tasks `TP lookup` lists for this project", and its `billable` |
+| `skills/daily/SKILL.md` Step 4 (work-item strings) | "matches only on" the provider's client field | lookup's `matched_on: client` |
+| `skills/daily/SKILL.md` "Files in this skill", `refresh_catalogs.py` entry | the catalog's file glob as what it refreshes | `TP refresh` writes the catalog `TP lookup` reads; no file named |
+| `skills/daily/references/classification-rules.md` step 1 (prefix → client) | groups the catalog file's projects by code prefix to find a client | `TP lookup <prefix> --json`, grouped by `client` |
+| `skills/daily/references/classification-rules.md` step 4b | the task list named by its provider field ("`harvest_lookup.py` returns them") | "the `tasks[]` `TP lookup` returns" |
+| `skills/daily/references/catalog-refresh.md` "When to refresh" | the catalog file's modification time and the project's code field | `TP refresh --age` (`AGE` ≥ 7 or `ABSENT`); lookup's `code` |
+| `skills/daily/references/catalog-refresh.md` "The assignment catalog" (endpoint, scope, headers, paging, output) | the provider's endpoint, token scope, headers, paging and page files | **moves behind the adapter** (§ 6.2), into the adapter's own notes; the section keeps only what `TP lookup` returns and that `TP refresh` needs no admin scope |
+| `skills/daily/references/first-run.md` Work kinds | read the task names out of the catalog file | offer the task names `TP lookup` lists across the user's projects |
+| `skills/daily/references/first-run.md` token scope | the endpoint and cached file the skill reads through | "a member-scope token is enough; `TP refresh` and `TP lookup` need no admin scope" — the endpoint is the adapter's |
 | `docs/adr/0007-…md` and `CONTEXT.md` status paragraph | the gate "implemented once, in `skills/daily/scripts/harvest_write.py`" | #35 amends both: the gate is in the dispatcher (§ 2) |
 | `skills/daily/SKILL.md` Prerequisite 5 | the `harvest_list.py` credentials check | `TP list <today> <today>`, per § 8.1 |
 | `skills/daily/SKILL.md` Step 1 (gap listing) and "check whether that date is already billed" | `harvest_list.py <date> <date>` | `TP list <date> <date>` |
