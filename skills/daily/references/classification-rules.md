@@ -41,6 +41,10 @@ Teams windows follow this pattern: `Chat | <Name>[, <Name>…] | <TenantName> | 
 - Title contains an **unrecognised external** with no client signal → ask the user; don't auto-classify.
 - **Recurring meeting names** → see `.context.md` "Notes on inference" or "Recurring meetings" for the user's canonical attribution.
 
+### 3a. Calendar event subject and attendees (same rank as a Teams title)
+
+When the calendar is on, a **calendar event**'s subject and attendee names are a client signal at **the same rank as the Teams title above** — read them with the same rules: a known external contact maps to their client, a recurring meeting name to the user's canonical attribution in `.context.md`, an all-colleague attendee list is *not* by itself internal. They can settle a client when nothing higher-ranked does. **They never override a work item** (§1): a meeting about one client never moves a block whose evidence carries another client's ticket number. A subject that does not settle it is what the drill-down is for — `references/disambiguation.md`, rung 2.
+
 ### 4. App-stack signal (MEDIUM confidence)
 
 VS Code workspaces, Obsidian vaults, repo paths, ChatGPT project names, and other app signatures map to **codebases** that belong to a client — see `.context.md` for the current mapping.

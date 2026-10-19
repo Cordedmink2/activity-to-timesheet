@@ -16,7 +16,12 @@
     {"events": [{"id", "subject", "start", "end", "show_as", "response",
                  "all_day", "cancelled", "attendees"}, ...]}
 
-  Basic fields only: no body, no location. Instants are UTC ("...Z"); the wrapper decides
+  Basic fields only: no body, no location. Those come one event at a time, from the
+  drill-down form (#55):
+
+    ... -File outlook_calendar.ps1 YYYY-MM-DD <event id>
+
+  which prints {"event": {"id", "body", "location"}} for that id alone, or fails naming it. Instants are UTC ("...Z"); the wrapper decides
   which day and clock that is in the configured zone, so this script never has to agree
   with it about time zones. The window read is the requested day plus a day either side
   for the same reason: the machine's day and the configured zone's day need not be the
@@ -38,7 +43,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [string]$Date = ""
+    [string]$Date = "",
+    [Parameter(Position = 1)]
+    [string]$EventId = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -77,6 +84,17 @@ function ConvertTo-Instant([datetime]$Utc) {
     return [DateTime]::SpecifyKind($Utc, [DateTimeKind]::Utc).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
 }
 
+function Get-EventId($Item) {
+    <#
+      Instances of a recurring meeting all report the series master's EntryID, so an
+      instance's id carries its own start; a one-off keeps the bare id. The day's read and
+      the drill-down both name an event by this, so they cannot disagree about which.
+    #>
+    $id = [string]$Item.EntryID
+    if ([bool]$Item.IsRecurring) { $id = "$id/$(ConvertTo-Instant $Item.StartUTC)" }
+    return $id
+}
+
 function ConvertTo-CalendarEvent($Item) {
     <#
       One AppointmentItem - or anything with its members - as the contract's event.
@@ -106,11 +124,7 @@ function ConvertTo-CalendarEvent($Item) {
         Fail "Outlook reported a response of $responded for '$subject', which this adapter does not know"
     }
 
-    # Instances of a recurring meeting all report the series master's EntryID, so an
-    # instance's id carries its own start; a one-off keeps the bare id, which the
-    # drill-down can reopen directly.
-    $id = [string]$Item.EntryID
-    if ([bool]$Item.IsRecurring) { $id = "$id/$start" }
+    $id = Get-EventId $Item
 
     # People, not rooms: a resource is where the meeting was, and would otherwise reach the
     # rules as an attendee name.
@@ -139,6 +153,41 @@ function Read-CalendarDay([datetime]$Day) {
     <#
       Every calendar event in the default calendar touching the three days around $Day,
       recurring ones expanded into their instances, as contract events.
+    #>
+    return @(Read-CalendarItems $Day | ForEach-Object { ConvertTo-CalendarEvent $_ })
+}
+
+function Find-EventDetail($Items, [string]$Id) {
+    <#
+      The drill-down (#55): body and location of the one item whose id is $Id, and of no
+      other. Matched on the id the day's read printed, so a recurring instance is found
+      by its own start rather than by the series it belongs to.
+    #>
+    foreach ($item in @($Items)) {
+        if ($null -eq $item) { continue }
+        if ((Get-EventId $item) -ceq $Id) {
+            return [ordered]@{
+                id       = $Id
+                body     = ([string]$item.Body).Trim()
+                location = ([string]$item.Location).Trim()
+            }
+        }
+    }
+    Fail "no calendar event $Id on this day in the default calendar"
+}
+
+function Write-EventDetail($Detail) {
+    <# One event's detail, as UTF-8 bytes straight to stdout, for the same reason as below. #>
+    $json = ConvertTo-Json -InputObject ([ordered]@{ event = $Detail }) -Depth 4
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+    $stdout = [Console]::OpenStandardOutput()
+    $stdout.Write($bytes, 0, $bytes.Length)
+    $stdout.Flush()
+}
+
+function Read-CalendarItems([datetime]$Day) {
+    <#
+      The raw AppointmentItems touching the three days around $Day, recurrences expanded.
     #>
     try {
         $outlook = New-Object -ComObject Outlook.Application
@@ -172,13 +221,13 @@ function Read-CalendarDay([datetime]$Day) {
         Fail "classic Outlook refused to list the calendar: $($_.Exception.Message)"
     }
 
-    $events = New-Object System.Collections.ArrayList
+    $items = New-Object System.Collections.ArrayList
     $item = $found.GetFirst()
     while ($null -ne $item) {
-        [void]$events.Add((ConvertTo-CalendarEvent $item))
+        [void]$items.Add($item)
         $item = $found.GetNext()
     }
-    return $events.ToArray()
+    return $items.ToArray()
 }
 
 function Write-CalendarDay($Events) {
@@ -213,7 +262,11 @@ if ($MyInvocation.InvocationName -ne ".") {
         Fail "classic Outlook's object model exists on Windows alone, so the calendar cannot be read here"
     }
     try {
-        Write-CalendarDay (Read-CalendarDay $day)
+        if ($EventId) {
+            Write-EventDetail (Find-EventDetail (Read-CalendarItems $day) $EventId)
+        } else {
+            Write-CalendarDay (Read-CalendarDay $day)
+        }
     } catch {
         Fail "the calendar could not be read: $($_.Exception.Message)"
     }

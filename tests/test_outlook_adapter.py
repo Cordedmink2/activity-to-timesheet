@@ -320,3 +320,55 @@ def test_a_missing_or_malformed_date_is_a_usage_error(argv):
     assert res.returncode == 2, f"exit {res.returncode}:\n{res.stdout}{res.stderr}"
     assert res.stdout == ""
     assert "YYYY-MM-DD" in res.stderr
+
+
+# --------------------------------------------------------------------------------------
+# The drill-down (#55): `outlook_calendar.ps1 YYYY-MM-DD <id>` prints one event's body
+# and location, and nothing about any other event.
+# --------------------------------------------------------------------------------------
+
+def detail_of(tmp_path: Path, event_id: str, *items: str) -> subprocess.CompletedProcess:
+    listed = ", ".join(f"({item})" for item in items)
+    return run_adapter_functions(
+        tmp_path, f"Write-EventDetail (Find-EventDetail @({listed}) '{event_id}')")
+
+
+@requires_winps
+def test_the_drill_down_prints_the_body_and_location_of_the_one_event_asked_for(tmp_path):
+    asked = meeting(Body="'  Agenda: release go/no-go  '", Location="'Teams'")
+    other = meeting(EntryID="'OTHER'", Body="'not this one'", Location="'Room 4'")
+    res = detail_of(tmp_path, "00000000F24B0D74ABCDEF", other, asked)
+    assert res.returncode == 0, res.stderr
+    assert json.loads(res.stdout) == {"event": {
+        "id": "00000000F24B0D74ABCDEF", "body": "Agenda: release go/no-go",
+        "location": "Teams"}}
+    assert "not this one" not in res.stdout
+
+
+@requires_winps
+def test_the_drill_down_finds_a_recurring_instance_by_the_id_the_day_printed(tmp_path):
+    """Every instance reports the master's EntryID; the day prints `<id>/<start>`, and the
+    drill-down has to find the instance that id names, not the first of the series."""
+    first = meeting(IsRecurring="$true", Body="'week one'")
+    second = meeting(IsRecurring="$true", Body="'week two'",
+                     StartUTC="[datetime]'2026-06-03T21:00:00'",
+                     EndUTC="[datetime]'2026-06-03T21:45:00'")
+    day_ids = [e["id"] for e in events_of(tmp_path, first, second)]
+    res = detail_of(tmp_path, day_ids[1], first, second)
+    assert res.returncode == 0, res.stderr
+    assert json.loads(res.stdout)["event"]["body"] == "week two"
+
+
+@requires_winps
+def test_the_drill_down_fails_naming_an_id_it_cannot_find(tmp_path):
+    res = detail_of(tmp_path, "NOPE", meeting(Body="'private'"))
+    assert res.returncode != 0 and res.stdout == ""
+    assert "NOPE" in res.stderr and "private" not in res.stderr
+
+
+@requires_winps
+def test_an_event_with_no_body_or_location_reads_as_empty_strings(tmp_path):
+    res = detail_of(tmp_path, "00000000F24B0D74ABCDEF", meeting())
+    assert res.returncode == 0, res.stderr
+    assert json.loads(res.stdout)["event"] == {
+        "id": "00000000F24B0D74ABCDEF", "body": "", "location": ""}

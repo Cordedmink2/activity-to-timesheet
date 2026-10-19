@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   walkthrough is gone — `setup` owns those steps and checks each one. The non-Claude-Code
   install is its own README section; the Dataverse catalog moved to the `daily` skill's
   `references/catalog-refresh.md`; the repo map moved to `docs/CONTRIBUTING.md`.
+- **A calendar event can settle a client** (#55). Its subject and attendees rank with the
+  Teams title and below a work item; when a subject is not enough,
+  `calendar_day.py <date> --detail <id>` prints that one event's body and location, and is
+  the disambiguation ladder's second rung. Nothing it reads is written to the workspace.
 - **A workday with no screenshots at all is called out** (#34). The day skeleton now counts
   the date's capture ticks and names the last one; on a day with real activity and none, it
   says the capture task was dead all day and that no block has a screenshot fallback. A day

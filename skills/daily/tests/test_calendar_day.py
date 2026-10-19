@@ -863,3 +863,95 @@ def test_nothing_is_written_anywhere(fake_adapter, calendar_on, activity_day, wo
     written = {p for p in after - before if "__pycache__" not in p.parts}
     assert not written, f"the wrapper left files behind: {sorted(written)}"
     assert workspace.is_dir()
+
+
+# --------------------------------------------------------------------------------------
+# Drill-down (#55): one event's body and location, asked for by its id — and nothing else.
+# --------------------------------------------------------------------------------------
+
+DETAIL = {"event": {"id": "standup", "body": "Agenda: ACME release go/no-go",
+                    "location": "Teams"}}
+
+
+@pytest.fixture
+def detail_adapter(tmp_path):
+    """An adapter that answers the drill-down form, `<adapter> YYYY-MM-DD <id>`, with
+    `payload` — and fails the run if it is handed anything else, so the wrapper's side of
+    the contract is asserted by the adapter."""
+    def _write(payload, *, want="standup") -> Path:
+        script = tmp_path / "detail_adapter.py"
+        script.write_text(textwrap.dedent(f"""
+            import json, sys
+            sys.stdout.reconfigure(encoding="utf-8")
+            if sys.argv[1:] != [{MAY.isoformat()!r}, {want!r}]:
+                sys.exit(f"the adapter was handed {{sys.argv[1:]}}")
+            print(json.dumps({payload!r}, ensure_ascii=False))
+            """), encoding="utf-8")
+        return script
+    return _write
+
+
+def test_detail_returns_one_events_body_and_location(detail_adapter, calendar_on):
+    r = run_cli(cd, [MAY.isoformat(), "--detail", "standup",
+                     "--adapter", str(detail_adapter(DETAIL))])
+    assert r.code == 0, r.err
+    assert r.json() == {"date": "2026-05-28", "id": "standup",
+                        "body": "Agenda: ACME release go/no-go", "location": "Teams"}
+
+
+def test_detail_does_not_read_the_activity_source(detail_adapter, calendar_on, live_aw):
+    """A drill-down is about one event's words, not about corroboration — and the run that
+    asks for one already has the day. No fetch, so nothing to fail on either."""
+    server = live_aw(day(MAY).active("09:00", "10:00"))
+    r = run_cli(cd, [MAY.isoformat(), "--detail", "standup",
+                     "--adapter", str(detail_adapter(DETAIL))])
+    assert r.code == 0, r.err
+    assert server.sent("GET", "aw-watcher-window") == []
+
+
+def test_detail_refuses_an_answer_about_any_other_event(detail_adapter, calendar_on):
+    """AC: body and location for one identifier and nothing for any other. An adapter that
+    answers with a neighbour's body is a bug the wrapper names rather than passes on."""
+    other = {"event": {"id": "sprint-review", "body": "secret", "location": "Room 4"}}
+    r = run_cli(cd, [MAY.isoformat(), "--detail", "standup",
+                     "--adapter", str(detail_adapter(other))])
+    assert r.code == 1
+    assert "secret" not in r.out + r.err
+    assert "sprint-review" in r.err and "standup" in r.err
+
+
+@pytest.mark.parametrize("payload", [{"event": None}, {"events": []}, {"event": {"id": "standup"}}],
+                         ids=["null", "day shape", "missing fields"])
+def test_detail_refuses_a_malformed_answer(detail_adapter, calendar_on, payload):
+    r = run_cli(cd, [MAY.isoformat(), "--detail", "standup",
+                     "--adapter", str(detail_adapter(payload))])
+    assert r.code == 1 and r.out == ""
+    assert r.err.startswith("ERR ")
+
+
+def test_detail_says_so_when_the_calendar_has_no_such_event(tmp_path, calendar_on):
+    script = tmp_path / "none.py"
+    script.write_text("import sys\nsys.exit('no calendar event standup on 2026-05-28')\n",
+                      encoding="utf-8")
+    r = run_cli(cd, [MAY.isoformat(), "--detail", "standup", "--adapter", str(script)])
+    assert r.code == 1
+    assert "no calendar event standup" in r.err
+
+
+def test_detail_still_needs_the_toggle(detail_adapter):
+    r = run_cli(cd, [MAY.isoformat(), "--detail", "standup",
+                     "--adapter", str(detail_adapter(DETAIL))])
+    assert r.code == 1 and "off" in r.err
+
+
+def test_detail_writes_nothing_to_the_workspace(detail_adapter, calendar_on, workspace):
+    before = sorted(p for p in workspace.rglob("*"))
+    run_cli(cd, [MAY.isoformat(), "--detail", "standup",
+                 "--adapter", str(detail_adapter(DETAIL))])
+    assert sorted(p for p in workspace.rglob("*")) == before
+
+
+def test_the_adapter_is_handed_the_id_as_its_second_argument(tmp_path):
+    assert cd.adapter_argv(tmp_path / "a.py", MAY, "x/1")[-2:] == ["2026-05-28", "x/1"]
+    assert cd.adapter_argv(tmp_path / "a.ps1", MAY, "x/1")[-2:] == ["2026-05-28", "x/1"]
+    assert cd.adapter_argv(tmp_path / "a.py", MAY)[-1] == "2026-05-28"
