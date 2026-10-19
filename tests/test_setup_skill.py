@@ -755,3 +755,27 @@ def test_it_points_at_the_configuration_dialog_rather_than_asking_for_values():
     puts a token into a session transcript that gets written to disk."""
     assert "/plugin configure billables" in shipped_text(), (
         "the skill never routes a missing configured value to the dialog that owns it")
+
+
+# --------------------------------------------------------------------------------------
+# Step 3: an Edge profile name is a second source of category terms (#66)
+# --------------------------------------------------------------------------------------
+
+def test_step_3_offers_edge_profile_names_as_terms_without_the_extension():
+    """Edge writes the profile into its window titles unaided, so the `PROFILE` lines
+    `--inspect` prints are a source of terms that needs no extension saved anywhere."""
+    text = shipped_text()
+    assert "`PROFILE`" in text and "Edge" in text
+    assert "Profile Title Suffix" not in text, "Chrome gets no second extension (#66)"
+
+
+def test_step_3_keeps_url_in_title_required_for_chrome_and_says_so_by_browser():
+    text = shipped_text()
+    assert re.search(r"Chrome[^.\n]*(?:no|never|not)[^.\n]*profile", text), (
+        "setup never says why Chrome needs the extension: its titles carry no profile name")
+    assert re.search(r"Chrome[^.\n]*\brequired\b|\brequired\b[^.\n]*Chrome", text)
+
+
+def test_step_3_does_not_claim_firefox_support_for_profile_names():
+    assert re.search(r"Firefox[^.\n]*(?:not (?:been )?(?:verified|measured|tested)|unverified)",
+                     shipped_text())

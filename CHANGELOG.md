@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.1] - 2026-09-29
 
 ### Added
+- **An Edge profile name is a category term with no extension** (#66). Edge writes the profile
+  into the window title itself, so `category_rules.py --inspect` now prints a `PROFILE` line
+  per name with the gate's verdict, and setup step 3 offers them. Chrome writes no profile
+  name, so URL in title stays required there; Firefox is stated as unverified. Bracketed codes
+  and existing rules are unchanged.
 - **Setup offers to install what the machine is missing.** It checks for ActivityWatch, Python, Git
   Bash and PowerShell 7, puts what is missing to you as one list with the command it would run
   (winget on Windows, Homebrew on macOS where it is installed), and runs only what you say yes to

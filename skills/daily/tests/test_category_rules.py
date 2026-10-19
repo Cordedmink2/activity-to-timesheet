@@ -517,6 +517,106 @@ def test_the_profile_tags_are_listed_where_the_rules_cannot_be_read(live_aw, wor
 
 
 # --------------------------------------------------------------------------------------
+# The Edge profile names the titles carry (#66)
+# --------------------------------------------------------------------------------------
+
+# Edge writes the profile into the window title on its own, ahead of ` - Microsoft Edge`; the
+# measured shapes (2026-09-09) are `... - <Name> - <Account> - Microsoft Edge` and
+# `... - Work - Microsoft Edge`. Chrome writes none: two different profiles, the same
+# `New Tab - Google Chrome`. Placeholder names throughout, never a real client.
+CLIENT_A_BOARD = ("msedge.exe", f"Board-clienta.example.com/board - ClientA - Alex{EDGE}")
+CLIENT_A_MAIL = ("msedge.exe", f"Inbox-mail.example.com/inbox - ClientA - Alex{EDGE}")
+WORK_DOCS = ("msedge.exe", f"Docs-docs.example.com/home - Work{EDGE}")
+WORK_WIKI = ("msedge.exe", f"Wiki-wiki.example.com/start - Work{EDGE}")
+CHROME_NEW_TAB = ("chrome.exe", "New Tab - Google Chrome")
+CHROME_PAGE = ("chrome.exe", "Example Domain - Google Chrome")
+
+
+def inspected(rows: list[tuple[str, str]], live_aw) -> str:
+    live_aw(sample_day(rows))
+    result = run_cli(cr, ["--inspect"])
+    assert result.code == 0, result.err
+    return result.out
+
+
+def test_inspect_offers_the_edge_profile_name_a_title_carries_as_a_category_term(
+        live_aw, workspace):
+    out = inspected([CLIENT_A_BOARD, CLIENT_A_MAIL, WORK_DOCS], live_aw)
+    assert 'PROFILE "ClientA - Alex" — 2 titles in Edge' in out
+
+
+def test_a_profile_name_with_no_account_is_offered_whole(live_aw, workspace):
+    out = inspected([CLIENT_A_BOARD, CLIENT_A_MAIL, WORK_DOCS, WORK_WIKI], live_aw)
+    assert 'PROFILE "Work" — 2 titles in Edge' in out
+    assert 'PROFILE "Alex"' not in out, "a profile name is not cut at its own hyphen"
+
+
+def test_a_name_seen_in_one_title_is_read_as_its_last_segment_and_left_to_the_gate(
+        live_aw, workspace):
+    """`Page - ClientA - Alex` once could be a page called ClientA in profile Alex; only a
+    repeat shows the two segments are a profile. Offered as the shorter reading, which the
+    gate still judges and the user still confirms."""
+    out = inspected([CLIENT_A_BOARD, WORK_DOCS, WORK_WIKI], live_aw)
+    assert 'PROFILE "Alex" — 1 title in Edge; gate: write' in out
+
+
+def test_an_offered_profile_name_goes_through_the_same_gate_as_any_term(live_aw, workspace):
+    out = inspected([CLIENT_A_BOARD, CLIENT_A_MAIL], live_aw)
+    assert ('PROFILE "ClientA - Alex" — 2 titles in Edge; gate: write, '
+            f'matches 2 of {sampled([CLIENT_A_BOARD, CLIENT_A_MAIL])} sampled titles') in out
+
+
+def test_an_offered_profile_name_that_matches_too_much_is_refused_by_the_gate(
+        live_aw, workspace):
+    """The profile everything is done in matches an implausible share: offered with the
+    verdict the gate would give it, so setup does not choose it."""
+    rows = [("msedge.exe", f"Page {n}-p{n}.example.com - Work{EDGE}") for n in range(8)]
+    out = inspected(rows, live_aw)
+    line = next(l for l in out.splitlines() if l.startswith('PROFILE "Work"'))
+    assert "gate: refuse" in line and "ceiling" in line
+
+
+def test_a_chrome_only_sample_offers_no_profile_name(live_aw, workspace):
+    """Chrome's titles carry no profile, so nothing is offered and the extension stays
+    the only way to tell its profiles apart."""
+    out = inspected([CHROME_NEW_TAB, CHROME_PAGE], live_aw)
+    assert 'PROFILE "' not in out
+    assert "PROFILE none in the sampled titles" in out
+
+
+def test_a_mixed_edge_and_chrome_sample_offers_only_the_edge_names(live_aw, workspace):
+    out = inspected([CLIENT_A_BOARD, CLIENT_A_MAIL, CHROME_NEW_TAB, CHROME_PAGE], live_aw)
+    offered = [l for l in out.splitlines() if l.startswith("PROFILE ")]
+    assert [l.split(" — ")[0] for l in offered] == ['PROFILE "ClientA - Alex"']
+    assert "Google Chrome" not in "".join(offered)
+
+
+def test_a_tagged_title_still_yields_its_profile_name_and_not_the_tag(live_aw, workspace):
+    out = inspected([ACME_TAGGED, ACME_TAGGED_ALONE, PERSONAL], live_aw)
+    assert 'PROFILE "Acme - Dana" — 2 titles in Edge' in out
+    assert 'PROFILE "[ACME]' not in out
+
+
+def test_the_profile_names_are_offered_where_the_rules_cannot_be_read(live_aw, workspace):
+    live_aw(sample_day([CLIENT_A_BOARD, CLIENT_A_MAIL]), settings_status=404)
+    result = run_cli(cr, ["--inspect"])
+    assert result.code == 1
+    assert 'PROFILE "ClientA - Alex"' in result.out
+
+
+def test_a_profile_name_taken_as_a_term_is_written_and_labels_its_windows(
+        live_aw, workspace, tmp_path):
+    """The whole path: a name read from the titles, passed as a term, written, and
+    confirmed by the activity source itself — no extension involved."""
+    server = live_aw(sample_day([CLIENT_A_BOARD, CLIENT_A_MAIL, WORK_DOCS]))
+    result = compile_run(tmp_path, [candidate("ClientA", "ClientA - Alex")])
+    assert result.code == 0, result.err
+    (entry,) = posted(server)
+    assert labels(entry, CLIENT_A_BOARD) and labels(entry, CLIENT_A_MAIL)
+    assert not labels(entry, WORK_DOCS)
+
+
+# --------------------------------------------------------------------------------------
 # The addresses the browser titles carry
 # --------------------------------------------------------------------------------------
 
