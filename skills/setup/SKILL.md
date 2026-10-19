@@ -210,7 +210,7 @@ This step is yours, not the user's. Each client gets **one** category rule, made
 > - Click **Save**.
 > - Do the same for each client.
 
-Save per category rather than once at the end, which is the order `README.md` § "The category rules" describes for this fallback. Keep the category flat and named for the client: the timeline joins a category's name path with `>`, so a grouping parent changes the label every downstream consumer matches on.
+Save per category rather than once at the end. Keep the category flat and named for the client: the timeline joins a category's name path with `>`, so a grouping parent changes the label every downstream consumer matches on.
 
 **Verify** — the same evidence either way, and never the UI having appeared to save.
 
