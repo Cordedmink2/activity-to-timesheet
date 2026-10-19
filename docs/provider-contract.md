@@ -205,7 +205,8 @@ Identifiers are strings in both formats.
 - **A fallback to history prints on stderr:** `NOTE not in the catalog (assignment likely
   archived); recovered from own entries, last <N> days`, and still exits 0.
 - **A fallback that itself fails** prints `WARN history fallback failed: <reason>` on stderr and
-  carries on to the verdict below — but the verdict is then **exit 3 or 5, not 6**: a read that
+  carries on to the verdict below — but the verdict is then **exit 3, 4 or 5, not 6** (a revoked
+  token on the fallback is a refusal, 4): a read that
   could not finish must not be reported as "no such project" (ADR-0007). Only a lookup that
   *completed both reads* and found nothing is a no-match.
 - **No match:** stderr `ERR no project matching '<QUERY>' in the catalog or recent entries`,
@@ -263,6 +264,7 @@ silently**: stderr says `(skipped <n> with no date inside the range: <ids>)`.
 
 ```
 timesheet-provider refresh [--wait CODE [--attempts N] [--delay SECONDS]]
+timesheet-provider refresh --age
 ```
 
 Re-reads the user's project and task assignments from the provider, **every page**, and rewrites
@@ -272,8 +274,14 @@ the local catalog `lookup` reads. **Stdout on success:** one line, `OK <n> proje
 - **A failed refresh leaves the existing catalog exactly as it was.** Every page is fetched into
   memory before the catalog is touched, and the new pages are staged before the old are
   removed — the property `refresh_catalogs.py` has today and is the contract's to keep, since a
-  caller cannot see how the catalog is stored. Exit 4 or 5, the reason on stderr, and
+  caller cannot see how the catalog is stored. Exit 3, 4 or 5 (a missing credential is 3), the reason on stderr, and
   `(existing catalog left untouched)` in it.
+- **`--age` says how stale the catalog is, and touches nothing.** It reads no provider and needs
+  no credential: stdout `AGE <days>` (whole days since the catalog was last written, rounded
+  down), or `ABSENT` when there is none, exit 0; a workspace that cannot be resolved is exit 3.
+  This is how a caller decides whether to refresh — the thresholds (7 days, the 30-day prompt)
+  are the caller's policy, not the contract's — because the catalog's files are the adapter's
+  and a caller reading their timestamps would be reading the storage (§ 6.2).
 - **A catalog that comes back with no projects at all is a failure** (exit 4), not a catalog
   written empty: it would make every later lookup fall through to the live fallback unannounced.
 - **`--wait CODE`** is `refresh_catalogs.wait_for_project()` as a command: it polls the
@@ -419,7 +427,8 @@ discovered by accident:
 
 `<daily>` is the `daily` skill's directory; `TP` stands for
 `python "<daily>/scripts/provider/bin/timesheet-provider"`. Rows are exhaustive: every place in
-`skills/` that runs, imports or names a provider script. The same-named files under `skills/daily/tests/`
+`skills/` and `docs/` that runs, imports or names a provider script, **or reads a provider file
+or field directly**. The same-named files under `skills/daily/tests/`
 exercise these scripts and move with them in #35.
 
 ### 8.1 Commands
@@ -447,6 +456,14 @@ exercise these scripts and move with them in #35.
 | File | Line's subject | Becomes |
 |---|---|---|
 | `skills/daily/SKILL.md` Prerequisite 4 | "else run `scripts/refresh_catalogs.py`" | `TP refresh` (and the work-item refresh as above) |
+| `skills/daily/SKILL.md` Prerequisite 4 | freshness judged from the assignment catalog file's modification time | `TP refresh --age`: refresh at `AGE` ≥ 7 or `ABSENT`; surface `AGE` > 30 first, as today (§ 3.5) |
+| `skills/daily/SKILL.md` "Data sources" table | the assignment catalog's file glob and the provider's field names as a data source | one row: "the provider's project/task catalog, read through `TP lookup`"; no file or field named |
+| `skills/daily/SKILL.md` checklist, work-kind line | the task name came from "this project's own" task list, named by its provider field | "from the tasks `TP lookup` lists for this project" |
+| `skills/daily/references/classification-rules.md` project lookup (step 2) | read the project code's id and tasks out of the catalog file | `TP lookup <code> --json`: `project_id` and `tasks[]` |
+| `skills/daily/references/classification-rules.md` task authority and billable rule | the provider's per-project task list, and its per-task billable flag, named as the authority | the `tasks[]` `TP lookup` returns and its `billable` (text: `(billable)` / `(NON-billable)`) |
+| `skills/daily/references/catalog-refresh.md` "Output" | the page files' names, and "downstream readers expect the provider's own shape" | removed: storage is the adapter's (§ 6.2); the paragraph says `TP refresh` writes the catalog `TP lookup` reads |
+| `skills/daily/references/new-client-work.md` | `scripts/refresh_catalogs.py` for the bulk work-item catalog | stays `refresh_catalogs.py --dataverse-only` until #37 |
+| `docs/adr/0007-…md` and `CONTEXT.md` status paragraph | the gate "implemented once, in `skills/daily/scripts/harvest_write.py`" | #35 amends both: the gate is in the dispatcher (§ 2) |
 | `skills/daily/SKILL.md` Prerequisite 5 | the `harvest_list.py` credentials check | `TP list <today> <today>`, per § 8.1 |
 | `skills/daily/SKILL.md` Step 1 (gap listing) and "check whether that date is already billed" | `harvest_list.py <date> <date>` | `TP list <date> <date>` |
 | `skills/daily/SKILL.md` Step 4 and the checklist | `harvest_lookup.py <code-name-or-client>` | `TP lookup <code-name-or-client>` |
@@ -485,5 +502,7 @@ the `refresh` output line, and the dropped duration-only flag. Each is in § 8.1
 3. The § 8.2 edits, in the same change as the move: a caller still naming a retired script path
    is the failure `test_every_script_it_names_is_one_the_sibling_skill_actually_ships` exists to
    catch.
-4. A test per row of § 3 and § 4 against the fake adapter, and the existing Harvest-shaped
+4. The docstrings that name the scripts or `--mcp-dir` — `skill_config.py` and `timezone.py` — are
+   not invocations, but the move stales them; re-point them in the same change.
+5. A test per row of § 3 and § 4 against the fake adapter, and the existing Harvest-shaped
    tests re-pointed at the adapter. None shells out to a script and none reads a real credential.
