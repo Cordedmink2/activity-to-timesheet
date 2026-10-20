@@ -32,8 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `references/day-reading.md` (Steps 1–3, screenshot folder), `references/review-and-posting.md`
   (Steps 6–12) and `references/scripts.md` (the script and flag inventory, formerly "Files in this
   skill"). Nothing for a user to do. The inventory check in `skills/daily/tests/test_references.py`
-  reads the new file. The before/after eval is incomplete: all three scenarios were run, at one rep per arm (reps 2-3 not run)
-  (`docs/skills/daily/decision-log.md`).
+  reads the new file. The before/after eval ran three scenarios at 3 reps per arm with fresh no-filesystem agents, hand-graded. It found one regression, a dropped "tile up to its edges" clause that let a calendar block overlap its neighbour, and that clause was put back. Evidence rung 3 (`docs/skills/daily/decision-log.md`).
 
 - **The work-item source has its own boundary** (#37). The Dataverse half of
   `refresh_catalogs.py` moved into `scripts/work_items/`: a read boundary with no gate and no

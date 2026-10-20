@@ -1293,13 +1293,12 @@ prose, not whether a run behaves the same.
 
 **What the instrument says — thin.** Scenarios are in `tests/evals/daily/evals.json`
 (calendar and guards; an already-billed day with a prior ruling; the confirmation gate on a
-fall-back day). All three were run once per arm (iteration-1, one rep per arm; reps 2-3 hit the subagent cap): one fresh no-filesystem subagent per arm, baseline
+fall-back day). All three were run once per arm (iteration-1; the first rep per arm is described here, reps 2-3 follow in the ledger at the end of this section): one fresh no-filesystem subagent per arm, baseline
 (pre-trim) against trimmed, read by hand against its six checks. Both arms scored 6/6 and gave
 the same `--cover` argument, the same declared break and the same treatment of the
 uncorroborated event. That is n=1 per arm, one scenario, on a model that is not the usual
 runner, and it exercises the guards the trim kept nearly verbatim. The card asked for 2–3
-scenarios and at least 3 reps; the one-shot run allowed two subagents in total
-(`delegation.oneshot_max_children`), so the rest was not run. Scenario 2 (already-billed ruling), n=1 per arm: both arms
+scenarios and at least 3 reps; those were run in later runs, 2 subagents each, and are recorded below. Scenario 2 (already-billed ruling), n=1 per arm: both arms
 checked Harvest first, read the responses file whole, treated the recorded ruling as binding,
 left the entry at 15:30 and read a screenshot inside Internal admin; neither mentioned
 `--confirm`. No difference. Scenario 3 (confirm gate and DST), n=1 per arm: both arms ran
@@ -3352,3 +3351,5 @@ already-billed-ruling rep 3, arms A (pre-trim) and B (trimmed, 7e5107b tree): bo
 ### #57 eval ledger update (run 11, 2026-10-20)
 
 confirm-gate-and-dst rep 3, arms A (pre-trim) and B (trimmed, 1e01d3a tree): both 5/5. Same on every guard: Step 8 gate on "looks fine", derived-zone line with TIMESHEET_TIMEZONE, first post without --confirm, --confirm only after the explicit yes, straddle refusal handled by posting the two named entries, WOULD POST not recorded as posted. No behavioural difference; no cut put back. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 3/3, confirm-gate-and-dst 3/3. Evidence rung stays 3.
+
+calendar-and-guards B2 rerun (run 12): arm B2 (trimmed with the "tile up to its edges, never overlapping" clause restored, 4,835 words) drafted 08:40-11:30, 11:30-12:30 (E1), 12:40-17:10 with `--cover "08:40-11:30,11:30-12:30,12:40-17:10"`: no overlap, 5/6 (the 12:40 vs 12:30 start of the last block matches arm A reps 2-3). The rep-3 double-billing defect did not recur. Limits: one rep, and the subagent got an abridged paste of SKILL.md rather than the whole file. Final ledger (reps per arm): calendar-and-guards 3/3 (one real regression found at rep 3, cut put back, B2 rerun clean), already-billed-ruling 3/3 (no difference), confirm-gate-and-dst 3/3 (no harmful difference). Verdict: the trim preserves the graded behaviour except the one clause restored. Evidence rung stays 3 (fresh no-filesystem agents, hand-graded, n=3 per scenario, one model); not rung 4.
