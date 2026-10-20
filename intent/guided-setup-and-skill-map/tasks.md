@@ -18,9 +18,9 @@ serves: US-2/AC-1
 
 ### T3 — Guard: one home for category terms (red first)
 serves: US-6/AC-1
-- Test first: write `tests/test_one_home_for_terms.py` and plant a second definition in a scratch copy of a skill; the test must fail on it. Then confirm it passes on the real tree after T4/T7 (until then it fails on the existing candidates examples: that failure is the baseline).
-- Do: allow-list `references/context.md.example` and `scripts/category_rules.py`; flag `"terms":` literal lists, filled `**Category terms**:` lines and term constants anywhere else shipped.
-- Evidence: red on the plant, then green, both commands and outputs.
+- Test first: define "shipped" as the export set: all files included by `install/export_agent_skills.py` (`skills/*/SKILL.md` and their exported references/scripts); `skills/*/tests/` are excluded because they are not exported. Write `tests/test_one_home_for_terms.py` so it detects (1) definitions and (2) any instruction in shipped files to build candidates from Category terms. Permit only the explicit `--candidates` adopt-existing-rules route cited as such; do not exempt generic candidate-transcription wording. Plant a second definition and a generic transcription instruction separately in scratch exported trees; each must fail. Then run against actual export set after T4/T7/T22 (until then baseline failures are expected).
+- Do: allow-list `references/context.md.example` and `scripts/category_rules.py`; detect term literals/lines/constants and generic instructions that transcribe context Category terms into candidates files across the export set, with only the explicit adopt-existing-rules exception.
+- Evidence: red on both planted violations, then green on actual export set; record commands and outputs.
 
 ### T4 — `category_rules.py --from-context`
 serves: US-6/AC-1, US-4/AC-1
@@ -78,9 +78,9 @@ serves: US-5/AC-2
 
 ### T13 — Daily relays the reminder without growing
 serves: US-3/AC-2, US-6/AC-3
-- Test first: size test fails if `daily/SKILL.md` words exceed the post-#106 baseline; test that Step 2 runs `--data-days` when `--status` reports rules never written and relays its `say:` line once.
+- Test first: T1 records the measured `skills/daily/SKILL.md` word count at the build start base; size test fails above that exact ceiling. Test Step 2 invoking `--data-days` only when status reports rules never written, relaying `say:` once maximum, no offer after a decline-for-good line under `## Preferences`, and no offer once managed rules exist. The test establishes that daily reads the decline line; rule-existence is supplied by `--status`.
 - Do: add one bullet; cut the `BROKEN` and `STALE` prose to pointers at the references; keep every guard in `tests/test_daily_skill.py` green.
-- Evidence: before/after word count; tests.
+- Evidence: T1 baseline and before/after word count; each of the four reminder assertions red then green; pytest output.
 
 ### T14 — Size, export, install shape
 serves: US-6/AC-3, US-6/AC-2
@@ -116,7 +116,7 @@ serves: US-7/AC-2, US-7/AC-3
 serves: US-2/AC-2, US-3/AC-3, D10
 - Test first: write the job's assertions first and see them fail without the feature. The job is the one on `windows-latest` in `.github/workflows/checks.yml`; the check-in build creates it (serial order 1). Extend it with new named steps; do not create a second job. If it does not exist yet when this build starts, create it per D10 and let check-in extend it.
 - Do: (1) US-2/AC-2: on the runner, run each install check from `skills/setup/references/checks.md` against a real `aw-server` and the watchers installed as setup installs them; assert every step prints its own verify line and the run ends in the stated "collecting data" state. (2) US-3/AC-3: inject a week of real-shape events through the real buckets (`aw-watcher-window_<host>` events with `app` and `title`, `aw-watcher-afk_<host>` events with `status`, copied from the watchers' source and named in the test), run the category stage after the threshold, and assert the candidate terms come from the injected titles and hosts and the written rules match each client in a synthetic context file (ACME / BETA).
-- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: the browser-store Add click, the admin prompt, the consent page, and a person's first-run experience. Never marked passed; no step for Connor.
+- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: the browser-store Add click, the admin prompt, the consent page, a real person's week of titles, the runner is an administrator, and a person's first-run experience. Never marked passed; no step for Connor.
 - Evidence: <windows-latest run URL, head SHA, job output lines per assertion>
 
 ### T20 — Cleanup
@@ -129,4 +129,10 @@ serves: D9
 serves: US-2/AC-2, US-3/AC-3, D10
 - Test first: tests that the fixture builders emit the exact bucket and event shape the real watchers write: bucket ids `aw-watcher-window_<host>` and `aw-watcher-afk_<host>`, event `data` keys, durations and timestamps, each copied from the watcher source at the pinned version, with the source file and line named in the test.
 - Do: add the builders to the shared test scenarios (synthetic ACME / BETA, `example.*` hosts) and use them in T5, T7 and T19.
-- Evidence: <pytest output; source path and line for each shape>
+- Evidence: pytest output; source path and line for each shape.
+
+### T22 — Daily rebuild routes use context as the only term home
+serves: US-6/AC-1
+- Test first: check the four named daily routes/references for no candidates-file transcription and for `--from-context`; verify the daily SKILL.md word count is unchanged from T1's start-base baseline. Plant a generic Category-terms-to-candidates instruction in the exported fixture and prove T3 fails; remove plant before commit.
+- Do: update STALE rebuild instruction in `skills/daily/SKILL.md` and `references/day-reading.md`, and Step 10 yes-to-diff instruction in `skills/daily/SKILL.md` and `references/review-and-posting.md` to invoke `--from-context`; keep daily word-neutral by replacing equivalent text, not adding prose. Keep one explicitly cited adopt-existing-rules route on `--candidates`.
+- Evidence: red-then-green tests; exact word count comparison; diff of all four locations.
