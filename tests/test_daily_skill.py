@@ -8,7 +8,7 @@ place as the other two per-skill prose guards (`test_setup_skill.py`,
 `test_reconcile_skill.py`).
 
 Scoped to the **Workflow** section on purpose. Every fact below is also written in the
-"Files in this skill" inventory, and that inventory is where a script lands the day it is
+script inventory (`references/scripts.md`, since #57), and that inventory is where a script lands the day it is
 written — before any step runs it. An assertion over the whole file would therefore have
 passed while the calendar was shipped and unread, which is precisely the state #53 exists
 to end: what these tests measure is that a *run* reaches the wrapper, not that the skill
@@ -57,7 +57,7 @@ def steps() -> list[str]:
     Enumerated out of the document rather than listed here, so a step added or renumbered
     is one the checks below read from that moment.
     """
-    return re.findall(r"^### Step \d+ —.*?(?=^### |\Z)", workflow(), re.M | re.S)
+    return re.findall(r"^### Step \d+[a-z]? —.*?(?=^### |\Z)", workflow(), re.M | re.S)
 
 
 def presentation_step() -> str:
@@ -288,3 +288,25 @@ def test_the_workflow_uses_the_glossarys_calendar_vocabulary():
         f"  verdict words {WRAPPER.name} prints: {missing_words or 'all present'}\n"
         "ADR-0008 depends on the distinction those words carry; the rules that read the "
         "calendar have to be written in the same ones.")
+
+
+def test_final_verify_ships_is_linked_and_sits_between_review_and_the_gate():
+    """#48: the final-verify step runs after the user reviews the table and before the
+    confirmation gate, its brief ships as `references/final-verify.md`, and SKILL.md links it.
+    Keyed on titles, so renumbering does not move the check."""
+    ref = DAILY / "references" / "final-verify.md"
+    assert ref.is_file(), "references/final-verify.md does not ship"
+    body = ref.read_text(encoding="utf-8")
+    for needed in ("read-only", "cheapest", "lead, not a fact", "reprint the whole table",
+                   "never skipped", "No subagents available", "absolute"):
+        assert needed in body.replace("Read only", "read-only"), f"final-verify.md lost {needed!r}"
+    titles = [s.splitlines()[0] for s in steps()]
+    pos = {t: i for i, t in enumerate(titles)}
+    def at(suffix):
+        found = [i for t, i in pos.items() if t.endswith(suffix)]
+        assert len(found) == 1, f"no single step titled {suffix!r}: {titles}"
+        return found[0]
+    assert at("Present the proposed timesheet") < at("Final verify") < at("Confirmation gate before Harvest")
+    skill = shipped.skill_md_text(DAILY)
+    assert "references/final-verify.md" in skill
+    assert len(skill.split()) < 5000, "SKILL.md is over its 5,000-word ceiling"
