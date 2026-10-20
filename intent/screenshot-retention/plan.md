@@ -1,6 +1,6 @@
 # Plan: Screenshots don't pile up after they've done their job
 
-**Spec:** [spec.md](spec.md) (spec gate t_a6ab865c returned CHANGES REQUIRED at 9b2c56d; this plan is written against 9b2c56d and is re-checked when atlas amends the spec, see Risks)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
+**Spec:** [spec.md](spec.md) (re-gated and merged at 41b5670 via PR #107; this plan is re-pointed to 41b5670)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
 **Author:** dev  **Date:** 2026-10-20  **Status:** Draft (plan gate: t_f84cee3e)
 
 ## Approach
@@ -45,7 +45,7 @@ Load-bearing assumptions the plan would otherwise only confirm by itself, so T1 
 
 - **H1:** every reader of the date index takes it from folder names alone, so an empty folder with a marker leaves the index unchanged. *Control:* the 60-day fixture before and after. *Expected observation:* identical `Get-ChildItem -Directory`-equivalent name lists and identical no-date picker candidates; `afk_blocks.captures()` returns zero ticks with no error. *Exit:* if any reader changes, decide a manifest (D1 reversed) and brief atlas. Already supported by a read of the code and by one run on an empty folder; T1 repeats it on the fixture and, in CI, on `windows-latest`.
 - **H2:** an empty folder reads as "capture task dead all day" in the skeleton. *Observed true* on one run (above); T1 records the exact line. This is why D3 exists.
-- **H3:** deleting a `.png` while its folder stays works on Windows, and a file held open fails without stopping the run. *Control:* `windows-latest` runs the locked-file test. *Exit:* if the lock cannot be simulated there, E5 is recorded PENDING-REAL-WINDOWS with the steps; it is not marked passed.
+- **H3:** deleting a `.png` while its folder stays works on Windows, and a file held open fails without stopping the run. *Control:* `windows-latest` runs the locked-file test. *Exit:* if the lock cannot be simulated there, E5 is stated as not verified by CI for Atlas's ship decision; it is not marked passed.
 
 *Safe boundary:* `tmp_path` fixtures only; no real capture folder, no real provider, no network. *Cleanup:* every fixture lives in pytest's `tmp_path` and is removed by pytest; nothing else is created, no service or job is added. The script adds no scheduled task: it runs only when a skill runs it, so it has no maintenance owner beyond the repository's tests.
 
@@ -60,7 +60,10 @@ Load-bearing assumptions the plan would otherwise only confirm by itself, so T1 
 - D7: "Month reconciled" is a fact of the current run (a whole-month reconcile that left no Gap, Short or Unclear), passed in by the agent; the script stores no reconcile verdict. Alternative: record the verdict in the workspace (new state, can go stale). Why: nothing to expire; no run, no month route.
 - D8: Only files matching the capture pattern are deleted. Alternative: any `*.png` or any file in a dated folder (would take a user's own image dropped there; the spec says images only and the capture pattern is stricter and already tested).
 - D9: Weekend, evening and no-entry days are kept (see Risks, E3). Alternative: delete them as "no billable work", which contradicts B1 and D1 and replaces provider evidence with a guess.
-- D10: Verification runs from the build worktree's own venv, `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright`, not from the shared checkout (spec gate F1). The spec's two `auto` probes use bare `python` and `pyright` with the shared checkout as cwd; if atlas pins them, the plan follows.
+- D10: Verification is the build worktree's own venv, `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, plus `Checks` green on the PR head (windows-latest and ubuntu-latest). The spec's two `auto` probes now read the latest completed `Checks` conclusion on main, so at the build gate the run's `headSha` must contain the build.
+- D12: E3 days (a weekend or evening folder with captures and no provider entries) are never eligible (Atlas ruled, spec E3 amended). D9 already does this. The US-2/AC-1 bar includes the E3 fixture and a dry run: `plan` is the dry run and lists exactly the eligible days before anything is deleted (T4, T11).
+- D13: Tests go beyond pytest and pyright: a retention dry run on a dated screenshot tree (T11), a locked-file and confirmed-delete run on `windows-latest` in the shared Windows end-to-end job (D14, T12).
+- D14: Windows proof is the shared end-to-end job on `windows-latest` in `.github/workflows/checks.yml` (Atlas, 2026-10-20), created by the earlier builds. This build extends it with named steps and creates no second job. Steps: build a dated tree, run `screenshot_cleanup.py plan` (dry run) and assert the eligible list, then `apply --confirm` and assert the images are gone, the folders and `.cleaned` markers stay, the day picker and reconcile's index are unchanged, and a file held open is reported and does not stop the run.
 - D11: Docs: CHANGELOG in-progress section per AGENTS.md § Releasing (check `git tag --list` first; no tag, no version bump); a decision-log entry for D1, D2 and D9; a CONTRIBUTING row listing every copy of the sentence and of the setting (README, `.env.example`, `plugin.json`, the reference); an ADR only if T1 reverses D1. The CONTRIBUTING evaluation for the skill changes is run by the build.
 
 ## Coverage
@@ -69,11 +72,11 @@ Load-bearing assumptions the plan would otherwise only confirm by itself, so T1 
 |---|---|---|
 | US-1/AC-1 | Approach 1, 2, 5 | T4, T7, T9 |
 | US-1/AC-2 | Approach 5 | T7, T9 |
-| US-2/AC-1 | Approach 2 (eligibility rules 2 and 3), D2, D9 | T3, T4, T5 |
+| US-2/AC-1 | Approach 2 (eligibility rules 2 and 3), D2, D9, D12 | T3, T4, T5, T11 |
 | US-2/AC-2 | Approach 1, 2 | T4, T6 |
 | US-2/AC-3 | Approach 4, D8 | T5 |
 | US-2/AC-4 | Approach 2 (rule 1), 5 | T3, T7 |
-| US-3/AC-1 | Approach 3, D1 | T1, T5, T8 |
+| US-3/AC-1 | Approach 3, D1, D14 | T1, T5, T8, T12 |
 | US-3/AC-2 | Approach 3, D1 | T1, T8 |
 | US-4/AC-1 | Approach 5, 6, D6 | T7, T9 |
 | US-4/AC-2 | Approach 6, D5 | T2, T6, T9 |
@@ -82,8 +85,8 @@ Load-bearing assumptions the plan would otherwise only confirm by itself, so T1 
 
 ## Risks and rollback
 
-- **Spec E3 contradicts the intent (spec gate F3).** E3 would delete a weekend or evening folder with no billable work. The plan keeps those days (D9) because intent B1 and D1 allow only fully billed days. If atlas amends E3 to match, no plan change; if atlas keeps it, the plan stops and goes back to atlas, which is a spec change, not a build choice.
-- **Spec probes cannot run as written (gate F1).** Bare `python` and `pyright`. Plan follows whatever atlas pins; D10 is the plan's own method meanwhile.
+- **Spec E3 (resolved, F3).** Spec E3 now says such days are never eligible, matching D9 and intent B1/D1 (D12). Old risk text follows for the record: if atlas had kept deletion, the plan would have stopped and gone back to atlas, which is a spec change, not a build choice.
+- **Spec probes (resolved, F1).** They now read `Checks` on main; D10 is the method.
 - **Provider says billed, the user disagrees.** The offer lists the range and count and the user can say no or exclude a day. Nothing is deleted without the yes, and the confirmed list is re-checked (D4).
 - **A wrong floor hides a half-billed day as billed.** The floor is the user's own; the offer names the days. The cost of this error is the loss of one billed day's evidence after a yes, which is the point of the feature, and the day is already in the timesheet.
 - **Marker or folder deleted by the user.** The index then loses that date, the same as today. Nothing recreates it.

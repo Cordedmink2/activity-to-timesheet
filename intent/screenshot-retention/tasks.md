@@ -3,7 +3,7 @@
 **Plan:** [plan.md](plan.md)  **Spec:** [spec.md](spec.md)
 Check: `python3 /home/ubuntu/.hermes/sdd-skills/sdd-plan-and-tasks/scripts/trace_check.py intent/screenshot-retention` must print OK.
 
-Rules for every task: tests first (write the failing test, run it, see it fail, then build). Fixtures use only synthetic dates and the synthetic names the existing tests use, in pytest's `tmp_path`; no test touches a real capture folder or a real provider, and nothing is deleted outside a fixture. Run from the worktree's own venv: `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright`. Build starts from a fresh `origin/main`, after the spec is gated and merged, after the web-watchers build and after PR #106 (#57) is on main. Evidence is filled in at build time and is the command with its observed output, never a claim. Judged criteria carry the reviewer's probe from the spec; the fixture below is the one it runs on.
+Rules for every task: tests first (write the failing test, run it, see it fail, then build). Fixtures use only synthetic dates and the synthetic names the existing tests use, in pytest's `tmp_path`; no test touches a real capture folder or a real provider, and nothing is deleted outside a fixture. Run from the worktree's own venv: `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, and finish with `Checks` green on the PR head. Build starts from a fresh `origin/main` (spec merged at 41b5670), after the web-watchers build and after PR #106 (#57) is on main. Evidence is filled in at build time and is the command with its observed output, never a claim. Judged criteria carry the reviewer's probe from the spec; the fixture below is the one it runs on.
 
 **The 60-day fixture** (built once in `skills/daily/tests/`, used by T1, T4, T5, T8): dated folders for 60 consecutive days ending yesterday-of-the-test, `HH-MM-SS_mN.png` files in each (two monitors, small byte content), plus `capture.log` in the root. The first calendar month is fully billed (fake provider: entries at or above the floor) and a reconcile result names it reconciled. Later days include: unbilled days, a partly billed day (under the floor), a reconcile-flagged day, a day billed but newer than the age, a weekend folder with captures and no entries, today's folder and the drafted day's folder.
 
@@ -11,7 +11,7 @@ Rules for every task: tests first (write the failing test, run it, see it fail, 
 serves: D1, US-3/AC-1, US-3/AC-2
 - Test first: write H1 to H3 and the expected observation for each (plan, "Research and spike") in this card's Evidence before running anything. Build the 60-day fixture. Record, before any deletion code exists: the sorted dated-folder names a directory listing gives, the no-date day picker's candidate days for the fixture (as SKILL.md Step 1 builds them from that listing and the fake provider's `list --by-day`), and `afk_blocks.captures()` for a full, an empty and an absent folder.
 - Do: run the same three by hand against a copy of the fixture with one month's images removed and the folders left, and against one with a `.cleaned` marker only. Compare. Run the locked-file case on `windows-latest` (a file held open; the delete must fail for that file only). If any reader differs, stop and send atlas the evidence (D1 reversed means a manifest, an ADR and a spec re-check).
-- Evidence: <commands and observed output: identical name lists, identical picker candidates, captures() results, the CI Windows result or the recorded PENDING-REAL-WINDOWS steps>
+- Evidence: <commands and observed output: identical name lists, identical picker candidates, captures() results, the shared Windows CI job's result, or the plain statement that CI could not drive it>
 
 ### T2 — The setting: parse, default, off
 serves: US-4/AC-2, D5
@@ -20,7 +20,7 @@ serves: US-4/AC-2, D5
 - Evidence: <pytest output for the new tests; the five files' diff>
 
 ### T3 — Eligibility core: dates, today, the drafted day, fully billed, flagged
-serves: US-2/AC-1, US-2/AC-4, D2, D9
+serves: US-2/AC-1, US-2/AC-4, D2, D9, D12
 - Test first: table-driven test of one pure function `eligible(days, billed, today, floor, age, flagged, exclude, reconciled_months)` with the fake provider's rows. Expect kept, each with one reason: today; the excluded (drafted) day; a future date; an unbilled day; a day under the floor; a day with one entry and zero hours; a weekend folder with captures and no entries (D9); a flagged day, even when older than the age and in a reconciled month; a non-date folder name. Expect eligible: a fully billed day older than the age; a fully billed day in a reconciled month though newer than the age; the boundary days 35 and 36 old. A property loop over a generated set asserts an unbilled day is never eligible on any combination.
 - Do: implement the pure function and its reason strings.
 - Evidence: <pytest output>
@@ -63,6 +63,19 @@ serves: US-1/AC-1, US-4/AC-1, US-4/AC-2
 
 ### T10 — Full suite, release notes, decision log, and the clean-up of the work
 serves: US-5/AC-1, US-5/AC-2, D10, D11
-- Test first: run `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright | grep -E '^[0-9]+ errors?'` before any edit of this task, and record the baseline.
-- Do: add the CHANGELOG entry to the in-progress section per AGENTS.md § Releasing (run `git tag --list` first; bump only if the newest heading is tagged, then stop; cut no release); add the decision-log entry for D1, D2 and D9 (and a note on spec E3 and its outcome); confirm no temporary artifact remains (fixtures live in `tmp_path`; the spike adds none). Record the real-Windows items as PENDING-REAL-WINDOWS with exact steps: delete one eligible day on a Windows test machine, then open that day in `daily` and `reconcile`. Do not mark them passed.
-- Evidence: <pytest and pyright output after; `git tag --list`; the CHANGELOG diff; the Windows steps and their status>
+- Test first: from the build worktree's own venv run `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright | grep -E '^[0-9]+ errors?'` before any edit of this task, and record the baseline.
+- Do: add the CHANGELOG entry to the in-progress section per AGENTS.md § Releasing (run `git tag --list` first; bump only if the newest heading is tagged, then stop; cut no release); add the decision-log entry for D1, D2 and D9 (and a note on spec E3 and its outcome); confirm no temporary artifact remains (fixtures live in `tmp_path`; the spike adds none). Push, wait for `Checks` (windows-latest, ubuntu-latest and the shared Windows job) green on the PR head and record its `headSha`. State in the PR what CI could not drive (an antivirus quarantine of a real capture) for Atlas's ship decision. Never mark it passed; no step for Connor.
+- Evidence: <pytest and pyright output after; the `Checks` run URL and headSha; `git tag --list`; the CHANGELOG diff; the Windows steps and their status>
+
+### T11 — Retention dry run on a dated screenshot tree, with the E3 fixture
+serves: US-2/AC-1, D12, D13
+- Test first: on the 60-day fixture extended with a weekend folder and an evening-only folder that hold captures and have no provider entries (E3), run `screenshot_cleanup.py plan` (the dry run) and assert it lists exactly the eligible days (fully billed, older than the age or in a reconciled month) and names each E3 day with the reason "no provider entries"; assert the tree listing is byte-identical before and after the dry run. Then `apply --confirm` and assert every E3 day, unbilled day, partly billed day and reconcile-flagged day keeps all its images. The fixture tree uses real dated-folder and capture file naming (`YYYY-MM-DD/HH-MM-SS_mN.png`) as the capture pipeline writes it, with the source file named in the test.
+- Do: add the E3 folders to the shared fixture builder and the dry-run assertion.
+- Evidence: <pytest output; the dry-run listing; before and after tree listings>
+
+### T12 — Extend the shared Windows end-to-end CI job: retention dry run, confirmed delete, locked file
+serves: US-3/AC-1, D14
+- Test first: write the assertions first and see them fail without the feature. The job is the one on `windows-latest` in `.github/workflows/checks.yml` created by the earlier builds; extend it with new named steps. Do not create a second job; if it is not on main when this build starts, stop and `kanban_block(needs_input)` to atlas.
+- Do: on the runner, build a dated tree on the real filesystem, run the dry run and assert the eligible list; run `apply --confirm` with one file held open (opened without share-delete) and assert that file is reported, the others are removed, the folder stays, and no marker is written for that day; release the file, re-run, assert the day is then cleaned and `.cleaned` exists; assert the day picker's candidate days and reconcile's index are the same as before.
+- Not verified by CI, stated for Atlas's ship decision: an antivirus quarantine or a cloud-sync client holding a real capture. Never marked passed; no step for Connor.
+- Evidence: <windows-latest run URL, head SHA, job output lines per assertion>
