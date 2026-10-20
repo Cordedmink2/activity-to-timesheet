@@ -1,0 +1,80 @@
+# Plan: Hands-off setup, and one front door for every non-daily job
+
+**Spec:** [spec.md](spec.md) (spec gate t_a6ab865c; specs at 9b2c56d, PR #107, not yet merged: this file's link resolves once it is)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
+**Author:** dev  **Date:** 2026-10-20  **Status:** Draft (plan gate: child reviewer card t_31f575b5)
+
+## Problem and evidence (read before the approach)
+- `skills/setup/SKILL.md` is 8,972 words: one first-install walk. Its per-step **Verify** and **If it fails** blocks are the only home of the install checks, so any other job (troubleshoot) must either re-enter the whole walk or copy them. That is the concrete reason a menu alone is not enough (D2).
+- Category terms already have one *meaning* home, each client's **Category terms** line in `Timesheets/.context.md` (`references/context.md.example:128`, CONTEXT.md). But the compiler reads *candidates*, not the file (`category_rules.py` docstring: "no parser should be asked to read it"). So every path transcribes the line into a candidates JSON by hand. Three skills and one reference show that JSON shape or the term-choosing rules (setup step 4, daily Step 2 `STALE` bullet, first-run.md, daily Step 10 yes-to-diff). That transcription is where a second copy of a term can appear (D3, D4).
+- Setup step 4 runs on day one. `--inspect` samples 7 days (`DEFAULT_DAYS`) but nothing tells setup how much real work is in them (D5).
+- `reporting-issues.md` § Filing lets the agent run `gh issue create` after a yes. Spec US-5/AC-2 says the feedback path "never sends or posts" (D8, Q1).
+- Word counts at origin/main 5f78de3: daily 11,806 (#106 is cutting it to under 5,000; PR open, head 8c753a8), setup 8,972, reconcile 2,661.
+
+## Approach
+Skill map (the atlas default, kept): `setup` stays the front door and install path. It opens with the five-choice menu. Two new small skills, `onboard-client` and `troubleshoot`. Feedback is a section of the menu that sends the agent to `daily/references/reporting-issues.md`; there is no sixth skill. All paths call the same scripts and cite the same references.
+
+1. **One home per fact, enforced.**
+   - Client terms: only the workspace `Timesheets/.context.md`. New `category_rules.py --from-context` parses the `## Active client projects` sections (client name, `**Category terms**` line, file order = priority) and compiles. Every path runs `--from-context`; none writes a candidates file by hand. `--candidates` stays for the adopt-existing-rules case and for back-compat.
+   - New guard test `tests/test_one_home_for_terms.py` fails when a shipped skill, reference or script outside the allowed set defines terms (a `"terms":` literal list, a filled `**Category terms**:` line, a `TERMS = ` constant). Allowed set is exactly `context.md.example` and `category_rules.py`. It is proved by planting a second definition and watching it fail (mutation run recorded in tasks).
+   - Verify checks and install commands: `skills/setup/references/checks.md` (one entry per check: id, probe, expected, failure fix, in setup order) and `skills/setup/references/install-commands.md` (the package-manager table). `setup`, `troubleshoot` and `onboard-client` cite entries by id. A test fails if a check's probe text appears in two shipped files.
+   - Term choosing (round 3 of the interview): `skills/setup/references/choosing-terms.md`, cited by setup's category stage and by `onboard-client`.
+2. **Front door.** `setup/SKILL.md` opens with the menu and the human-only list before any install step. Routing: new machine → the existing steps; existing machine → detect-then-do-missing (reads each check in `checks.md`, shows a diff before any write); add a client → `onboard-client`; fix → `troubleshoot`; report/ask → reporting reference, hand-over only. A user who names their job up front skips the menu. `onboard-client` and `troubleshoot` omit `disable-model-invocation`, so "I've got a new client" and "my screenshots stopped" reach them directly. Their descriptions open with those trigger phrases.
+3. **Hands-off.** Setup already offers installs once and scaffolds the workspace. The plan adds: (a) the explicit human-only list (browser-store Add clicks, admin prompts, consent pages, credentials in the harness's store) in one section of setup, cited everywhere; (b) a short bounded audit (spike, T2) of which of steps 1-6 still make the user do what the agent can, with the agent opening the store page for the user as the likeliest fix. Admin-rights installs and anything weakening endpoint security stay Reserved: told plainly as human-only, never done.
+4. **Wait for data.** New `category_rules.py --data-days [--min-days N]` prints one `DATA` line: recorded workdays in the lookback (a workday = local weekday with at least 30 min of non-AFK window activity, from the activity source's own buckets), the threshold (default 5), and `COLLECTING` with the date to come back or `READY`. Setup runs it before the category stage. Under the threshold it skips the stage, says when to come back, and writes no rule. The threshold and "stop offering" live as lines under `## Preferences` in `.context.md` (the existing home for user tunables, read by the run as today). The reminder is the daily run: when `--status` says no rules were ever written, daily runs `--data-days` and relays its `say:` line once. No scheduler, no process. The sentence the user reads comes from the script's output, not from daily's SKILL.md, which is what lets daily not grow.
+5. **Daily must not grow (US-6/AC-3).** The relay is one bullet; offset by cutting the `BROKEN` and `STALE` bullets' prose to pointers at the new references. Measured against main *after* #106 lands. A size test enforces it.
+6. **Export.** `install/export_agent_skills.py` finds every `skills/*/SKILL.md` (`source_skills()`), so the new skills ship with no code change. What needs changes: `tests/test_install_shapes.py` `NEEDS_A_SIBLING` gains both new skills (they reach `daily` scripts and `setup` references and must resolve `daily`/`billables-daily` and `setup`/`billables-setup`); `tests/test_distribution.py` parametrizes over discovered skills so it covers them without edits (confirmed by reading; re-verified in T14).
+7. **Evidence for judged criteria.** Fixtures are neutral ("Client A", no user facts; `test_redaction`/`test_provider_neutrality` apply), kept under `docs/skills/setup/eval/`. For each scenario a fresh agent runs the shipped instructions before (main) and after, three reps per arm, hand-graded as in #106. Transcripts and grades go in `docs/skills/daily/decision-log.md`. Real-Windows criteria (US-2/AC-2, US-3/AC-3) are recorded PENDING-REAL-WINDOWS with exact steps; never marked passed.
+
+## Autonomous-execution prerequisites
+- **Research and evidence in hand:** the setup/daily/reference text, `category_rules.py`, the export script and the test names above, read in full for this plan. Research note on ActivityWatch on the machine: /home/ubuntu/artefacts/activitywatch-three-repos-research.md (shared context).
+- **Material uncertainty, bounded spike S1 (T2):** *which setup steps can the agent perform that it now asks the user to?* Hypothesis: only the browser-store Add click, the admin prompt, the consent page and the credential are human-only, and opening the store page and registering autostart are agent-doable. Control: the human-only list as written in the intent. Expected observation: each of steps 1-6 classified, with the source line that makes it human-only. Safe boundary: reading the current instructions, the ActivityWatch/extension docs and the scripts only. It installs nothing, changes no host setting, runs nothing on a Windows machine (none is reachable). Exit: a table in `checks.md`/the human-only section; any step that cannot be classified without a real Windows run is marked PENDING-REAL-WINDOWS and stays as a human-listed step. A spike result that would move a step to Reserved goes to atlas via kanban_block(needs_input).
+- **Cleanup/restore (named from the start):** temporary artefacts are the build worktree, the venv, eval scratch workspaces and fixture ActivityWatch servers (all under the task workspace or `$TMPDIR`; no scheduled task, service or job is created). The durable evidence is the decision-log entry, the committed fixtures and the PR. Remove the worktree and scratch after the PR is up and the evidence is committed (T20); never touch the shared checkout. No protected state is deleted. Nothing needs a maintenance owner beyond the repo: the one-home guard and the size test are the standing health checks, in the suite and CI.
+
+## Decisions
+- D1: Skill map = atlas default (setup + `onboard-client` + `troubleshoot`; feedback via the existing reference). No concrete US-6 violation found, provided D2/D3 hold: with checks and term rules extracted once, three skills cite instead of copy. — alternatives: one skill with a menu (setup would stay near 9,000 words and `daily`-style growth returns; "onboard a client" is not one step); four skills (a feedback skill would copy the reference). Why: matches the intent's judging criteria. Revisit only if T6/T7 show a US-6 violation; record it here and tell atlas.
+- D2: Install checks move out of `setup/SKILL.md` into `setup/references/checks.md`; steps cite them. — alternatives: troubleshoot reads setup's `SKILL.md` (9,000 words; step numbers test-guarded; "run in order, stop at first failure" would be prose over prose); copy the checks (US-6/AC-2 violation). Why: US-5/AC-1 needs the checks runnable in order without the walk.
+- D3: Category terms are compiled from the context file by a narrow parser `--from-context` in `category_rules.py`. — alternatives: keep model transcription (a second copy lives in each transcript and candidates file; this is the drift the intent names); parse the whole file (the docstring's reason against: free text). Why: parse only the `Category terms` and `Client name` lines under `Active client projects`, which the template fixes. The fingerprint stays a digest of the whole file (unchanged). The module docstring is updated: parse of that one section is now deliberate.
+- D4: One-home guard is a repo test with an explicit allow-list (`context.md.example`, `category_rules.py`), proved by mutation. — alternatives: grep in CI only; trust review. Why: US-6/AC-1 asks for an automated guard.
+- D5: Workday = weekday with at least 30 min non-AFK window activity; default threshold 5; lookback 30 days; adjustable by a `## Preferences` line and `--min-days`. — alternatives: calendar days since first event (counts a quiet fortnight as data); count events (machine-dependent). Why: matches "recorded workdays" and the AFK-anchored model. The 30-min floor is a tunable constant with a test.
+- D6: Reminder = the daily run noticing, via `--data-days`; no new process. Decline-for-good is a `## Preferences` line. — alternatives: scheduled task (Reserved-adjacent, spec non-goal); a `.mcp` marker file (a second home). Known cost: writing Preferences changes the context fingerprint, so `--status` reads `STALE` once. T5/T13 test that a zero-client `STALE` does not loop a rebuild.
+- D7: Hard-to-reverse part, new skill names as user commands (`/billables:onboard-client`, `/billables:troubleshoot`), gets ADR-0009 and amends ADR-0005's "setup owns the manual steps" line. — Why: AGENTS.md § Where a thing goes.
+- D8: Feedback path hands over a redacted draft (saved file plus the exact `gh` command for the user to run); it never files. `reporting-issues.md` gains an entry for the menu path and a one-paragraph change to § Filing for that entry only. Daily Step 11's existing "show, get a yes, then file" is not changed (spec non-goal: no change to daily behavior). See Q1.
+- D9: Build starts from fresh origin/main after #106 (daily size baseline) and the check-in build t_b703f6a8 (also edits setup) have merged. Flag `hotspot: skills/setup/SKILL.md`. If either is late, T1 waits; no parallel edit of setup.
+
+## Open questions (do not change scope)
+- Q1 (atlas): spec US-5/AC-2 says never "posts"; `reporting-issues.md` today lets the agent file after an explicit yes. D8 keeps the menu path strictly hand-over. If Connor prefers the agent file after a yes on both routes, that is a one-paragraph change; say so before T12.
+- Q2: F1 from the spec gate (auto probes use bare `python`/`pyright`) is unresolved on #107. Build verification here uses the venv and pins the interpreter (`.venv/bin/python -B -m pytest -q -p no:cacheprovider`) regardless of how the probes are finally written.
+
+## Coverage
+| Criterion | Plan section | Tasks |
+|---|---|---|
+| US-1/AC-1 | Approach 2; D1 | T8, T16 |
+| US-1/AC-2 | Approach 2 | T10, T11, T16 |
+| US-1/AC-3 | Approach 2 (existing-machine path) | T9, T16 |
+| US-2/AC-1 | Approach 3; spike S1 | T2, T8 |
+| US-2/AC-2 | Approach 7 (PENDING-REAL-WINDOWS) | T19 |
+| US-2/AC-3 | Approach 7; D2 | T15 |
+| US-3/AC-1 | Approach 4; D5 | T5, T7, T16 |
+| US-3/AC-2 | Approach 4, 5; D6 | T5, T13, T16 |
+| US-3/AC-3 | Approach 4, 7 (PENDING-REAL-WINDOWS) | T19 |
+| US-4/AC-1 | Approach 1, 2; D3 | T4, T10, T16 |
+| US-4/AC-2 | Approach 2 | T10, T16 |
+| US-5/AC-1 | Approach 1; D2 | T6, T11, T16 |
+| US-5/AC-2 | D8; Q1 | T12, T16 |
+| US-6/AC-1 | Approach 1; D3, D4 | T3, T4, T7 |
+| US-6/AC-2 | Approach 1, 6; D2 | T6, T7, T14 |
+| US-6/AC-3 | Approach 5, 6; D9 | T1, T13, T14 |
+| US-7/AC-1 | Approach 2, 7 | T9, T16 |
+| US-7/AC-2 | Verification | T18 |
+| US-7/AC-3 | Verification | T18 |
+
+Decisions with no criterion of their own are carried by tasks citing them: D7 by T17; D9 by T1.
+
+## Risks and rollback
+- **Collision with setup/daily edits** (check-in build, #106, #48) → D9 ordering; rebase before T6; hotspot comment on the card. Rollback: every task is one commit; `git revert` the range. Docs and scripts only; nothing is installed on any machine, and no user file is migrated.
+- **Extracting checks breaks the step-structure tests** in `tests/test_setup_skill.py` (step count, "every step is verified", elevated-fix single copy at `SETUP_MD`) → tests are rewritten first (T6) to assert the same facts against `checks.md`; the old assertion's intent is kept, not loosened. Rollback: revert T6.
+- **Parser misreads a hand-edited context file** → refuses with an `ERR` naming the line, writes nothing (same gate semantics as today); fixtures include free text, a missing line and a client with no terms.
+- **Model-invocable new skills trigger on ordinary talk** → both only act after a shown diff and a yes; descriptions are specific; eval scenario includes a non-matching prompt.
+- **Daily word budget** → T13 measures before and after against post-#106 main; if the offset cannot be found without cutting a rule, stop and send atlas the evidence rather than growing daily.
+- **Judged criteria rely on fresh-agent transcripts, which are the same model family as the author** → three reps per arm, hand-graded by the reviewer reading transcripts directly; real-Windows items stay PENDING.
+- **Reserved boundary:** if any step needs admin rights or weakens endpoint security, stop and `kanban_block(needs_input)` to atlas.
