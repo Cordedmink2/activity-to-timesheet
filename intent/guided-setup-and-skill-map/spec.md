@@ -1,7 +1,7 @@
 # Spec: Hands-off setup, and one front door for every non-daily job
 
 **Intent:** [intent.md](intent.md), Accepted 2026-10-20 (Connor, in conversation with Hermes: "Yeah I think that sounds good"; recorded in the intent's Status line)
-**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec gate pending)
+**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec re-gate pending)
 **Serves:** O1–O4, S1–S4, B1–B3 (inventory below)
 
 ## Summary
@@ -68,7 +68,7 @@ want: setup to install and configure everything it safely can for me
 so_that: I only click where only a person can, and each step is checked (O2, S1, B2, B3)
 criteria:
   - id: AC-1
-    text: Setup lists the human-only steps (browser-store Add clicks, an administrator prompt, a consent page, a credential in the harness's own store) and asks the user for nothing else; every other step it performs itself after one plain what-and-why. Serves O2, S1, B2.
+    text: Setup lists the human-only steps (browser-store Add clicks, an administrator prompt for an install that already needs one today, a consent page, a credential in the harness's own store) and asks the user for nothing else; every other step it performs itself after one plain what-and-why. Any new install that would need administrator rights is a Reserved decision and is not added by this change. Serves O2, S1, B2.
     check: judged
     bar: The shipped instructions name the human-only steps explicitly; for every other step the agent acts after stating what and why; no step asks the user to type a command, a regular expression or a path.
     probe: Reviewer reads the shipped instructions against the human-only list.
@@ -76,13 +76,13 @@ criteria:
   - id: AC-2
     text: On a clean Windows machine, setup reaches a stated "collecting data" state with each step recorded as verified by its own check. Serves S1.
     check: usage
-    probe: Real Windows machine evidence (setup transcript ending in collecting data, with the verify output of each step).
+    probe: Windows evidence from the windows-latest end-to-end CI job where it can drive the step, otherwise the Atlas logged ship decision plus post-release monitoring (setup transcript ending in collecting data, with the verify output of each step).
     expect: {}
   - id: AC-3
-    text: Setup never asks for or handles a password or token in chat, and no check it runs prints a credential. Serves B3.
+    text: Setup never asks for or handles a password or token in chat, and no check it runs prints a credential; a repo guard test fails if any shipped setup path asks the user to type or paste a password, token or API key into chat, and the guard is shown to catch a planted violation. Serves B3.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests/test_setup_skill.py]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
 ```
 
 ```yaml
@@ -143,7 +143,7 @@ criteria:
     probe: Reviewer reads the shipped instructions and a fresh-agent troubleshoot transcript on the fixture.
     expect: {}
   - id: AC-2
-    text: The feedback path drafts an issue for the user to send themselves, through the existing reporting reference, with client names, hosts and answers redacted; it never sends or posts it. Serves B1.
+    text: The feedback path drafts an issue for the user to send themselves, through the existing reporting reference, with client names, hosts and answers redacted; from the setup menu it never sends or posts it (the daily run's existing file-after-explicit-yes route is unchanged). Serves B1.
     check: judged
     bar: The drafted report contains no client name, host or user answer from the fixture context file, and the agent hands it to the user rather than creating it.
     probe: Reviewer reads a fresh-agent feedback transcript on the fixture workspace.
@@ -191,13 +191,13 @@ criteria:
   - id: AC-2
     text: The repository suite is green from the repo root. Serves S4.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests, skills/daily/tests]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
   - id: AC-3
     text: Pyright reports zero errors from the repo root. Serves S4.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [pyright]}
-    expect: {exit: 0, regex: "(^|\\n)0 errors"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
 ```
 
 ## Edge cases
@@ -225,3 +225,4 @@ criteria:
 
 ## Changes
 <!-- YYYY-MM-DD: <IDs changed> — <reason>; linked updates: plan/tasks/tests; re-review: <card> -->
+- 2026-10-20: US-2/AC-3, US-7/AC-2, AC-3 — F1: auto probes now read the `Checks` workflow conclusion on main (pytest + pyright on windows-latest and ubuntu-latest) instead of bare python/pyright in a shared checkout; US-2/AC-3 names a password-ask guard proved by a planted violation (W2); US-2/AC-1 keeps new admin installs Reserved (W3); US-5/AC-2 scoped to the setup menu (plan Q1). Reason: spec gate t_a6ab865c CHANGES REQUIRED. Linked updates: plan/tasks re-point on the plan PRs. Re-review: spec re-gate (Atlas, t_3c4f0453).
