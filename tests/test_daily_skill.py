@@ -298,7 +298,7 @@ def test_final_verify_ships_is_linked_and_sits_between_review_and_the_gate():
     assert ref.is_file(), "references/final-verify.md does not ship"
     body = ref.read_text(encoding="utf-8")
     for needed in ("read-only", "cheapest", "lead, not a fact", "reprint the whole table",
-                   "never skipped"):
+                   "never skipped", "No subagents available", "absolute"):
         assert needed in body.replace("Read only", "read-only"), f"final-verify.md lost {needed!r}"
     titles = [s.splitlines()[0] for s in steps()]
     pos = {t: i for i, t in enumerate(titles)}

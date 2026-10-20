@@ -13,17 +13,25 @@ Runs on the **post preview**: the blocks about to be posted, including every edi
 
 ## Subagent brief
 
+A subagent has no conversation context, so the brief must carry everything. It is a template: **fill every `<…>` slot before dispatch**, and never send a brief with a slot empty or a relative path in it.
+
 > You are checking one block of a draft timesheet. **Read only. Change nothing, post nothing, write no files.**
 > Block: `<date> <start>-<end>`, client/project `<client>`, note `<note>`.
-> Run `python scripts/activity_timeline.py <date> --window <start>-<end> --full` and `python scripts/afk_blocks.py <date> --window <start>-<end>`; look at any captures in that window.
-> Report, per check below, `OK` or `PROBLEM` with the evidence (the line, the time, the app/title). Do not guess; if the evidence is absent say `NO EVIDENCE`.
+> Scripts live in `<absolute skill script folder>` (the folder this skill's `SKILL.md` was read from, plus `scripts/`). Run them from there by absolute path, never relative to the workspace:
+> `python <skill folder>/scripts/activity_timeline.py <date> --window <start>-<end> --full <utc-offset flag>` and `python <skill folder>/scripts/afk_blocks.py <date> --window <start>-<end> <utc-offset flag>`.
+> UTC offset: `<the --utc-offset <hours> this run used, or "none: use the default zone">`; pass it on every command exactly as given.
+> Captures to look at, all monitors: directory `<absolute screenshot directory>`; files `<exact capture filenames or timestamps inside the block, every monitor: _m1, _m2, …>`. Look at no others.
+> Signals from `.context.md`: for the billed client `<client>`: `<its signals: apps, titles, URLs, paths>`. For the day's other clients: `<each other client and its signals>`.
+> Report, per check below, `OK` or `PROBLEM` with the raw signals behind it (the line, the time, the app/title, the capture filename). Do not guess; if the evidence is absent say `NO EVIDENCE`. Report signals only: **do not decide which client a stretch belongs to**; the main agent attributes.
+
+Attribution stays with the main agent, as `references/disambiguation.md` requires: the subagent returns raw signals and the main agent matches them to a client.
 
 ## Checklist (per block)
 
 - **Start.** Is the first active minute at or just after `start`? Is there active time before `start` that no block covers?
 - **End.** Is the last active minute at or just before `end`? Does the block run into a break or past `work_end`?
 - **Client/project.** Does the window/title/capture evidence in the span point to the client billed?
-- **Hidden switch.** Does any stretch inside the block, 15 minutes or longer, point to a different client or project? Name its start, end and client.
+- **Hidden switch.** Does any stretch inside the block, 15 minutes or longer (the threshold is the 0.25 hr minimum entry: anything shorter could not be billed as its own entry), point to a different client or project? Name its start, end and client.
 - **Idle.** Is a long AFK stretch inside the block billed as work?
 
 Report only problems that the evidence supports. A block with no evidence either way stays as drafted.

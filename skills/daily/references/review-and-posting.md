@@ -52,7 +52,7 @@ Then put the posting question: how many time entries this will create, and for e
 
 The zone is there only on a derived zone — a configured zone is the user's own choice and is not announced. It is the last moment the user sees the zone before anything reaches the provider, and a wrong one dates every entry above it.
 
-**An explicit "yes" or equivalent is what earns `--confirm` in Step 9** — without that flag the posting scripts write nothing and print what they would have posted instead, so anything short of a yes simply leaves it off. Edits loop back to Step 6.
+**An explicit "yes" or equivalent is what earns `--confirm` in Step 9** — without that flag the posting scripts write nothing and print what they would have posted instead, so anything short of a yes simply leaves it off. Edits loop back to Step 6, then through Step 6b again.
 
 ## Step 9: posting
 
