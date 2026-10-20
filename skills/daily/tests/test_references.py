@@ -95,6 +95,9 @@ def test_no_documented_command_hands_over_the_confirmation_flag_ready_typed():
 # --------------------------------------------------------------------------------------
 
 INVENTORY_HEADING = "## Files in this skill"
+# #57 moved the inventory out of SKILL.md (a word ceiling) into this reference. SKILL.md
+# still names it, which `test_every_reference_file_is_named_by_skill_md` holds.
+INVENTORY_FILE = os.path.join("references", "scripts.md")
 
 # `flags_a_script_parses()` and the `FLAG` shape live in `flag_scan.py` beside this file,
 # because the repo-level `tests/test_reconcile_skill.py` holds a second document against
@@ -115,11 +118,11 @@ def inventory_entries() -> list[tuple[set[str], set[str]]]:
     is the `.ps1` beside `screenshot_capture.py`: its parameters are PowerShell's and are
     not what this compares.
     """
-    with open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8") as fh:
+    with open(os.path.join(SKILL, INVENTORY_FILE), encoding="utf-8") as fh:
         lines = fh.read().splitlines()
     heading = [i for i, line in enumerate(lines) if line.strip() == INVENTORY_HEADING]
     assert len(heading) == 1, (
-        f"SKILL.md has {len(heading)} sections headed {INVENTORY_HEADING!r}; this test "
+        f"{INVENTORY_FILE} has {len(heading)} sections headed {INVENTORY_HEADING!r}; this test "
         "reads that one to learn which scripts and flags the skill claims to ship. If the "
         "section was retitled, retitle INVENTORY_HEADING with it.")
     section = lines[heading[0] + 1:]

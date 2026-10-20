@@ -8,7 +8,7 @@ place as the other two per-skill prose guards (`test_setup_skill.py`,
 `test_reconcile_skill.py`).
 
 Scoped to the **Workflow** section on purpose. Every fact below is also written in the
-"Files in this skill" inventory, and that inventory is where a script lands the day it is
+script inventory (`references/scripts.md`, since #57), and that inventory is where a script lands the day it is
 written — before any step runs it. An assertion over the whole file would therefore have
 passed while the calendar was shipped and unread, which is precisely the state #53 exists
 to end: what these tests measure is that a *run* reaches the wrapper, not that the skill

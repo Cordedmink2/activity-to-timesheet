@@ -1271,6 +1271,54 @@ Fictional day with an internal description and a composed note per block, three 
 no-tool agents per arm. **Before:** notes in the draft 3/3, in the posting question 1/3.
 **After:** 3/3 at both.
 
+### SKILL.md moved under the word ceiling by relocating mechanism, not guards — #57
+**Rung 3 for the behavioural claim (reasoned, one thin measurement); rung 2 for the hazard.**
+2026-10-20. `SKILL.md` was 11,806 words after #35 and #37 (11,430 when the issue was
+measured), against a 5,000 ceiling, with ~150 words to be left for #48. Now 4,845 (4,835 before the Steps 4–5 pointer line was added).
+
+What moved (kept whole, with the exceptions restored in the last paragraph of this entry): "Files in this skill" to `references/scripts.md`
+(`INVENTORY_HEADING` stays; `test_references.py` now reads `INVENTORY_FILE`, and the
+inventory and flag-equality assertions are unchanged); Steps 1–3, the screenshot folder and
+the timezone and script-resolution mechanism to `references/day-reading.md`; Steps 6–12 to
+`references/review-and-posting.md`. What stayed: every guard a run acts on (Step 2's verdict
+words and the `ERR`-line rule, Step 3's skeleton rules and the calendar block, Step 6's three
+guards and the calendar questions, Step 8's checklist, Step 9's `--confirm` rule, Step 12's
+reset ask), plus a pointer from each step. Words were cut from SKILL.md's own copies only; the
+references hold the original wording, so nothing was deleted from the plugin.
+
+**What the tests say.** Every repo-level test reading `SKILL.md` stayed green without being
+weakened: `1306 passed, 51 skipped`; `--real-aw` on the skill suite `929 passed, 5 skipped`;
+`pyright` 0 errors. Per the section above, that measures the scripts and the shape of the
+prose, not whether a run behaves the same.
+
+**What the instrument says — thin.** Scenarios are in `tests/evals/daily/evals.json`
+(calendar and guards; an already-billed day with a prior ruling; the confirmation gate on a
+fall-back day). All three were run once per arm (iteration-1; the first rep per arm is described here, reps 2-3 follow in the ledger at the end of this section): one fresh no-filesystem subagent per arm, baseline
+(pre-trim) against trimmed, read by hand against its six checks. Both arms scored 6/6 and gave
+the same `--cover` argument, the same declared break and the same treatment of the
+uncorroborated event. That is n=1 per arm, one scenario, on a model that is not the usual
+runner, and it exercises the guards the trim kept nearly verbatim. The card asked for 2–3
+scenarios and at least 3 reps; those were run in later runs, 2 subagents each, and are recorded below. Scenario 2 (already-billed ruling), n=1 per arm: both arms
+checked Harvest first, read the responses file whole, treated the recorded ruling as binding,
+left the entry at 15:30 and read a screenshot inside Internal admin; neither mentioned
+`--confirm`. No difference. Scenario 3 (confirm gate and DST), n=1 per arm: both arms ran
+the post command without `--confirm` first, added it only after the explicit yes, followed the
+refusal by posting the two named entries without closing the overlap, and recorded WOULD POST as
+not posted. Wording differences only: arm B also said 'looks fine' approved the Step 6 draft, not
+posting; arm A did not say so explicitly but still put the Step 8 question first. No behavioural
+difference. **Rep ledger (per arm, A=baseline B=trimmed; each run can spawn 2 subagents):**
+calendar-and-guards reps 1-3 done. **Rep 3 found a difference:** arm B (trimmed) drafted 08:40-11:45 beside the 11:30-12:30 calendar block, a 15-minute overlap that double-bills, and passed it to `--cover`; arm A tiled to the edge. The trim had dropped A's clause "the blocks either side tile up to its edges"; **that cut is put back** in Step 3 (one clause). Reps 1-2 had no difference (rep 2: both 5/6, same --cover, same E2 handling; A also invented a 12:30-12:40 exclusion, a baseline-only variation, not a guard B lost). already-billed-ruling reps 1-3: no difference (rep 2 both 4/6; rep 3 both 3/6, checks 1, 2, 5 unstated by either arm; the ruling-binds guard held in both). confirm-gate-and-dst reps 1-3: no harmful difference (rep 2 A 4/5, B 5/5; rep 3 both 5/5).
+
+**The B2 rerun on the restored clause (run 12)** — the evals workspace `tests/evals/daily-workspace` is gitignored, so the line is quoted here: arm B2 (trimmed, tiling clause restored) drafted 08:40-11:30, 11:30-12:30 (E1), 12:40-17:10 with `--cover "08:40-11:30,11:30-12:30,12:40-17:10"`: no overlap, 5/6 (the 12:40 vs 12:30 start of the last block matches arm A reps 2-3). The rep-3 double-billing defect did not recur. Limits: one rep, and the subagent got an abridged paste of SKILL.md rather than the whole file. For confirm-gate-and-dst rep 3 the line is: both arms 5/5 on every guard (Step 8 gate on "looks fine", derived-zone line, first post without --confirm, --confirm only after the explicit yes, straddle refusal handled by posting the two named entries, WOULD POST not recorded as posted).
+
+**Final ledger (reps per arm):** calendar-and-guards 3/3 (one real regression at rep 3, cut put back, B2 rerun clean), already-billed-ruling 3/3, confirm-gate-and-dst 3/3. Verdict: the trim preserves the graded behaviour except the one clause restored. Evidence rung stays 3 (fresh no-filesystem agents, hand-graded, n=3 per scenario, one model); not rung 4.
+
+**Restored after review (PR #106).** The first version said everything moved "whole"; it did not. Cut from SKILL.md without a home: Step 4's AW-category limit ("never project/work-item-level, never 100%"), "reads one page and misses projects", the `matched_on: client` ranking explanation, the support-item sentence and "single largest source of real misattributions"; Step 5's "interleaved day can score every block HIGH" passage; the `compact.jsonl` short-key legend, the screenshot cadence and the partial `daily_exports/<date>/screenshots/` copy; Prerequisite 1's sentence on who writes `.context.md`. All are now whole in `references/day-reading.md` § "Steps 4–5 and the data sources", with a pointer from Step 4. The CONTRIBUTING multi-copy rows that claimed `SKILL.md` still held `--max-share`, the breadth ceiling, the judgement tunables, and Prerequisite 1's setup sentence were re-pointed at the real copies, as was the provider-contract row on "matches only on".
+
+**Rejected: deleting rationale outright.** The mechanism has a home in the references, so a
+rule measured useful is not lost, and CONTRIBUTING's "Rules with more than one copy" rows that
+cited "Files in this skill" or SKILL.md's folder mechanics now cite the new files.
+
 ## Script defects
 
 Found while building the scenario/contract suite, 2026-08-14. All **rung 1** — each was
