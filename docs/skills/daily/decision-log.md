@@ -3336,3 +3336,7 @@ whether `aw_client.py` ought to drop `LockApp.exe` spans from the timeline altog
   deletion condition written into its entry.
 - `tests/` has no coverage asserting `SKILL.md`'s *behavioural* claims, and by the
   method above it never usefully will — don't add doc-behaviour assertions there.
+
+### #57 eval ledger update (run 8, 2026-10-20)
+
+already-billed-ruling rep 2, arms A (pre-trim) and B (trimmed, 1e01d3a): both 4/6, identical on every step; the ruling-binds guard held in both. No behavioural difference. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 2/3, confirm-gate-and-dst 1/3. Evidence rung stays 3.
