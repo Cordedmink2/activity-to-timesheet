@@ -1,6 +1,6 @@
 # Plan: Hands-off setup, and one front door for every non-daily job
 
-**Spec:** [spec.md](spec.md) (spec gate t_a6ab865c; specs at 9b2c56d, PR #107, not yet merged: this file's link resolves once it is)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
+**Spec:** [spec.md](spec.md) (re-gated and merged at 41b5670 via PR #107; this plan is re-pointed to 41b5670)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
 **Author:** dev  **Date:** 2026-10-20  **Status:** Draft (plan gate: child reviewer card t_31f575b5)
 
 ## Problem and evidence (read before the approach)
@@ -23,7 +23,7 @@ Skill map (the atlas default, kept): `setup` stays the front door and install pa
 4. **Wait for data.** New `category_rules.py --data-days [--min-days N]` prints one `DATA` line: recorded workdays in the lookback (a workday = local weekday with at least 30 min of non-AFK window activity, from the activity source's own buckets), the threshold (default 5), and `COLLECTING` with the date to come back or `READY`. Setup runs it before the category stage. Under the threshold it skips the stage, says when to come back, and writes no rule. The threshold and "stop offering" live as lines under `## Preferences` in `.context.md` (the existing home for user tunables, read by the run as today). The reminder is the daily run: when `--status` says no rules were ever written, daily runs `--data-days` and relays its `say:` line once. No scheduler, no process. The sentence the user reads comes from the script's output, not from daily's SKILL.md, which is what lets daily not grow.
 5. **Daily must not grow (US-6/AC-3).** The relay is one bullet; offset by cutting the `BROKEN` and `STALE` bullets' prose to pointers at the new references. Measured against main *after* #106 lands. A size test enforces it.
 6. **Export.** `install/export_agent_skills.py` finds every `skills/*/SKILL.md` (`source_skills()`), so the new skills ship with no code change. What needs changes: `tests/test_install_shapes.py` `NEEDS_A_SIBLING` gains both new skills (they reach `daily` scripts and `setup` references and must resolve `daily`/`billables-daily` and `setup`/`billables-setup`); `tests/test_distribution.py` parametrizes over discovered skills so it covers them without edits (confirmed by reading; re-verified in T14).
-7. **Evidence for judged criteria.** Fixtures are neutral ("Client A", no user facts; `test_redaction`/`test_provider_neutrality` apply), kept under `docs/skills/setup/eval/`. For each scenario a fresh agent runs the shipped instructions before (main) and after, three reps per arm, hand-graded as in #106. Transcripts and grades go in `docs/skills/daily/decision-log.md`. Real-Windows criteria (US-2/AC-2, US-3/AC-3) are recorded PENDING-REAL-WINDOWS with exact steps; never marked passed.
+7. **Evidence for judged criteria.** Fixtures are neutral ("Client A", no user facts; `test_redaction`/`test_provider_neutrality` apply), kept under `docs/skills/setup/eval/`. For each scenario a fresh agent runs the shipped instructions before (main) and after, three reps per arm, hand-graded as in #106. Transcripts and grades go in `docs/skills/daily/decision-log.md`. Windows criteria (US-2/AC-2, US-3/AC-3) are proven by the shared Windows end-to-end CI job (D10, T19); what CI cannot drive is stated as not verified for Atlas's ship decision, never marked passed and never a step for Connor. Tests also go beyond pytest and pyright (D11): the guard's planted-violation proof (T15) and fixtures with real ActivityWatch bucket shapes (T19).
 
 ## Autonomous-execution prerequisites
 - **Research and evidence in hand:** the setup/daily/reference text, `category_rules.py`, the export script and the test names above, read in full for this plan. Research note on ActivityWatch on the machine: /home/ubuntu/artefacts/activitywatch-three-repos-research.md (shared context).
@@ -39,11 +39,14 @@ Skill map (the atlas default, kept): `setup` stays the front door and install pa
 - D6: Reminder = the daily run noticing, via `--data-days`; no new process. Decline-for-good is a `## Preferences` line. — alternatives: scheduled task (Reserved-adjacent, spec non-goal); a `.mcp` marker file (a second home). Known cost: writing Preferences changes the context fingerprint, so `--status` reads `STALE` once. T5/T13 test that a zero-client `STALE` does not loop a rebuild.
 - D7: Hard-to-reverse part, new skill names as user commands (`/billables:onboard-client`, `/billables:troubleshoot`), gets ADR-0009 and amends ADR-0005's "setup owns the manual steps" line. — Why: AGENTS.md § Where a thing goes.
 - D8: Feedback path hands over a redacted draft (saved file plus the exact `gh` command for the user to run); it never files. `reporting-issues.md` gains an entry for the menu path and a one-paragraph change to § Filing for that entry only. Daily Step 11's existing "show, get a yes, then file" is not changed (spec non-goal: no change to daily behavior). See Q1.
+- D10: Windows proof is the repository's one shared end-to-end job on `windows-latest` in `.github/workflows/checks.yml` (Atlas, 2026-10-20; public repo, free minutes). The check-in build (serial order 1) creates it; this build extends it and does not create a second one. If this build lands first, it creates it and check-in extends it. The extension runs setup's install checks from `checks.md` against a real `aw-server`, reaches the stated "collecting data" state (US-2/AC-2), and runs the category stage over a week of injected, real-shape events (US-3/AC-3). Alternative: a separate workflow (a second place to keep green).
+- D11: Verification is the build worktree's own venv, `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, plus `Checks` green on the PR head. The spec's `auto` probes read the latest completed `Checks` conclusion on main, so at the build gate the run's `headSha` must contain the build.
+- D12: US-2/AC-3's password/token-ask guard is a repo test over every shipped setup path; it is proven by a planted violation that makes it fail, then removed (T15). New installs that need administrator rights stay Reserved to Atlas (US-2/AC-1).
 - D9: Build starts from fresh origin/main after #106 (daily size baseline) and the check-in build t_b703f6a8 (also edits setup) have merged. Flag `hotspot: skills/setup/SKILL.md`. If either is late, T1 waits; no parallel edit of setup.
 
 ## Open questions (do not change scope)
-- Q1 (atlas): spec US-5/AC-2 says never "posts"; `reporting-issues.md` today lets the agent file after an explicit yes. D8 keeps the menu path strictly hand-over. If Connor prefers the agent file after a yes on both routes, that is a one-paragraph change; say so before T12.
-- Q2: F1 from the spec gate (auto probes use bare `python`/`pyright`) is unresolved on #107. Build verification here uses the venv and pins the interpreter (`.venv/bin/python -B -m pytest -q -p no:cacheprovider`) regardless of how the probes are finally written.
+- Q1 (ruled by Atlas, 2026-10-20, under Connor's delegation; do not re-ask): the setup-menu feedback path drafts and hands over only and never posts (D8 stands). Daily's existing route (Step 11, show, yes, then file) is unchanged. US-5/AC-2 is scoped to the setup menu in the spec.
+- Q2 (resolved, F1): the auto probes now read `Checks` on main. Build verification is D11.
 
 ## Coverage
 | Criterion | Plan section | Tasks |
@@ -52,11 +55,11 @@ Skill map (the atlas default, kept): `setup` stays the front door and install pa
 | US-1/AC-2 | Approach 2 | T10, T11, T16 |
 | US-1/AC-3 | Approach 2 (existing-machine path) | T9, T16 |
 | US-2/AC-1 | Approach 3; spike S1 | T2, T8 |
-| US-2/AC-2 | Approach 7 (PENDING-REAL-WINDOWS) | T19 |
-| US-2/AC-3 | Approach 7; D2 | T15 |
+| US-2/AC-2 | Approach 7; D10 | T19, T21 |
+| US-2/AC-3 | Approach 7; D2, D12 | T15 |
 | US-3/AC-1 | Approach 4; D5 | T5, T7, T16 |
 | US-3/AC-2 | Approach 4, 5; D6 | T5, T13, T16 |
-| US-3/AC-3 | Approach 4, 7 (PENDING-REAL-WINDOWS) | T19 |
+| US-3/AC-3 | Approach 4, 7; D10 | T19, T21 |
 | US-4/AC-1 | Approach 1, 2; D3 | T4, T10, T16 |
 | US-4/AC-2 | Approach 2 | T10, T16 |
 | US-5/AC-1 | Approach 1; D2 | T6, T11, T16 |
@@ -65,8 +68,8 @@ Skill map (the atlas default, kept): `setup` stays the front door and install pa
 | US-6/AC-2 | Approach 1, 6; D2 | T6, T7, T14 |
 | US-6/AC-3 | Approach 5, 6; D9 | T1, T13, T14 |
 | US-7/AC-1 | Approach 2, 7 | T9, T16 |
-| US-7/AC-2 | Verification | T18 |
-| US-7/AC-3 | Verification | T18 |
+| US-7/AC-2 | Verification; D11 | T18 |
+| US-7/AC-3 | Verification; D11 | T18 |
 
 Decisions with no criterion of their own are carried by tasks citing them: D7 by T17; D9 by T1.
 
@@ -76,5 +79,5 @@ Decisions with no criterion of their own are carried by tasks citing them: D7 by
 - **Parser misreads a hand-edited context file** → refuses with an `ERR` naming the line, writes nothing (same gate semantics as today); fixtures include free text, a missing line and a client with no terms.
 - **Model-invocable new skills trigger on ordinary talk** → both only act after a shown diff and a yes; descriptions are specific; eval scenario includes a non-matching prompt.
 - **Daily word budget** → T13 measures before and after against post-#106 main; if the offset cannot be found without cutting a rule, stop and send atlas the evidence rather than growing daily.
-- **Judged criteria rely on fresh-agent transcripts, which are the same model family as the author** → three reps per arm, hand-graded by the reviewer reading transcripts directly; real-Windows items stay PENDING.
+- **Judged criteria rely on fresh-agent transcripts, which are the same model family as the author** → three reps per arm, hand-graded by the reviewer reading transcripts directly; Windows items are proven by the shared CI job or stated as not verified for Atlas.
 - **Reserved boundary:** if any step needs admin rights or weakens endpoint security, stop and `kanban_block(needs_input)` to atlas.

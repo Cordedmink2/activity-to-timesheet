@@ -1,8 +1,8 @@
 # Tasks: Hands-off setup, and one front door for every non-daily job
 
 **Plan:** [plan.md](plan.md)  **Spec:** [spec.md](spec.md)
-Check: `python3 <skill_dir>/scripts/trace_check.py .` must print OK (run with spec.md present; it merges via PR #107).
-Run tests as `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright` from the repo root of the build worktree.
+Check: `python3 /home/ubuntu/.hermes/sdd-skills/sdd-plan-and-tasks/scripts/trace_check.py intent/guided-setup-and-skill-map` must print OK.
+Verify from the repo root of the build worktree with its own venv: `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, and finish with `Checks` green on the PR head. Spec is merged at 41b5670.
 
 ### T1 — Preflight: fresh base, baselines, worktree
 serves: US-6/AC-3, D9
@@ -72,7 +72,7 @@ serves: US-5/AC-1, US-1/AC-2
 
 ### T12 — Feedback path (hand-over only)
 serves: US-5/AC-2
-- Test first: test that the menu's feedback choice cites `daily/references/reporting-issues.md`, the reference carries the menu entry, and the menu path has no `gh issue create` run by the agent; the redaction wording remains. Confirm Q1 with atlas first.
+- Test first: test that the menu's feedback choice cites `daily/references/reporting-issues.md`, the reference carries the menu entry, and the menu path has no `gh issue create` run by the agent; the redaction wording remains. Q1 is ruled (Atlas): hand-over only, never posts; do not re-ask.
 - Do: edit the reference per D8: add the menu entry and the user-sends paragraph for that entry; leave Step 11's own route untouched.
 - Evidence: tests; transcript showing no client name, host or answer from the fixture in the draft (T16).
 
@@ -89,10 +89,10 @@ serves: US-6/AC-3, US-6/AC-2
 - Evidence: test output; the exported directory listing.
 
 ### T15 — Credentials never touch chat, in every skill
-serves: US-2/AC-3
-- Test first: parametrize the credential tests in `tests/test_setup_skill.py` over all shipped skills and `checks.md`; confirm they fail on a planted `echo $HARVEST_API_KEY`.
-- Do: fix any new-skill text that trips them.
-- Evidence: `pytest -q tests/test_setup_skill.py` shows N passed.
+serves: US-2/AC-3, D12
+- Test first: add a guard test over every shipped setup path (all shipped skills, `checks.md`, the setup references) that fails if any path asks the user to type or paste a password, token or API key into chat, or if any check prints a credential. Prove the guard by a planted violation: add one (an instruction line asking the user to paste an API key into chat, and `echo $HARVEST_API_KEY` in a check), run the guard and see it fail naming the line, then remove the plant and see it pass. The planted-violation run is kept as a test that builds the violation in a temp copy, so the proof stays in the suite.
+- Do: fix any new-skill text that trips the guard.
+- Evidence: pytest output showing the red run on the plant and the green run after it; the guard test's name.
 
 ### T16 — Fresh-agent evaluation (after arm) and grading
 serves: US-1/AC-1, US-1/AC-2, US-1/AC-3, US-3/AC-1, US-3/AC-2, US-4/AC-1, US-4/AC-2, US-5/AC-1, US-5/AC-2, US-7/AC-1
@@ -109,17 +109,24 @@ serves: D7, US-6/AC-1
 ### T18 — Whole-repo verification
 serves: US-7/AC-2, US-7/AC-3
 - Test first: n/a (verification).
-- Do: run `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright | grep -E '^[0-9]+ errors?'`; wait for CI "Checks" on windows-latest and ubuntu-latest.
+- Do: from the build worktree's own venv run `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright | grep -E '^[0-9]+ errors?'`; push; wait for `Checks` (windows-latest, ubuntu-latest and the shared Windows end-to-end job) to finish green on the PR head and record its `headSha`.
 - Evidence: pass counts, `0 errors`, CI run URLs.
 
-### T19 — Record the real-Windows criteria
-serves: US-2/AC-2, US-3/AC-3
-- Test first: n/a (no Windows host reachable).
-- Do: record both as PENDING-REAL-WINDOWS with the exact steps: clean machine, run setup, a transcript ending in "collecting data" with each step's `checks.md` verify output; after a week, run the category stage and capture the `--inspect` output, the written terms and the `VERIFY` lines matching each client. Never mark them passed.
-- Evidence: the PENDING entries in the PR body and decision log.
+### T19 — Extend the shared Windows end-to-end CI job
+serves: US-2/AC-2, US-3/AC-3, D10
+- Test first: write the job's assertions first and see them fail without the feature. The job is the one on `windows-latest` in `.github/workflows/checks.yml`; the check-in build creates it (serial order 1). Extend it with new named steps; do not create a second job. If it does not exist yet when this build starts, create it per D10 and let check-in extend it.
+- Do: (1) US-2/AC-2: on the runner, run each install check from `skills/setup/references/checks.md` against a real `aw-server` and the watchers installed as setup installs them; assert every step prints its own verify line and the run ends in the stated "collecting data" state. (2) US-3/AC-3: inject a week of real-shape events through the real buckets (`aw-watcher-window_<host>` events with `app` and `title`, `aw-watcher-afk_<host>` events with `status`, copied from the watchers' source and named in the test), run the category stage after the threshold, and assert the candidate terms come from the injected titles and hosts and the written rules match each client in a synthetic context file (ACME / BETA).
+- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: the browser-store Add click, the admin prompt, the consent page, and a person's first-run experience. Never marked passed; no step for Connor.
+- Evidence: <windows-latest run URL, head SHA, job output lines per assertion>
 
 ### T20 — Cleanup
 serves: D9
 - Test first: list what this task created (worktree, venv, eval scratch dirs, fixture servers); none is a scheduled task or service.
 - Do: after the PR has the evidence, remove those scratch artefacts and the worktree (`git worktree remove`); leave the shared checkout untouched; record any leftover with owner and date.
 - Evidence: `git worktree list` and a listing of the scratch directory.
+
+### T21 — Real-shape fixtures for the category stage and setup checks
+serves: US-2/AC-2, US-3/AC-3, D10
+- Test first: tests that the fixture builders emit the exact bucket and event shape the real watchers write: bucket ids `aw-watcher-window_<host>` and `aw-watcher-afk_<host>`, event `data` keys, durations and timestamps, each copied from the watcher source at the pinned version, with the source file and line named in the test.
+- Do: add the builders to the shared test scenarios (synthetic ACME / BETA, `example.*` hosts) and use them in T5, T7 and T19.
+- Evidence: <pytest output; source path and line for each shape>
