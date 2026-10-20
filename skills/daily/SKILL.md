@@ -129,6 +129,8 @@ AFK anchors the boundaries and the timeline shows what is inside them; the calen
 
 Attribution — **client + project + task + billable + confidence (high/medium/low)** — per `references/classification-rules.md`:
 
+Full wording: `references/day-reading.md` § "Steps 4–5 and the data sources".
+
 - The AW category is a client-level first pass only; investigate every `uncategorized` and `!MULTI` span.
 - Work-item-shaped strings (`[A-Z]{2,4}\d{3,}S?`) are the highest-confidence signal: resolve the title in the work-item catalog and the project/task via `python scripts/provider/bin/timesheet-provider lookup <code-name-or-client>`; never hand-roll a glob loop. **A client's name is a first-class search term, and the top hit is not automatically the right project** — read all candidates; an all-non-billable task set is the tell for a shell.
 - **Task and billable status follow the rubric's "Work kind and task selection" exactly**: `.context.md` overrides, then the dominant activity gives a work kind, then `.context.md` § "Work kinds" gives the task name. Billable comes from what `lookup` returns for the task, never from its name.

@@ -468,7 +468,7 @@ exercise these scripts and move with them in #35.
 | `skills/daily/references/catalog-refresh.md` "Output" | the page files' names, and "downstream readers expect the provider's own shape" | removed: storage is the adapter's (§ 6.2); the paragraph says `TP refresh` writes the catalog `TP lookup` reads |
 | `skills/daily/references/new-client-work.md` | `scripts/refresh_catalogs.py` for the bulk work-item catalog | is `refresh_catalogs.py` (#37) |
 | `skills/daily/SKILL.md` Tunable defaults and Step 4 (task selection) | the project's own task list, and the billable rule, named by the provider's fields | "the tasks `TP lookup` lists for this project", and its `billable` |
-| `skills/daily/SKILL.md` Step 4 (work-item strings) | "matches only on" the provider's client field | lookup's `matched_on: client` |
+| `skills/daily/references/day-reading.md` § Step 4 (work-item strings) | "matches only on" the provider's client field | lookup's `matched_on: client` |
 | `skills/daily/references/scripts.md`, `refresh_catalogs.py` entry | the catalog's file glob as what it refreshes | `TP refresh` writes the catalog `TP lookup` reads; no file named |
 | `skills/daily/references/classification-rules.md` step 1 (prefix → client) | groups the catalog file's projects by code prefix to find a client | `TP lookup <prefix> --json`, grouped by `client` |
 | `skills/daily/references/classification-rules.md` step 4b | the task list named by its provider field ("`harvest_lookup.py` returns them") | "the `tasks[]` `TP lookup` returns" |

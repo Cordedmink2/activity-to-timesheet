@@ -1274,9 +1274,9 @@ no-tool agents per arm. **Before:** notes in the draft 3/3, in the posting quest
 ### SKILL.md moved under the word ceiling by relocating mechanism, not guards — #57
 **Rung 3 for the behavioural claim (reasoned, one thin measurement); rung 2 for the hazard.**
 2026-10-20. `SKILL.md` was 11,806 words after #35 and #37 (11,430 when the issue was
-measured), against a 5,000 ceiling, with ~150 words to be left for #48. Now 4,844.
+measured), against a 5,000 ceiling, with ~150 words to be left for #48. Now 4,845 (4,835 before the Steps 4–5 pointer line was added).
 
-What moved, text kept whole: "Files in this skill" to `references/scripts.md`
+What moved (kept whole, with the exceptions restored in the last paragraph of this entry): "Files in this skill" to `references/scripts.md`
 (`INVENTORY_HEADING` stays; `test_references.py` now reads `INVENTORY_FILE`, and the
 inventory and flag-equality assertions are unchanged); Steps 1–3, the screenshot folder and
 the timezone and script-resolution mechanism to `references/day-reading.md`; Steps 6–12 to
@@ -1307,12 +1307,13 @@ refusal by posting the two named entries without closing the overlap, and record
 not posted. Wording differences only: arm B also said 'looks fine' approved the Step 6 draft, not
 posting; arm A did not say so explicitly but still put the Step 8 question first. No behavioural
 difference. **Rep ledger (per arm, A=baseline B=trimmed; each run can spawn 2 subagents):**
-calendar-and-guards reps 1-3 done. **Rep 3 found a difference:** arm B (trimmed) drafted 08:40-11:45 beside the 11:30-12:30 calendar block, a 15-minute overlap that double-bills, and passed it to `--cover`; arm A tiled to the edge. The trim had dropped A's clause "the blocks either side tile up to its edges"; **that cut is put back** in Step 3 (one clause; SKILL.md 4,835 words). The fix itself has had no rep yet. Reps 1-2 had no difference (rep 2: both 5/6, same --cover, same E2 handling; A
-also invented a 12:30-12:40 exclusion, a baseline-only variation, not a guard B lost). already-billed-ruling
-rep 1 done. confirm-gate-and-dst rep 1 done. Still to run: a B rep of calendar-and-guards on the restored clause;
-already-billed-ruling reps 2-3; confirm-gate-and-dst reps 2-3. **Not shown:** that any of this holds at 3 reps; nothing here is a rung above 3.
-Re-run all three scenarios with reps 2-3 per arm (needs a run with a higher subagent cap) before
-treating this as more than a reasoned change; if either arm differs, put that step's cut back.
+calendar-and-guards reps 1-3 done. **Rep 3 found a difference:** arm B (trimmed) drafted 08:40-11:45 beside the 11:30-12:30 calendar block, a 15-minute overlap that double-bills, and passed it to `--cover`; arm A tiled to the edge. The trim had dropped A's clause "the blocks either side tile up to its edges"; **that cut is put back** in Step 3 (one clause). Reps 1-2 had no difference (rep 2: both 5/6, same --cover, same E2 handling; A also invented a 12:30-12:40 exclusion, a baseline-only variation, not a guard B lost). already-billed-ruling reps 1-3: no difference (rep 2 both 4/6; rep 3 both 3/6, checks 1, 2, 5 unstated by either arm; the ruling-binds guard held in both). confirm-gate-and-dst reps 1-3: no harmful difference (rep 2 A 4/5, B 5/5; rep 3 both 5/5).
+
+**The B2 rerun on the restored clause (run 12)** — the evals workspace `tests/evals/daily-workspace` is gitignored, so the line is quoted here: arm B2 (trimmed, tiling clause restored) drafted 08:40-11:30, 11:30-12:30 (E1), 12:40-17:10 with `--cover "08:40-11:30,11:30-12:30,12:40-17:10"`: no overlap, 5/6 (the 12:40 vs 12:30 start of the last block matches arm A reps 2-3). The rep-3 double-billing defect did not recur. Limits: one rep, and the subagent got an abridged paste of SKILL.md rather than the whole file. For confirm-gate-and-dst rep 3 the line is: both arms 5/5 on every guard (Step 8 gate on "looks fine", derived-zone line, first post without --confirm, --confirm only after the explicit yes, straddle refusal handled by posting the two named entries, WOULD POST not recorded as posted).
+
+**Final ledger (reps per arm):** calendar-and-guards 3/3 (one real regression at rep 3, cut put back, B2 rerun clean), already-billed-ruling 3/3, confirm-gate-and-dst 3/3. Verdict: the trim preserves the graded behaviour except the one clause restored. Evidence rung stays 3 (fresh no-filesystem agents, hand-graded, n=3 per scenario, one model); not rung 4.
+
+**Restored after review (PR #106).** The first version said everything moved "whole"; it did not. Cut from SKILL.md without a home: Step 4's AW-category limit ("never project/work-item-level, never 100%"), "reads one page and misses projects", the `matched_on: client` ranking explanation, the support-item sentence and "single largest source of real misattributions"; Step 5's "interleaved day can score every block HIGH" passage; the `compact.jsonl` short-key legend, the screenshot cadence and the partial `daily_exports/<date>/screenshots/` copy; Prerequisite 1's sentence on who writes `.context.md`. All are now whole in `references/day-reading.md` § "Steps 4–5 and the data sources", with a pointer from Step 4. The CONTRIBUTING multi-copy rows that claimed `SKILL.md` still held `--max-share`, the breadth ceiling, the judgement tunables, and Prerequisite 1's setup sentence were re-pointed at the real copies, as was the provider-contract row on "matches only on".
 
 **Rejected: deleting rationale outright.** The mechanism has a home in the references, so a
 rule measured useful is not lost, and CONTRIBUTING's "Rules with more than one copy" rows that
@@ -3335,21 +3336,3 @@ whether `aw_client.py` ought to drop `LockApp.exe` spans from the timeline altog
   deletion condition written into its entry.
 - `tests/` has no coverage asserting `SKILL.md`'s *behavioural* claims, and by the
   method above it never usefully will — don't add doc-behaviour assertions there.
-
-### #57 eval ledger update (run 8, 2026-10-20)
-
-already-billed-ruling rep 2, arms A (pre-trim) and B (trimmed, 1e01d3a): both 4/6, identical on every step; the ruling-binds guard held in both. No behavioural difference. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 2/3, confirm-gate-and-dst 1/3. Evidence rung stays 3.
-
-### #57 eval ledger update (run 9, 2026-10-20)
-
-confirm-gate-and-dst rep 2, arms A (pre-trim) and B (trimmed, 1e01d3a): A 4/5 (implicit on 'looks fine' and the no-confirm first run), B 5/5 (explicit). No guard failed in B, so no behavioural regression; no cut put back. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 2/3, confirm-gate-and-dst 2/3. Evidence rung stays 3.
-
-### #57 eval ledger update (run 10, 2026-10-20)
-
-already-billed-ruling rep 3, arms A (pre-trim) and B (trimmed, 7e5107b tree): both 3/6 (checks 3, 4, 6 met; checks 1, 2, 5 not stated by either). Identical on every step; the ruling-binds guard held in both. No behavioural difference; no cut put back. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 3/3, confirm-gate-and-dst 2/3. Evidence rung stays 3.
-
-### #57 eval ledger update (run 11, 2026-10-20)
-
-confirm-gate-and-dst rep 3, arms A (pre-trim) and B (trimmed, 1e01d3a tree): both 5/5. Same on every guard: Step 8 gate on "looks fine", derived-zone line with TIMESHEET_TIMEZONE, first post without --confirm, --confirm only after the explicit yes, straddle refusal handled by posting the two named entries, WOULD POST not recorded as posted. No behavioural difference; no cut put back. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 3/3, confirm-gate-and-dst 3/3. Evidence rung stays 3.
-
-calendar-and-guards B2 rerun (run 12): arm B2 (trimmed with the "tile up to its edges, never overlapping" clause restored, 4,835 words) drafted 08:40-11:30, 11:30-12:30 (E1), 12:40-17:10 with `--cover "08:40-11:30,11:30-12:30,12:40-17:10"`: no overlap, 5/6 (the 12:40 vs 12:30 start of the last block matches arm A reps 2-3). The rep-3 double-billing defect did not recur. Limits: one rep, and the subagent got an abridged paste of SKILL.md rather than the whole file. Final ledger (reps per arm): calendar-and-guards 3/3 (one real regression found at rep 3, cut put back, B2 rerun clean), already-billed-ruling 3/3 (no difference), confirm-gate-and-dst 3/3 (no harmful difference). Verdict: the trim preserves the graded behaviour except the one clause restored. Evidence rung stays 3 (fresh no-filesystem agents, hand-graded, n=3 per scenario, one model); not rung 4.

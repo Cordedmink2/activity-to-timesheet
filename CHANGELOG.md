@@ -27,9 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting and where it goes; with a section it carries on and says the old ones are ignored.
 
 ### Changed
-- **`skills/daily/SKILL.md` is under its word ceiling** (#57): 11,806 words to 4,835, against 5,000. The
-  guards a run acts on stay in `SKILL.md`; the mechanism and worked cases moved, whole, to
-  `references/day-reading.md` (Steps 1–3, screenshot folder), `references/review-and-posting.md`
+- **`skills/daily/SKILL.md` is under its word ceiling** (#57): 11,806 words to 4,845, against 5,000. The
+  guards a run acts on stay in `SKILL.md`; the mechanism and worked cases moved to
+  `references/day-reading.md` (Steps 1–3, screenshot folder, and the Step 4–5 and data-source wording the trim first dropped), `references/review-and-posting.md`
   (Steps 6–12) and `references/scripts.md` (the script and flag inventory, formerly "Files in this
   skill"). Nothing for a user to do. The inventory check in `skills/daily/tests/test_references.py`
   reads the new file. The before/after eval ran three scenarios at 3 reps per arm with fresh no-filesystem agents, hand-graded. It found one regression, a dropped "tile up to its edges" clause that let a calendar block overlap its neighbour, and that clause was put back. Evidence rung 3 (`docs/skills/daily/decision-log.md`).

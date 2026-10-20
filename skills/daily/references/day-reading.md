@@ -107,3 +107,30 @@ Cumulative short AFKs are real: several 5–15 min chunks in an hour add up. `ac
 Aim for 15-min granularity (0.25 hr); fold blocks shorter than 0.25 hr into a neighbour.
 
 These rules apply identically when **backfilling an older date** — trailing left-in-focus windows are *more* likely there.
+
+## Steps 4–5 and the data sources: wording `SKILL.md` no longer carries
+
+`SKILL.md` keeps the shortened guard for each of these. The original wording is here, whole,
+so a run that needs the reasoning behind a one-line rule reads it once and not by inference.
+
+### Step 4: the AW category, the lookup, and interleaved days
+
+- The AW category from the timeline is a client-level first pass only — never project/work-item-level, never 100%. Investigate every `uncategorized` and `!MULTI` span.
+- Work-item-shaped strings (`[A-Z]{2,4}\d{3,}S?`) in titles/URLs are the highest-confidence signal: resolve the title in the user's work-item catalog and the project/task via `python scripts/provider/bin/timesheet-provider lookup <code-name-or-client>` — it searches the whole catalog and falls back to the user's recent entries for archived projects. Never hand-roll a glob loop (it reads one page and misses projects). **A client's name is a first-class search term, and the top hit is not automatically the right project:** the live delivery project is often named for the *work* and matches only on its client's name (reported as `matched_on: client`, ranked last), while a dead presales or shell project named after the client ranks above it. Read all candidates before picking — an all-non-billable task set is the tell for a shell. A support item (per `.context.md`'s convention, often a trailing `S`) takes the same project/task selection, and its entry note is marked only as that convention says.
+- **If the day shows more than one client, or a block is titled by an agent-session file (`CLAUDE.md`, `AGENTS.md`, plan `.md`s): apply `references/disambiguation.md` § "Interleaved days" before accepting any block over an hour.** This is the single largest source of real misattributions.
+
+### Step 5: why the interleaved day loads the disambiguation file
+
+Load it on any day with a 🔸 in it — **and on any day that shows more than one client, flagged or not.** An interleaved day can score every block HIGH and still be the largest source of real misattributions there is, so the switch-point half of that file is reached by the day's shape rather than by a flag. A single-client day that flagged nothing skips this step.
+
+### Data sources
+
+| Source | Purpose | When to use |
+|---|---|---|
+| `daily_exports/<date>/compact.jsonl` | Pre-processed AW dump (sub-10s events pre-dropped; short keys: `b`=bucket, `t`=timestamp, `d`=duration, `a`=app, `ti`=title, `u`=url, `s`=afk) | Fallback only when AW is unreachable |
+| `~/Pictures/WorkScreenshots/<date>/HH-MM-SS_mN.png` | **Source-of-truth** screenshots, ~2.5 min cadence, 08:30–20:00 weekdays | Disambiguation only — load specific timestamps, never proactively |
+| `daily_exports/<date>/screenshots/` | Partial copy | Ignore; use the Pictures folder |
+
+### Prerequisite 1: who writes `.context.md`
+
+The `setup` skill normally scaffolds the workspace and writes the client sections of `.context.md`; the rest of that file is this skill's first run.
