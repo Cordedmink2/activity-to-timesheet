@@ -44,7 +44,7 @@ Precedence: flag, `.env`, process environment, script default; blank is unset (`
 
 **Timezone.** Scripts use `TIMESHEET_TIMEZONE`, or this machine's own zone, applied at each instant (a daylight-saving change needs nothing from you). **There is no assumed zone and no default offset**; a run that can read neither stops and says so. A machine-read zone is labelled `derived from this machine` in every skeleton header and JSON `zone` field — **carry that label into the timesheet's Notes and the Step 8 confirmation**. On the day the clocks go back the repeated hour's second pass is suffixed `*` (`02:30:00*`): pass it to `--window` / `--cover` as part of the time. `--utc-offset <hours>` overrides for one run. See `references/activitywatch.md`, `references/output-format.md`.
 
-**Running the scripts.** Every `python scripts/…` command is relative to *this skill's own folder* — the directory this `SKILL.md` was read from — not the workspace. Prefix it with that folder's absolute path, resolved once and reused; never guess one. Catalog paths resolve from the workspace. **Run scripts and read every configured value in Bash** — the configuration reaches Bash alone; paste the resolved literal into any PowerShell command. `python` means the interpreter this machine uses (`.context.md` → Machine records it): on Windows a bare `python` may be the Store stub (Microsoft Store help text, exit 49 — a missing interpreter, not a broken script; `py` usually works).
+**Running the scripts.** Every `python scripts/…` command is relative to *this skill's own folder* — the directory this `SKILL.md` was read from — not the workspace. Prefix it with that folder's absolute path, resolved once and reused; never guess one. Catalog paths resolve from the workspace. **Run scripts and read every configured value in Bash** — the configuration reaches Bash alone; paste the resolved literal into any PowerShell command. `python` means the interpreter this machine uses (`.context.md` → Machine records it): on Windows a bare `python` may be the Store stub (Store stub, exit 49: a missing interpreter; `py` usually works).
 
 ## Prerequisites — check at start of every run
 
@@ -121,11 +121,9 @@ AFK anchors the boundaries and the timeline shows what is inside them; the calen
 
 **Soft boundaries** — split only where it improves classification: a sustained context switch (≥3 events on a different ticket/profile, ≥3 min); a Teams meeting (`Meeting | …` / `Call with …`), its own block even when attended while multitasking; an active-ratio drop.
 
-**A corroborated calendar event is one block over its `block` span**, verbatim and unmoved at its start, *even across a break the skeleton recorded*. Nothing else about the skeleton changes: **AFK is settled by the AFK watcher, and the calendar re-infers idle no more than a screenshot does.** The break it swallows is declared with the draft (Step 6 guard 1). It is classified like any block and **replaces what it covers rather than doubling it**. An `evidence_share` under about 0.5 is a meeting on another monitor: read the call timer in a capture (`references/classification-rules.md` §3) and correct from it. A span starting before `work_start`, or ending after `work_end` **when the `evidence` stops earlier**, is flagged 🔸 and put to the user.
+**A corroborated calendar event is one block over its `block` span**, verbatim and unmoved at its start, *even across a break the skeleton recorded*. Nothing else about the skeleton changes: **AFK is settled by the AFK watcher, and the calendar re-infers idle no more than a screenshot does.** The break it swallows is declared with the draft (Step 6 guard 1). It is classified like any block and **replaces what it covers rather than doubling it**: drafted blocks either side tile up to its edges, never overlapping. An `evidence_share` under about 0.5 is a meeting on another monitor: read the call timer in a capture (`references/classification-rules.md` §3) and correct from it. A span starting before `work_start`, or ending after `work_end` **when the `evidence` stops earlier**, is flagged 🔸 and put to the user.
 
 **An uncorroborated event is never drafted as a block.** Leave it out of the draft and the coverage check; Step 6 puts it to the user as a **calendar question**, and it becomes a block only on their answer.
-
-Aim for 15-min granularity; all this applies to backfills too.
 
 ### Step 4 — Classify each block
 
@@ -211,7 +209,7 @@ Summarise total hours posted, blocks deferred or skipped, and whether more days 
 
 ### Step 11 — Surface skill or `.context.md` improvements
 
-Present what the run revealed at the end, **one fact per ask, as the exact diff**: this user's clients/signals/preferences → `.context.md`; a generic heuristic or API quirk → `SKILL.md`/`references/`; the skill being wrong (a script answers wrongly, a guard didn't fire) → `references/reporting-issues.md` if installed, `docs/CONTRIBUTING.md` if maintained.
+Present what the run revealed, **one fact per ask, as the exact diff**: this user's clients/signals/preferences → `.context.md`; a generic heuristic or API quirk → `SKILL.md`/`references/`; the skill being wrong (a script answers wrongly, a guard didn't fire) → `references/reporting-issues.md` if installed, `docs/CONTRIBUTING.md` if maintained.
 
 **A yes to a diff that adds or changes a client's Category terms rebuilds the category rules in the same breath** — write the file, run `scripts/category_rules.py --candidates <file>` with every client's terms, report what it wrote in a line, and don't ask twice. A refusal or `suspect` line is reported here.
 

@@ -1308,9 +1308,9 @@ refusal by posting the two named entries without closing the overlap, and record
 not posted. Wording differences only: arm B also said 'looks fine' approved the Step 6 draft, not
 posting; arm A did not say so explicitly but still put the Step 8 question first. No behavioural
 difference. **Rep ledger (per arm, A=baseline B=trimmed; each run can spawn 2 subagents):**
-calendar-and-guards reps 1-2 done, no difference (rep 2: both 5/6, same --cover, same E2 handling; A
+calendar-and-guards reps 1-3 done. **Rep 3 found a difference:** arm B (trimmed) drafted 08:40-11:45 beside the 11:30-12:30 calendar block, a 15-minute overlap that double-bills, and passed it to `--cover`; arm A tiled to the edge. The trim had dropped A's clause "the blocks either side tile up to its edges"; **that cut is put back** in Step 3 (one clause; SKILL.md 4,835 words). The fix itself has had no rep yet. Reps 1-2 had no difference (rep 2: both 5/6, same --cover, same E2 handling; A
 also invented a 12:30-12:40 exclusion, a baseline-only variation, not a guard B lost). already-billed-ruling
-rep 1 done. confirm-gate-and-dst rep 1 done. Still to run: calendar-and-guards rep 3;
+rep 1 done. confirm-gate-and-dst rep 1 done. Still to run: a B rep of calendar-and-guards on the restored clause;
 already-billed-ruling reps 2-3; confirm-gate-and-dst reps 2-3. **Not shown:** that any of this holds at 3 reps; nothing here is a rung above 3.
 Re-run all three scenarios with reps 2-3 per arm (needs a run with a higher subagent cap) before
 treating this as more than a reasoned change; if either arm differs, put that step's cut back.

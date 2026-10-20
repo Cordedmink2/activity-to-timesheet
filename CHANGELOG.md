@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting and where it goes; with a section it carries on and says the old ones are ignored.
 
 ### Changed
-- **`skills/daily/SKILL.md` is under its word ceiling** (#57): 11,806 words to 4,844, against 5,000. The
+- **`skills/daily/SKILL.md` is under its word ceiling** (#57): 11,806 words to 4,835, against 5,000. The
   guards a run acts on stay in `SKILL.md`; the mechanism and worked cases moved, whole, to
   `references/day-reading.md` (Steps 1–3, screenshot folder), `references/review-and-posting.md`
   (Steps 6–12) and `references/scripts.md` (the script and flag inventory, formerly "Files in this
