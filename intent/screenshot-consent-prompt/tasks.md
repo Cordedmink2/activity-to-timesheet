@@ -3,12 +3,12 @@
 **Plan:** [plan.md](plan.md)  **Spec:** [spec.md](spec.md)
 Check: `python3 /home/ubuntu/.hermes/sdd-skills/sdd-plan-and-tasks/scripts/trace_check.py intent/screenshot-consent-prompt` must print OK.
 
-Rules for every task: tests first (write the failing test, run it, see it fail, then build). Tests use fakes for `consent` and `grab` and `pytest`'s `tmp_path`; no test shows a dialog except the T1 smoke test, which uses a 1 ms timeout; no test touches a real capture folder. Run from the worktree's own venv: `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright`. Build starts from fresh `origin/main` after the spec is gated and merged and after the other four builds (this lands last, after retention). Read `docs/CONTRIBUTING.md` before the skill and reference edits. Evidence is filled in at build time and is the command with its observed output, never a claim.
+Rules for every task: tests first (write the failing test, run it, see it fail, then build). Tests use fakes for `consent` and `grab` and `pytest`'s `tmp_path`; no test shows a dialog except the T1 smoke test, which uses a 1 ms timeout; no test touches a real capture folder. Run from the worktree's own venv: `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, and finish with `Checks` green on the PR head. Build starts from fresh `origin/main` (spec merged at 41b5670) and after the other four builds (this lands last, after retention). Read `docs/CONTRIBUTING.md` before the skill and reference edits. Evidence is filled in at build time and is the command with its observed output, never a claim.
 
 ### T1 — Spike: does MessageBoxTimeoutW time out and close on windows-latest? (H1, H2)
 serves: D1, US-1/AC-3
 - Test first: write H1 and H2 and the expected observation (plan, "Research and spike") in this card's Evidence before running anything. Add a `skipif(sys.platform != "win32")` test that calls the export with a 1 ms timeout and `MB_YESNO|MB_DEFBUTTON2`, and asserts the return is 32000 within 2 s.
-- Do: run it in CI on `windows-latest`. If it passes, keep it. If it fails (wrong code, hang, no desktop, no export), delete it, record why, and either switch ask_consent to the documented `MessageBoxW`-in-a-thread fallback (D1, export missing or wrong code) or keep only the fake-based tests (no desktop). Either way the real-box result stays PENDING-REAL-WINDOWS (T8).
+- Do: run it in CI on `windows-latest`. If it passes, keep it. If it fails (wrong code, hang, no desktop, no export), delete it, record why, and either switch ask_consent to the documented `MessageBoxW`-in-a-thread fallback (D1, export missing or wrong code) or keep only the fake-based tests (no desktop). Either way what CI cannot drive is stated as not verified for Atlas's ship decision (T8).
 - Evidence: <CI log line with the returned code and elapsed time, or the failure and the decision taken>
 
 ### T2 — The ask and the gate (seam), grab only after yes
@@ -48,13 +48,20 @@ serves: US-4/AC-1, US-4/AC-2, US-4/AC-3, D6
 - Evidence: <diff stat; production line count; the decision-log and CHANGELOG diff>
 
 ### T8 — Real-Windows walk (PENDING-REAL-WINDOWS)
-serves: US-1/AC-3
-- Test first: write the steps now so a person can run them later: on a Windows 10 or 11 machine with the build's `setup_screenshot_pipeline.ps1 -AskFirst` registered, (1) with a document open, type while the first prompt appears and note whether keystrokes go into the box; (2) answer Yes once; (3) answer No once; (4) ignore one for more than 20 s; (5) lock the screen through one tick. Record the dated folder listing and `capture.log` after each.
-- Do: nothing in this repo; recorded as PENDING-REAL-WINDOWS in the build PR and the reviewer card. Never marked passed from CI.
-- Evidence: <PENDING-REAL-WINDOWS until a person supplies the session log and folder listing>
+serves: US-1/AC-3, D10
+- Test first: write the job assertions first and see them fail without the feature. The job is the one on `windows-latest` in `.github/workflows/checks.yml` created by the earlier builds; extend it with new named steps. Do not create a second job; if it is not on main when this build starts, stop and `kanban_block(needs_input)` to atlas.
+- Do: on the runner (1) run the real capture script with the prompt on and the dialog auto-answered yes through the test hook (D10): assert one image per monitor with today's names in the dated folder; (2) auto-answered no: assert no file for that time and one `skipped` log line; (3) call the real `MessageBoxTimeoutW` with a short timeout and assert it returns 32000 and the script then skips (fail closed); (4) assert `capture.log` and the folder listing after each.
+- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: a person's click on the real dialog, whether it steals typing focus, and a locked-screen tick. Never marked passed; no step for Connor.
+- Evidence: <windows-latest run URL, head SHA, job output lines per assertion>
 
 ### T9 — Suite and type check
-serves: US-5/AC-1, US-5/AC-2
+serves: US-5/AC-1, US-5/AC-2, D11
 - Test first: run both on a fresh `origin/main` worktree and record the baseline counts.
-- Do: after the build, `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright | grep -E '^[0-9]+ errors?'`; confirm CI "Checks" on `windows-latest` and `ubuntu-latest` green.
+- Do: after the build, from the build worktree's own venv run `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright | grep -E '^[0-9]+ errors?'`; push; confirm `Checks` (windows-latest, ubuntu-latest and the shared Windows job) green on the PR head and record its `headSha`.
 - Evidence: <both outputs and the CI run link>
+
+### T10 — Consent paths with the dialog mocked: yes, no, timeout, dialog failure
+serves: US-1/AC-1, US-1/AC-2, D8, D9
+- Test first: a table-driven test of `capture_once` with `ask_consent`'s `ctypes` call mocked to return each of: 6 (yes), 7 (no), 32000 (timeout), 2 (closed), an `OSError` and an `AttributeError` (missing export), and with the `MessageBoxW`-in-a-thread fallback mocked to hang past the timeout. Assert: only yes writes images (same names and folder as an unprompted capture); every other outcome writes no file, no temp file and one log line with the time and `skipped` or `prompt-error` only; `grab` never runs before the answer; the default button is No and the timeout is at most 20 s and below the capture interval.
+- Do: add the table to `skills/daily/tests/test_screenshot_capture.py`; the shipped code has no test-only branch (the D10 hook is a seam argument, not a shipped switch).
+- Evidence: <pytest output; each row's outcome>
