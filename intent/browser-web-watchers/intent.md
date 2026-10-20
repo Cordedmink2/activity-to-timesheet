@@ -53,3 +53,15 @@ browsing; Firefox parity; least setup burden.
 - On Edge, setup's install link and verification both work and the bucket is found.
 - Without the web watcher, `daily` output for a recorded test day is unchanged.
 - `pytest` and `pyright` are green per AGENTS.md.
+
+## Clarifications
+### Session 2026-10-20 (Atlas, delegated)
+Connor delegated every decision reserved for him across these five intents to Atlas on 2026-10-20
+("Have atlas decide all that. This project needs to be fully finished up now."; card t_3c4f0453).
+Foundational refusals and this accepted intent text are not delegated and are unchanged.
+- Edge and Chrome share one web watcher bucket (plan Q1) → a browser counts as verified only when
+  a recent event is corroborated by its foreground window; otherwise it is reported unproven by
+  name. Why: honest evidence over an assumed bucket per browser.
+- URL in title stays required for Chromium browsers (Reserved; not changed).
+- Release cut → Atlas cuts it once every build gate has merged and `Checks` is green on main;
+  the CHANGELOG records that Connor delegated this release on 2026-10-20.

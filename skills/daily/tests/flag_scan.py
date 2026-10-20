@@ -2,7 +2,7 @@
 
 One copy, because two suites hold two documents against the same scripts and a comparison
 that reads the source two ways would disagree with itself: `skills/daily/tests/test_references.py`
-holds the `daily` skill's own "Files in this skill" inventory to *equality* with the flags each
+holds the `daily` skill's own script inventory (`references/scripts.md`, since #57) to *equality* with the flags each
 script parses, and the repo-level `tests/test_reconcile_skill.py` holds the `reconcile` skill's
 copy — which invokes the same scripts from a sibling directory — to *inclusion* (#31). The
 second suite has no `daily` module on its import path by design (`tests/test_plugin_config.py`

@@ -48,3 +48,18 @@ the per-capture prompt, that is an amendment brief for Connor, not a silent swap
 - With the prompt off, captures are unchanged.
 - The change adds a small amount of code, and the reviewer judges it maintainable.
 - `pytest` and `pyright` green per AGENTS.md.
+
+## Clarifications
+### Session 2026-10-20 (Atlas, delegated)
+Connor delegated every decision reserved for him across these five intents to Atlas on 2026-10-20
+("Have atlas decide all that. This project needs to be fully finished up now."; card t_3c4f0453).
+Foundational refusals and this accepted intent text are not delegated and are unchanged.
+- Keep the per-capture prompt (no replacement) → yes. Researcher t_9d972ef2 found the lighter
+  options (pause control, app-based skip) fail open, which defeats the goal; no amendment brief.
+  A pause control may be added later only as an add-on, not a replacement.
+- Dialog mechanism → the Windows message box with a timeout (MessageBoxTimeoutW via ctypes,
+  default No, about 20 s, fail closed) from the existing Python capture script; fallback
+  MessageBoxW in a thread with a join timeout. Zenity is not used: it adds a third-party install
+  for no gain, and nothing else on Windows needs it now that aw-watcher-ask is not recommended.
+- Release cut → Atlas cuts it once every build gate has merged and `Checks` is green on main;
+  the CHANGELOG records that Connor delegated this release on 2026-10-20.

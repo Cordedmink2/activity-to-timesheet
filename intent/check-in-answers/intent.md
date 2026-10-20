@@ -109,3 +109,23 @@ Good-enough fallback: outcome 1 alone, Windows first.
   because an answer doesn't show switches between clients or projects inside the stretch it covers.
 - Q: One watcher or two for in-work prompts? → A: Connor: "You decide"; noted periodic asks are
   valuable context. Hermes chose aw-watcher-checkin for both, aw-watcher-ask read-only support.
+
+### Session 2026-10-20 (Atlas, delegated)
+Connor delegated every decision reserved for him across these five intents to Atlas on 2026-10-20
+("Have atlas decide all that. This project needs to be fully finished up now."; card t_3c4f0453).
+Foundational refusals and this accepted intent text are not delegated and are unchanged.
+- Running checkin PR #5 (end-of-block check-ins) for users → only if an independent reviewer
+  review of PR #5 at a pinned commit passes (reviewer card t_d30c6616). If it does not pass, ship
+  return-from-AFK only (the intent's good-enough fallback) and record why in the decision log.
+  Why: unreviewed third-party code must not run on users' machines; the fallback already meets
+  outcome 1, which carries the phone-call benefit.
+- Windows third-party binary (Zenity port for aw-watcher-ask) → not recommended. Why: KISS and
+  no new install; checkin covers the use case with Python packaging only.
+- PR #5 outcome → reviewer t_d30c6616 FAILED it at aada3d3 (its own README says keep the block
+  flags off for unattended use; no quiet hours, cooldown or daily cap; untested on Windows; stacked
+  on unmerged PR #4). Billables ships return-from-AFK check-ins only. Revisit if upstream merges.
+- Windows verification → Atlas owns it (Connor, 2026-10-20: "Stop making me do stuff. That's the
+  whole purpose of atlas."): a windows-latest end-to-end CI job; anything it cannot drive is a
+  logged ship decision with monitoring, never a checklist for Connor.
+- Release cut → Atlas cuts it once every build gate has merged and `Checks` is green on main;
+  the CHANGELOG records that Connor delegated this release on 2026-10-20.

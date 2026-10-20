@@ -1,7 +1,7 @@
 # Spec: Screenshots don't pile up after they've done their job
 
 **Intent:** [intent.md](intent.md), Accepted 2026-10-20 (Connor, in conversation with Hermes: "Yeah I think that sounds good"; recorded in the intent's Status line)
-**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec gate pending)
+**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec re-gate pending)
 **Serves:** O1–O3, S1–S2, B1–B3, D1–D2 (inventory below)
 
 ## Summary
@@ -60,7 +60,7 @@ criteria:
   - id: AC-1
     text: A day that is unbilled, partly billed, or flagged by reconcile is never eligible, whatever its age, and eligibility is decided from the timesheet provider's entries and the workspace records rather than assumed. Serves B1, S1.
     check: judged
-    bar: On the 60-day fixture, every unbilled, partly billed and reconcile-flagged day keeps all its images after a confirmed clean-up; an automated test pins this with the fake provider.
+    bar: On the 60-day fixture, every unbilled, partly billed and reconcile-flagged day, and a weekend day with captures but no provider entries (E3), keeps all its images after a confirmed clean-up; an automated test pins this with the fake provider, and a dry run on the fixture tree lists exactly the eligible days before anything is deleted.
     probe: Reviewer lists the fixture folder after the clean-up and reads the eligibility test.
     expect: {}
   - id: AC-2
@@ -132,19 +132,19 @@ criteria:
   - id: AC-1
     text: The repository suite is green from the repo root. Serves S2.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests, skills/daily/tests]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
   - id: AC-2
     text: Pyright reports zero errors from the repo root. Serves S2.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [pyright]}
-    expect: {exit: 0, regex: "(^|\\n)0 errors"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
 ```
 
 ## Edge cases
 - E1: A day billed to the provider then edited by the user so it is now partly billed → not eligible. Covered by US-2/AC-1.
 - E2: The configured capture folder changed since the old captures were taken → only the currently configured folder is cleaned; the user is told an old folder exists. Covered by US-2/AC-3.
-- E3: A weekend or evening folder with captures but no billable work → treated as eligible only if the day has no unbilled activity per the run's own day check; otherwise kept. Covered by US-2/AC-1.
+- E3: A weekend or evening folder with captures but no provider entries → not billed, so never eligible; kept (intent B1/D1: only days already fully billed qualify). Covered by US-2/AC-1 (named fixture day).
 - E4: macOS or Linux, where no capture pipeline ships → no offer. Covered by US-1/AC-1.
 - E5: A partly failed delete (file locked by a viewer) → reported; the day's index is still kept; retried on a later offer. Covered by US-3/AC-1.
 - E6: The user wants to keep a specific day → they say no to the offer or exclude it; it stays. Covered by US-1/AC-2.
@@ -159,3 +159,4 @@ criteria:
 
 ## Changes
 <!-- YYYY-MM-DD: <IDs changed> — <reason>; linked updates: plan/tasks/tests; re-review: <card> -->
+- 2026-10-20: US-5/AC-1, AC-2 — F1: auto probes now read the `Checks` workflow conclusion on main (pytest + pyright on windows-latest and ubuntu-latest) instead of bare python/pyright in a shared checkout; E3 made ineligible to match intent B1/D1 (F3); US-2/AC-1 bar names the E3 fixture and a dry run. Reason: spec gate t_a6ab865c CHANGES REQUIRED. Linked updates: plan/tasks re-point on the plan PRs. Re-review: spec re-gate (Atlas, t_3c4f0453).

@@ -1,7 +1,7 @@
 # Spec: Ask before each screenshot, so confidential screens aren't captured
 
 **Intent:** [intent.md](intent.md), Accepted 2026-10-20 (Connor, in conversation with Hermes: "Yeah I think that sounds good"; recorded in the intent's Status line)
-**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec gate pending)
+**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec re-gate pending)
 **Serves:** O1–O3, S1–S4, B1–B4, A1 (inventory below)
 
 ## Summary
@@ -41,7 +41,7 @@ criteria:
   - id: AC-1
     text: With the prompt on, answering no, or not answering before the prompt times out, writes no image file for that capture time. Serves O1, O2, S1.
     check: judged
-    bar: Automated tests driving the capture with the prompt answered no and timed out find no file for that time in the dated folder; the timeout is short enough not to overlap the next capture.
+    bar: Automated tests driving the capture with the dialog mocked to answer no, to time out, and to fail to open find no file for that time in the dated folder; the timeout is short enough not to overlap the next capture.
     probe: Reviewer reads the tests and their output; spot-checks on the real Windows machine at build gate.
     expect: {}
   - id: AC-2
@@ -53,7 +53,7 @@ criteria:
   - id: AC-3
     text: On a real Windows machine the prompt appears, is quick to answer with one click or key, does not steal typing focus in a way that sends keystrokes into it, and its yes/no/ignore outcomes match AC-1 and AC-2. Serves O2, S1.
     check: usage
-    probe: Real Windows machine evidence (a short session log with three prompts answered yes, no and ignored, and the dated folder listing).
+    probe: Windows evidence from the windows-latest end-to-end CI job where it can drive the step, otherwise the Atlas logged ship decision plus post-release monitoring (a short session log with three prompts answered yes, no and ignored, and the dated folder listing).
     expect: {}
 ```
 
@@ -72,7 +72,7 @@ criteria:
   - id: AC-2
     text: The daily run treats a refused capture exactly as a missing one ("no screenshot"), never as idle, and the capture log records only that a capture was skipped, with no content. Serves B3, B4.
     check: judged
-    bar: The day skeleton for a fixture day with skipped captures is byte-identical to the same day with captures; the log line names the time and "skipped" only.
+    bar: For a fixture day with skipped captures and the same day with captures, the skeleton's breaks, work start, work end, active spans and every active ratio are identical; only the captures line may differ (US-2/AC-3 requires it to). The log line names the time and "skipped" only.
     probe: Reviewer compares skeleton outputs and reads the log line.
     expect: {}
   - id: AC-3
@@ -138,13 +138,13 @@ criteria:
   - id: AC-1
     text: The repository suite is green from the repo root. Serves S4.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests, skills/daily/tests]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
   - id: AC-2
     text: Pyright reports zero errors from the repo root. Serves S4.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [pyright]}
-    expect: {exit: 0, regex: "(^|\\n)0 errors"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
 ```
 
 ## Edge cases
@@ -166,3 +166,4 @@ criteria:
 
 ## Changes
 <!-- YYYY-MM-DD: <IDs changed> — <reason>; linked updates: plan/tasks/tests; re-review: <card> -->
+- 2026-10-20: US-5/AC-1, AC-2 — F1: auto probes now read the `Checks` workflow conclusion on main (pytest + pyright on windows-latest and ubuntu-latest) instead of bare python/pyright in a shared checkout; US-2/AC-2 bar scoped so only the captures line may differ (F4); US-1/AC-1 bar names mocked dialog no/timeout/failure. Reason: spec gate t_a6ab865c CHANGES REQUIRED. Linked updates: plan/tasks re-point on the plan PRs. Re-review: spec re-gate (Atlas, t_3c4f0453).
