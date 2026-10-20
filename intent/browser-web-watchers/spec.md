@@ -1,7 +1,7 @@
 # Spec: First-class browser address evidence in Firefox, Chrome and Edge
 
 **Intent:** [intent.md](intent.md), Accepted 2026-10-20 (Connor, in conversation with Hermes: "Yeah I think that sounds good"; recorded in the intent's Status line)
-**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec gate pending)
+**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec re-gate pending)
 **Serves:** O1–O4, S1–S4, B1–B5 (inventory below)
 
 ## Summary
@@ -88,12 +88,12 @@ criteria:
   - id: AC-2
     text: On Edge, the install link and the verification both work and the web watcher's bucket for this host is found with a recent event. Serves S2.
     check: usage
-    probe: Real Windows + Edge evidence (setup transcript showing the store page opened in the named profile, the bucket found, and its last event within minutes).
+    probe: Windows evidence from the windows-latest end-to-end CI job where it can drive the step, otherwise the Atlas logged ship decision plus post-release monitoring (setup transcript showing the store page opened in the named profile, the bucket found, and its last event within minutes).
     expect: {}
   - id: AC-3
     text: Setup verifies each browser's web watcher by its own bucket and recent event, reporting a browser where it is missing by name rather than in aggregate. Serves O3.
     check: judged
-    bar: On a fixture bucket list with Edge and Firefox web watcher buckets but no Chrome one, setup reports Edge and Firefox verified and Chrome missing by name.
+    bar: On a fixture bucket list with Edge and Firefox web watcher buckets but no Chrome one, setup reports Edge and Firefox verified and Chrome missing by name. On a fixture where Edge and Chrome share the one `aw-watcher-web-chrome_<host>` bucket (as real Edge does), a browser is reported verified only when a recent event is corroborated by that browser's foreground window, and otherwise reported unproven by name with one plain retry step — never verified on the shared bucket alone. Fixtures copy the real bucket and event shapes of aw-watcher-web for Firefox, Chrome and Edge.
     probe: Reviewer reads setup's verification against the fixture bucket list.
     expect: {}
 ```
@@ -125,8 +125,8 @@ criteria:
   - id: AC-4
     text: No shipped file names a real client host or name; the neutrality and redaction guards cover the new fixtures. Serves B4.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests/test_provider_neutrality.py, tests/test_redaction.py]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
 ```
 
 ```yaml
@@ -144,13 +144,13 @@ criteria:
   - id: AC-2
     text: The repository suite is green from the repo root. Serves S4.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests, skills/daily/tests]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
   - id: AC-3
     text: Pyright reports zero errors from the repo root. Serves S4.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [pyright]}
-    expect: {exit: 0, regex: "(^|\\n)0 errors"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
 ```
 
 ## Edge cases
@@ -176,3 +176,4 @@ criteria:
 
 ## Changes
 <!-- YYYY-MM-DD: <IDs changed> — <reason>; linked updates: plan/tasks/tests; re-review: <card> -->
+- 2026-10-20: US-4/AC-4, US-5/AC-2, AC-3 — F1: auto probes now read the `Checks` workflow conclusion on main (pytest + pyright on windows-latest and ubuntu-latest) instead of bare python/pyright in a shared checkout; US-3/AC-3 bar covers the shared Edge/Chrome bucket and real aw-watcher-web shapes (plan Q1). Reason: spec gate t_a6ab865c CHANGES REQUIRED. Linked updates: plan/tasks re-point on the plan PRs. Re-review: spec re-gate (Atlas, t_3c4f0453).

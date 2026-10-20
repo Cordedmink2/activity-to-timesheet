@@ -70,3 +70,15 @@ Priorities: one source of truth; user effort; plain language for non-technical u
 - Saying "I've got a new client" reaches the onboarding path in one step and updates the context
   file and rules together.
 - `pytest` and `pyright` green per AGENTS.md.
+
+## Clarifications
+### Session 2026-10-20 (Atlas, delegated)
+Connor delegated every decision reserved for him across these five intents to Atlas on 2026-10-20
+("Have atlas decide all that. This project needs to be fully finished up now."; card t_3c4f0453).
+Foundational refusals and this accepted intent text are not delegated and are unchanged.
+- Feedback path from the setup menu (plan Q1) → drafts and hands over only; it never posts. The
+  daily run's existing file-after-explicit-yes route is unchanged. Why: the menu is a new entry
+  point and B1 says nothing leaves the machine without the user.
+- No new install needing administrator rights is added (stays Reserved).
+- Release cut → Atlas cuts it once every build gate has merged and `Checks` is green on main;
+  the CHANGELOG records that Connor delegated this release on 2026-10-20.
