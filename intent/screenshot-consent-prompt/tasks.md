@@ -19,7 +19,7 @@ serves: US-1/AC-1, US-1/AC-2, US-2/AC-1, D2, D7
 
 ### T3 — Skip lines in the log, and the daily capture line
 serves: US-2/AC-2, US-2/AC-3, US-1/AC-1, D4, D5
-- Test first: (a) a skip writes exactly one line matching `^\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] skipped$` to `capture.log` and nothing else anywhere under `dest`; a failed prompt writes `prompt-error`, not `skipped`; (b) `captures(date)` returns `skipped` counted for that date only; (c) `render_text` prints `none for this date, N skipped by you  <- not a dead task` for zero ticks with skips, appends `, N skipped by you` for ticks with skips, and the existing dead-task line for zero ticks with no skips; (d) every existing golden is byte-identical.
+- Test first: (a) a skip writes exactly one line matching `^\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] skipped$` to `capture.log` and nothing else anywhere under `dest`; a failed prompt writes `prompt-error`, not `skipped`; (b) `captures(date)` returns `{ "count": 0, "last": null }` with no `skipped` key when there are no skips (matching existing `golden/*.json` byte-for-byte), and adds a `skipped` count only when it is greater than zero; (c) `render_text` prints `none for this date, N skipped by you  <- not a dead task` for zero ticks with skips, appends `, N skipped by you` for ticks with skips, and the existing dead-task line for zero ticks with no skips; (d) every existing golden is byte-identical.
 - Do: add the log lines in `capture_once`; extend `captures()` and the `captures:` line in `render_text`. Change nothing else in the skeleton.
 - Evidence: <test output; existing `test_afk_blocks` goldens unchanged>
 
@@ -50,8 +50,8 @@ serves: US-4/AC-1, US-4/AC-2, US-4/AC-3, D6
 ### T8 — Real-Windows walk (PENDING-REAL-WINDOWS)
 serves: US-1/AC-3, D10
 - Test first: write the job assertions first and see them fail without the feature. The job is the one on `windows-latest` in `.github/workflows/checks.yml` created by the earlier builds; extend it with new named steps. Do not create a second job; if it is not on main when this build starts, stop and `kanban_block(needs_input)` to atlas.
-- Do: on the runner (1) run the real capture script with the prompt on and the dialog auto-answered yes through the test hook (D10): assert one image per monitor with today's names in the dated folder; (2) auto-answered no: assert no file for that time and one `skipped` log line; (3) call the real `MessageBoxTimeoutW` with a short timeout and assert it returns 32000 and the script then skips (fail closed); (4) assert `capture.log` and the folder listing after each.
-- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: a person's click on the real dialog, whether it steals typing focus, and a locked-screen tick. Never marked passed; no step for Connor.
+- Do: a test harness imports `screenshot_capture.py` and calls `capture_once(..., consent=fake)` for yes/no; assert one normal image per monitor for yes and no image plus one `skipped` line for no. No environment variable, test-only command-line switch or shipped path auto-answers consent. (3) call the real `MessageBoxTimeoutW` with a short timeout and assert it returns 32000 and the script then skips (fail closed); (4) assert `capture.log` and the folder listing after each.
+- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: a person's click on the real dialog; focus theft and the `MB_YESNO` Y accelerator (typing `y` while the box has focus answers Yes); and a locked-screen tick. Topmost is used without `MB_SETFOREGROUND`; never mark focus safety passed. If real-Windows evidence shows focus theft, record it and remove the Y accelerator so consent requires an explicit mouse click before shipping. Never marked passed; no step for Connor.
 - Evidence: <windows-latest run URL, head SHA, job output lines per assertion>
 
 ### T9 — Suite and type check
@@ -63,5 +63,5 @@ serves: US-5/AC-1, US-5/AC-2, D11
 ### T10 — Consent paths with the dialog mocked: yes, no, timeout, dialog failure
 serves: US-1/AC-1, US-1/AC-2, D8, D9
 - Test first: a table-driven test of `capture_once` with `ask_consent`'s `ctypes` call mocked to return each of: 6 (yes), 7 (no), 32000 (timeout), 2 (closed), an `OSError` and an `AttributeError` (missing export), and with the `MessageBoxW`-in-a-thread fallback mocked to hang past the timeout. Assert: only yes writes images (same names and folder as an unprompted capture); every other outcome writes no file, no temp file and one log line with the time and `skipped` or `prompt-error` only; `grab` never runs before the answer; the default button is No and the timeout is at most 20 s and below the capture interval.
-- Do: add the table to `skills/daily/tests/test_screenshot_capture.py`; the shipped code has no test-only branch (the D10 hook is a seam argument, not a shipped switch).
+- Do: table-driven mocked tests exercise yes/no/timeout/failure and call `capture_once(..., consent=fake)` through the harness; no shipped test-only branch or auto-consent path is added.
 - Evidence: <pytest output; each row's outcome>
