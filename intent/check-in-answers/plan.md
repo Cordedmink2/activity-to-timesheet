@@ -1,6 +1,6 @@
 # Plan: Check-in answers bill work the computer couldn't see
 
-**Spec:** [spec.md](spec.md) (spec gate t_a6ab865c returned CHANGES REQUIRED at 9b2c56d; this plan is written against 9b2c56d and is re-checked when atlas amends the spec, see Risks)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
+**Spec:** [spec.md](spec.md) (re-gated and merged at 41b5670 via PR #107; this plan is re-pointed to 41b5670)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
 **Author:** dev  **Date:** 2026-10-20  **Status:** Draft (plan gate: t_57316f22)
 
 ## Approach
@@ -28,7 +28,7 @@ Personal wins over a client term, by decision D6.
 
 **7. Windows persistence.** `skills/daily/scripts/setup_checkin_watcher.ps1` registers one per-user scheduled task that starts the watcher at logon, `RunLevel Limited`, interactive logon type (the dialog needs the user's desktop), no admin, `-DryRun` and `-Force` as in `setup_screenshot_pipeline.ps1`. It restarts on failure. Uninstall is `Unregister-ScheduledTask` plus the package's own uninstall, stated in the reference. Linux and macOS persistence is settled by the spike (T1): `aw-qt` autostart if the watcher is discovered there, otherwise a documented per-user unit.
 
-**8. Real-Windows proof.** No Windows host is reachable. CI `windows-latest` runs the `.ps1` in `-DryRun` and the script's tests. US-4/AC-2 and the intent's S1 walk are recorded PENDING-REAL-WINDOWS with exact steps (T14), never passed.
+**8. Windows proof (one shared end-to-end CI job).** No Windows host is reachable, and Connor does not run steps (Atlas, 2026-10-20). This build creates the repository's one shared Windows end-to-end job, a job in `.github/workflows/checks.yml` on `windows-latest` (D16, T14). It installs `aw-server` and the check-in watcher as setup does, injects the away answers "call with <client>" and "lunch" through the watcher's own bucket `aw-watcher-ask-away_<host>`, runs the daily scripts for that day and asserts the outcomes (US-1/AC-5, US-4/AC-2). Later builds (web watchers, retention, consent) extend the same job. What CI cannot drive (a person answering the dialog, focus behaviour) is stated plainly in the PR as not verified, and the ship decision is Atlas's; it is never marked passed and never written as a step for Connor.
 
 ## Research and spike (autonomous prerequisites)
 
@@ -54,26 +54,30 @@ Problem and context: established in the intent, `/home/ubuntu/artefacts/activity
 - D9: New instruction detail goes to a reference file; SKILL.md net growth is tested; this build starts after PR #106 (#57) is on main, so the 5,000-word ceiling can be checked rather than assumed.
 - D10: "Off" is a line under `## Preferences` in `.context.md`, where the other overridable preferences already live. Alternative: an environment setting (needs the declared-configuration machinery for a fact about one person).
 - D11: The shipped personal list is small, generic and ships no user words: lunch, break, coffee, tea, school run, school pickup, gym, commute, errand, personal, nap, doctor, dentist, kids. Words match whole, case-insensitive. The user's exclusions extend it. Alternative: a long list (more wrong breaks, more surprises).
-- D12: US-4/AC-2 and the intent's S1 walk are PENDING-REAL-WINDOWS until a person runs the steps in T14.
+- D12: US-1/AC-5 and US-4/AC-2 are proven by the shared Windows end-to-end CI job (D16, T14). Anything CI cannot drive is stated as not verified and left to Atlas's ship decision; no step is written for Connor.
 - D13: Docs: new ADR-0009 (check-in answers are questions, extends ADR-0008, because a plain reading of "an answer says what I did" invites drafting a block); decision-log entry; `CONTEXT.md` glossary term **Check-in question** (the vocabulary test reads it); CONTRIBUTING instrument row; CHANGELOG in-progress section per AGENTS.md § Releasing, no tag, no version bump.
 - D14: In-work prompt cadence (outcome 2): check-in itself prompts only on return from away; periodic prompts come from `aw-watcher-ask` on Linux and macOS, defaulted to two weekday prompts (schedule confirmed in T1/H4), user-adjustable, never offered on Windows. Block-end prompts need PR #5 and are out of scope (E9).
-- D15: Verification runs from the build worktree's own venv, `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright`, not the shared checkout (spec gate F1). The two `auto` probes in the spec use bare `python` and `pyright`; if atlas pins them, the plan follows.
+- D15: Verification is the build worktree's own venv, `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, plus `Checks` green on the PR head (windows-latest and ubuntu-latest). The spec's `auto` probes now read the latest completed `Checks` conclusion on main, so at the build gate the run's `headSha` must contain the build.
+- D16: One shared Windows end-to-end job in `checks.yml` on `windows-latest` (Atlas, 2026-10-20; the repo is public, so minutes are free). This build (first in the serial order) creates it; later builds add steps. Alternative: a separate workflow (a second place to keep green). Why: one install of aw-server, one place the spec probes read.
+- D17: Tests go beyond pytest and pyright. Fixtures copy the real shapes: `aw-watcher-ask-away_<host>` events of type `afktask` with `data.message` over the away gap, checked against the pinned watcher's source (T1, T19). A fixture for the E1 overlap (a stretch over an uncorroborated calendar event) is in T5 and the US-1/AC-1 bar.
+- D18: Block check-ins (upstream PR #5) are not planned: reviewer t_d30c6616 FAILED PR #5 at aada3d3. The build ships return-from-AFK check-ins only (Atlas, 2026-10-20). Setup never offers PR #5.
 
 ## Coverage
 
 | Criterion | Plan section | Tasks |
 |---|---|---|
-| US-1/AC-1 | Approach 1 to 3, 5 | T2, T3, T4, T5, T10, T14 |
+| US-1/AC-1 | Approach 1 to 3, 5, D17 | T2, T3, T4, T5, T10, T14, T19 |
 | US-1/AC-2 | Approach 4 | T5, T10, T12 |
 | US-1/AC-3 | Approach 4 | T6, T10 |
 | US-1/AC-4 | Approach 1, D3 | T7 |
+| US-1/AC-5 | Approach 8, D12, D16 | T14, T19 |
 | US-2/AC-1 | Approach 2, D6, D11 | T4 |
 | US-2/AC-2 | Approach 2 | T4 |
 | US-3/AC-1 | Approach 3, 4 | T3, T5, T10 |
 | US-3/AC-2 | Approach 3, 4 | T5, T7, T10 |
 | US-3/AC-3 | Approach 2, D7 | T3, T4 |
 | US-4/AC-1 | Approach 6, D14 | T11, T13, T15 |
-| US-4/AC-2 | Approach 6, 7, 8, D2 | T1, T9, T11, T14 |
+| US-4/AC-2 | Approach 6, 7, 8, D2, D16 | T1, T9, T11, T14 |
 | US-4/AC-3 | Approach 6, D10 | T8, T13, T15 |
 | US-4/AC-4 | Approach 6, D4 | T1, T9, T13 |
 | US-5/AC-1 | Approach 1, D3 | T2, T7, T8 |
@@ -82,14 +86,15 @@ Problem and context: established in the intent, `/home/ubuntu/artefacts/activity
 | US-6/AC-1 | Approach 1, D5, D11 | T6, T12, T16 |
 | US-6/AC-2 | Approach 1, 4 | T6, T12 |
 
-Edge cases: E1 T5; E2 T5; E3 T5; E4 T4; E5 T3; E6 T6; E7 T3; E8 T8; E9 documented in T13 and not built. Spec gate finding F2 (a `usage` criterion for S1) is covered by D12 and T14; its criterion ID is added to the table when atlas adds it.
+Edge cases: E1 T5; E2 T5; E3 T5; E4 T4; E5 T3; E6 T6; E7 T3; E8 T8; E9 documented in T13 and not built. Spec gate finding F2 is US-1/AC-5, covered by D12, D16 and T14.
 
 ## Risks and rollback
 
-- Spec not yet approved or merged (gate returned CHANGES REQUIRED; PR #107 open). → The plan is anchored to 9b2c56d. If atlas changes an AC, T-IDs that serve it are re-pointed before the build starts, and the plan is re-gated. Build does not start until the spec is gated and merged.
+- The spec changes again. → The plan is anchored to 41b5670 (merged). If atlas changes an AC, T-IDs that serve it are re-pointed before the build starts.
 - `SKILL.md` and `setup/SKILL.md` are hotspots (#57/PR #106, #48, the guided-setup build). → Build starts from fresh origin/main after #106; edits are small and additive; flag a hotspot comment if the diff collides.
 - A bucket-name collision (D4) reads the wrong watcher. → Fixture with both buckets present, T3.
 - PyPI 0.0.6 turns out stale on Windows. → H1 exit: pinned org commit. If neither works without PR #5, brief atlas with an amendment (outcome 1 alone is the accepted fallback).
 - A personal answer drafted as work. → Cannot happen: only a user's yes makes a block (T5, T10), and the classifier errs to break (D6). Test cases cover each personal fixture.
-- Real-Windows proof is absent. → Recorded as PENDING-REAL-WINDOWS (T14); never claimed passed.
+- CI cannot drive a human click or focus behaviour. → Stated in the PR as not verified; Atlas decides ship or hold; never marked passed (T14).
+- The Windows job is flaky or slow (aw-server install). → Pin versions, cache pip, and keep the job to the scenarios in T14; a red job blocks the PR like any `Checks` job.
 - Rollback: every change is additive. Revert the PR; with the script gone, nothing in the skeleton, timeline or calendar wrapper changes (T7 proves they never read it). For a user: Unregister-ScheduledTask and pipx uninstall (text in the reference, T13); remove the `Check-in watcher:` line from `.context.md` (inert without the script). No data migration; `checkin_questions` in an old `harvest_responses.json` is ignored by older versions.

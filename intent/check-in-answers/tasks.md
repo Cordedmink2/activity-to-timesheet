@@ -3,7 +3,7 @@
 **Plan:** [plan.md](plan.md)  **Spec:** [spec.md](spec.md)
 Check: `python3 /home/ubuntu/.hermes/sdd-skills/sdd-plan-and-tasks/scripts/trace_check.py intent/check-in-answers` must print OK.
 
-Rules for every task: tests first (write the failing test, run it, see it fail, then build). Fixtures use only the synthetic names ACME / BETA / Ledger / Nimbus and `example.*` hosts, as `skills/daily/tests/scenarios.py` does. Run from the worktree's own venv: `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright`. Build starts from fresh origin/main, after the spec is gated and merged and after PR #106 (#57) is on main. Evidence is filled in at build time and is the command with its observed output, never a claim. Every `check: usage` item stays PENDING-REAL-WINDOWS until a person does it.
+Rules for every task: tests first (write the failing test, run it, see it fail, then build). Fixtures use only the synthetic names ACME / BETA / Ledger / Nimbus and `example.*` hosts, as `skills/daily/tests/scenarios.py` does. Run from the worktree's own venv: `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, and finish with `Checks` green on the PR head. Build starts from fresh origin/main (spec 41b5670 is merged) and after PR #106 (#57) is on main. Evidence is filled in at build time and is the command with its observed output, never a claim. A `check: usage` item is proven by the shared Windows end-to-end CI job (T14); what CI cannot drive is stated as not verified for Atlas's ship decision, never marked passed and never a step for Connor.
 
 ### T1 — Spike: confirm the watcher facts the build depends on (H1 to H4)
 serves: D1, US-4/AC-2, US-4/AC-4
@@ -83,11 +83,12 @@ serves: US-4/AC-1, US-4/AC-3, US-4/AC-4
 - Do: add the setup step and `skills/setup/references/checkin-watchers.md` (install, verify, uninstall, PR #5 not used and why).
 - Evidence: <pytest output>
 
-### T14 — Real-Windows walk, recorded PENDING-REAL-WINDOWS
-serves: US-4/AC-2, US-1/AC-1
-- Test first: none can run here. Write the exact steps and the evidence each must leave, so a person can run them without us: (1) clean Windows machine, run setup, accept the check-in watcher; transcript shows install and the task registered; (2) step away 10 minutes, answer "call with ACME" (a client of the tester's own); (3) bucket `aw-watcher-ask-away_<host>` has the event; (4) run daily for today: the stretch appears under the table as a question quoting the answer, not drafted as a block; (5) answer yes: it is added for that client; nothing posts before the table is confirmed; (6) answer "lunch" on another away: the stretch stays a break; (7) sign out and in: the watcher is running; (8) uninstall both: the day's output is as before.
-- Do: record as PENDING-REAL-WINDOWS in the PR and in the product-health results; never mark passed. If atlas adds a `usage` criterion for S1 (gate finding F2), this task serves it too.
-- Evidence: <PENDING-REAL-WINDOWS until a person supplies the transcript>
+### T14 — Shared Windows end-to-end CI job (creates it; later builds extend it)
+serves: US-4/AC-2, US-1/AC-5, US-1/AC-1, D12, D16
+- Test first: write the job's assertions before the steps, in `tests/` or the job's own script, and see them fail on a run without the feature. The job lives in `.github/workflows/checks.yml` as a job on `windows-latest` (D16).
+- Do: (1) install `aw-server` and `aw-watcher-checkin` the way setup installs them (pinned from T1; `setup_checkin_watcher.ps1` run for real, task registered, checked with `Get-ScheduledTask`); (2) start `aw-server` on a non-default port with its own data directory; (3) inject the away answers \"call with ACME\" and \"lunch\" through the watcher's own bucket `aw-watcher-ask-away_<host>` as real `afktask` events with `data.message` (shape from T19), plus the AFK bucket; (4) run the daily scripts for that day and assert: the \"call with ACME\" stretch is a question quoting the answer, with no block and no entry before confirmation (test provider); a yes adds it for ACME; the \"lunch\" stretch stays a break; (5) uninstall and assert the day's output is as before. Keep the job's steps in separate, named functions so the web watchers, retention and consent builds add steps without editing this one.
+- Not verified by CI, stated in the PR and in the decision log for Atlas's ship decision: a person answering the real dialog and focus behaviour. Never marked passed; no step for Connor.
+- Evidence: <windows-latest CI run URL, head SHA, and the job's output lines for each assertion>
 
 ### T15 — Fresh-agent dry runs of the setup offer
 serves: US-4/AC-1, US-4/AC-3
@@ -112,3 +113,15 @@ serves: D13, D1
 - Test first: list every temporary artifact before removing it: the T1 scratch venv, the scratch clone, the throwaway `aw-server` process and its data directory, any fixture dumps.
 - Do: after the T1 observations are copied into the decision log and the PR, stop the throwaway server and remove those scratch artifacts, nothing else; confirm with `ls` and `ps` that none remains. Name the owner of the pinned watcher version: dev, re-checked when atlas next reviews the plugin; a dated action to look at the upstream release state is added to the decision log. Health check the user can run: `checkin_answers.py --probe`.
 - Evidence: <ls and ps output after removal; the dated action line>
+
+### T19 — Real-shape fixtures and the E1 overlap fixture
+serves: US-1/AC-1, US-1/AC-5, D17
+- Test first: a test that the fixture builder emits a check-in bucket exactly as the watcher does: bucket id `aw-watcher-ask-away_<host>`, type `afktask`, one event over the away gap, `data` holding `message` (and any other key the pinned watcher writes). The expected shape is copied from the watcher's source at the version pinned in T1, and the source file and line are named in the test. A second test builds the E1 day: a stretch overlapping an uncorroborated calendar event, and asserts exactly one question citing both.
+- Do: add the fixture builders to `skills/daily/tests/scenarios.py` (synthetic ACME / BETA names, `example.*` hosts) and use them in T3, T4, T5, T10 and T14.
+- Evidence: <pytest output; the watcher source path and line the shape was copied from>
+
+### T20 — Final verification on the PR head
+serves: US-5/AC-2, US-5/AC-3, D15
+- Test first: none new; this task is the gate command set.
+- Do: from the build worktree's own venv run `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`. Push. Wait for `Checks` (windows-latest, ubuntu-latest, and the Windows end-to-end job) to finish green on the PR head, and record its `headSha`.
+- Evidence: <command output; `gh run` URL and headSha>
