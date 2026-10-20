@@ -166,6 +166,10 @@ Show, for every block, its time range, duration, client and the note it will pos
 
 Wait for the answer; edit per their input.
 
+### Step 6b — Final verify
+
+Once the user is done editing, check the post preview before anything else: one read-only subagent per block on the cheapest model, each re-reading its start, end, client and any hidden switch against the timeline, AFK data and captures; wait for all of them, then verify each finding yourself (a finding is a lead, not a fact). If anything changed, reprint the whole table with the changes marked. No subagents: run the checklist yourself. Never skipped. Brief and checklist: `references/final-verify.md`.
+
 ### Step 7 — Write the timesheet .md *(optional — ask first)*
 
 Harvest is the system of record. **Ask** first; if wanted, write `Timesheets/<date>_timesheet.md` per `references/output-format.md`.
@@ -185,7 +189,7 @@ First self-check every line of the proposal:
 
 Then put the posting question: how many time entries this will create, and for each one its hours, client, project and task, with `[Support]` where it applies, and its note exactly as it will post. When the skeleton's header read `derived from this machine`, add the zone: times in that zone, derived from this machine, and that `TIMESHEET_TIMEZONE` pins it (a configured zone is not announced). Close on yes, no, or edit a named block.
 
-**An explicit "yes" or equivalent earns `--confirm` in Step 9** — without it nothing is written. Edits loop back to Step 6.
+**An explicit "yes" or equivalent earns `--confirm` in Step 9** — without it nothing is written. Edits loop back to Step 6, then through Step 6b again.
 
 ### Step 9 — Post to the provider
 
@@ -233,6 +237,6 @@ Present what the run revealed, **one fact per ask, as the exact diff**: this use
 
 ## Files in this skill
 
-`references/scripts.md` lists every script with its flags; read it before running one you have not used this session. The references: `first-run.md` (first-run setup, screenshot health check, category maintenance), `context.md.example` (the `.context.md` template), `classification-rules.md` (the rubric, read at Step 2 on every run), `disambiguation.md` (Step 5), `day-reading.md` (mechanism behind Steps 1–3 and the screenshot folder), `review-and-posting.md` (mechanism behind Steps 6–12), `scripts.md`, `activitywatch.md`, `output-format.md`, `catalog-refresh.md`, `new-client-work.md`, `reporting-issues.md`.
+`references/scripts.md` lists every script with its flags; read it before running one you have not used this session. The references: `first-run.md` (first-run setup, screenshot health check, category maintenance), `context.md.example` (the `.context.md` template), `classification-rules.md` (the rubric, read at Step 2 on every run), `disambiguation.md` (Step 5), `final-verify.md` (Step 6b), `day-reading.md` (mechanism behind Steps 1–3 and the screenshot folder), `review-and-posting.md` (mechanism behind Steps 6–12), `scripts.md`, `activitywatch.md`, `output-format.md`, `catalog-refresh.md`, `new-client-work.md`, `reporting-issues.md`.
 
 `.env.example` is the credential template. `docs/CONTRIBUTING.md` and `docs/skills/daily/decision-log.md` are in the repository, not an installed copy: **for changing this skill, not running it**.

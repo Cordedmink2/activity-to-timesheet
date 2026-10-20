@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting and where it goes; with a section it carries on and says the old ones are ignored.
 
 ### Changed
+- **`/daily` checks the table once more before the confirmation gate** (#48). A new Step 6b runs after you finish editing the proposed table: one read-only subagent per block, on the cheapest model the harness offers, re-checks the block's start, end, client/project and any hidden client switch against the timeline, AFK record and captures. The main agent waits for all of them and verifies each finding itself before changing anything; if anything changed, the whole table is reprinted with the changes marked. With no subagents it runs the same checklist itself. Never skipped. Brief and checklist: `references/final-verify.md`. Nothing for a user to do.
 - **`skills/daily/SKILL.md` is under its word ceiling** (#57): 11,806 words to 4,845, against 5,000. The
   guards a run acts on stay in `SKILL.md`; the mechanism and worked cases moved to
   `references/day-reading.md` (Steps 1–3, screenshot folder, and the Step 4–5 and data-source wording the trim first dropped), `references/review-and-posting.md`
