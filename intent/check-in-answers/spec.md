@@ -1,7 +1,7 @@
 # Spec: Check-in answers bill work the computer couldn't see
 
 **Intent:** [intent.md](intent.md), Accepted 2026-10-20 (Connor, in conversation with Hermes: "Yeah I think that sounds good"; recorded in the intent's Status line)
-**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec gate pending)
+**Author:** atlas  **Date:** 2026-10-20  **Status:** Draft (spec re-gate pending)
 **Serves:** O1–O4, S1–S5, B1–B5 (inventory below)
 
 ## Summary
@@ -44,7 +44,7 @@ criteria:
   - id: AC-1
     text: For a recorded day whose check-in data holds a work answer over a break, the run lists one question under the table giving the stretch's start and end, the answer in the user's own words, and the client the words point to (by the client terms in the workspace context file). Serves O1, S1.
     check: judged
-    bar: On the fixture day, the question appears under the table (not in it), quotes the answer verbatim, gives start and end times matching the check-in event clipped to the break, and names the client whose context-file terms the answer contains. Where the answer points to no known client, the question asks which client instead of naming one.
+    bar: On the fixture day, the question appears under the table (not in it), quotes the answer verbatim, gives start and end times matching the check-in event clipped to the break, and names the client whose context-file terms the answer contains. Where the answer points to no known client, the question asks which client instead of naming one. On a second fixture day where the stretch overlaps an uncorroborated calendar event (E1), exactly one question is listed, citing both the event and the answer. Fixture data copies the real aw-watcher-checkin bucket shape (`aw-watcher-ask-away_<host>`, answer in `data.message`).
     probe: Reviewer runs the daily workflow against the recorded fixture day that carries a check-in answer over a break, and reads the rendered review.
     expect: {}
   - id: AC-2
@@ -64,6 +64,11 @@ criteria:
     check: judged
     bar: The skeleton output for the fixture day with the check-in bucket present is byte-identical to the output with it removed.
     probe: Reviewer compares the two skeleton outputs for the fixture day (and the automated test that pins this).
+    expect: {}
+  - id: AC-5
+    text: On a real Windows machine with the check-in watcher installed, stepping away about 10 minutes and answering "call with <client>" makes `daily` for today list that stretch as a question quoting the answer, not a drafted block; yes adds it for that client; nothing posts until the table is confirmed; answering "lunch" instead leaves the stretch a break. Serves O1, S1, S2, B2.
+    check: usage
+    probe: Real Windows machine evidence (PENDING-REAL-WINDOWS, on the one for-connor checklist) — the daily review text for the test day and the provider showing no entry before confirmation.
     expect: {}
 ```
 
@@ -159,13 +164,13 @@ criteria:
   - id: AC-2
     text: The repository suite and type check are green from the repo root. Serves S5.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests, skills/daily/tests]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
   - id: AC-3
     text: Pyright reports zero errors from the repo root. Serves S5.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [pyright]}
-    expect: {exit: 0, regex: "(^|\\n)0 errors"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
 ```
 
 ```yaml
@@ -177,8 +182,8 @@ criteria:
   - id: AC-1
     text: No shipped file contains a user answer, client name or host; the existing neutrality and redaction guards cover the new fixtures and instructions. Serves B5.
     check: auto
-    probe: {kind: command, timeout: 120, cwd: /home/ubuntu/Projects/Billables, argv: [python, -m, pytest, -q, tests/test_provider_neutrality.py, tests/test_redaction.py]}
-    expect: {exit: 0, regex: "[0-9]+ passed"}
+    probe: {kind: command, timeout: 60, argv: [gh, run, list, -R, Cordedmink2/activity-to-timesheet, --workflow, Checks, --branch, main, --status, completed, --limit, "1", --json, conclusion, --jq, ".[0].conclusion"]}
+    expect: {exit: 0, regex: "^success$"}
   - id: AC-2
     text: Answers are read only from the local activity source and are not copied anywhere except the user's own workspace record of their rulings; a drafted bug report redacts them. Serves B2.
     check: judged
@@ -188,7 +193,7 @@ criteria:
 ```
 
 ## Edge cases
-- E1: A check-in stretch overlaps an uncorroborated calendar event → one question citing both the event and the answer, not two. Covered by US-1/AC-1 (bar extended at plan time with a fixture).
+- E1: A check-in stretch overlaps an uncorroborated calendar event → one question citing both the event and the answer, not two. Covered by US-1/AC-1 (second fixture day in its bar).
 - E2: A check-in stretch lies inside a corroborated calendar block already drafted → the answer is context only; no extra question. Covered by US-1/AC-2.
 - E3: The check-in gap is shorter than the skeleton's break threshold, so the skeleton calls it active → treated as an in-work answer (US-3), never as a question. Covered by US-3/AC-2.
 - E4: The answer names two clients → the question names both and asks which (or whether to split); never guessed. Covered by US-1/AC-1.
@@ -215,3 +220,4 @@ criteria:
 
 ## Changes
 <!-- YYYY-MM-DD: <IDs changed> — <reason>; linked updates: plan/tasks/tests; re-review: <card> -->
+- 2026-10-20: US-5/AC-2, AC-3, US-6/AC-1 — F1: auto probes now read the `Checks` workflow conclusion on main (pytest + pyright on windows-latest and ubuntu-latest) instead of bare python/pyright in a shared checkout; US-1/AC-5 added (F2, S1 real-Windows usage); US-1/AC-1 bar names the E1 fixture and real checkin bucket shape (W1). Reason: spec gate t_a6ab865c CHANGES REQUIRED. Linked updates: plan/tasks re-point on the plan PRs. Re-review: spec re-gate (Atlas, t_3c4f0453).

@@ -49,3 +49,13 @@ never lose unbilled evidence; privacy; least user effort.
   clean-up, that month's images are gone, its dates still appear in reconcile's index, and every
   unbilled day's images remain.
 - `pytest` and `pyright` green per AGENTS.md.
+
+## Clarifications
+### Session 2026-10-20 (Atlas, delegated)
+Connor delegated every decision reserved for him across these five intents to Atlas on 2026-10-20
+("Have atlas decide all that. This project needs to be fully finished up now."; card t_3c4f0453).
+Foundational refusals and this accepted intent text are not delegated and are unchanged.
+- A day with captures but no provider entries (weekend, evening) → never eligible (spec E3 fixed
+  to match B1/D1). Why: a day with no entries is not billed; deletion needs provider evidence.
+- Release cut → Atlas cuts it once every build gate has merged and `Checks` is green on main;
+  the CHANGELOG records that Connor delegated this release on 2026-10-20.
