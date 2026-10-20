@@ -1307,7 +1307,11 @@ the post command without `--confirm` first, added it only after the explicit yes
 refusal by posting the two named entries without closing the overlap, and recorded WOULD POST as
 not posted. Wording differences only: arm B also said 'looks fine' approved the Step 6 draft, not
 posting; arm A did not say so explicitly but still put the Step 8 question first. No behavioural
-difference. **Not shown:** that any of this holds at 3 reps; nothing here is a rung above 3.
+difference. **Rep ledger (per arm, A=baseline B=trimmed; each run can spawn 2 subagents):**
+calendar-and-guards reps 1-2 done, no difference (rep 2: both 5/6, same --cover, same E2 handling; A
+also invented a 12:30-12:40 exclusion, a baseline-only variation, not a guard B lost). already-billed-ruling
+rep 1 done. confirm-gate-and-dst rep 1 done. Still to run: calendar-and-guards rep 3;
+already-billed-ruling reps 2-3; confirm-gate-and-dst reps 2-3. **Not shown:** that any of this holds at 3 reps; nothing here is a rung above 3.
 Re-run all three scenarios with reps 2-3 per arm (needs a run with a higher subagent cap) before
 treating this as more than a reasoned change; if either arm differs, put that step's cut back.
 
