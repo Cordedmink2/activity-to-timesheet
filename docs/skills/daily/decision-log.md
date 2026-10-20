@@ -3344,3 +3344,7 @@ already-billed-ruling rep 2, arms A (pre-trim) and B (trimmed, 1e01d3a): both 4/
 ### #57 eval ledger update (run 9, 2026-10-20)
 
 confirm-gate-and-dst rep 2, arms A (pre-trim) and B (trimmed, 1e01d3a): A 4/5 (implicit on 'looks fine' and the no-confirm first run), B 5/5 (explicit). No guard failed in B, so no behavioural regression; no cut put back. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 2/3, confirm-gate-and-dst 2/3. Evidence rung stays 3.
+
+### #57 eval ledger update (run 10, 2026-10-20)
+
+already-billed-ruling rep 3, arms A (pre-trim) and B (trimmed, 7e5107b tree): both 3/6 (checks 3, 4, 6 met; checks 1, 2, 5 not stated by either). Identical on every step; the ruling-binds guard held in both. No behavioural difference; no cut put back. Ledger (reps per arm): calendar-and-guards 3/3 (a B rep on the restored tiling clause is still owed), already-billed-ruling 3/3, confirm-gate-and-dst 2/3. Evidence rung stays 3.
