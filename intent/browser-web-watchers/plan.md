@@ -1,6 +1,6 @@
 # Plan: First-class browser address evidence in Firefox, Chrome and Edge
 
-**Spec:** [spec.md](spec.md) (spec gate t_a6ab865c; specs at 9b2c56d, PR #107, not yet merged: this file's link resolves once it is)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
+**Spec:** [spec.md](spec.md) (re-gated and merged at 41b5670 via PR #107; this plan is re-pointed to 41b5670)  **Intent:** [intent.md](intent.md) (Accepted 2026-10-20)
 **Author:** dev  **Date:** 2026-10-20  **Status:** Draft (plan gate: child reviewer card t_64a0b93e)
 
 ## Problem and evidence (read before the approach)
@@ -30,7 +30,7 @@ One change to the data flow, one to setup, and nothing to the skeleton.
 4. **The skeleton is untouched.** `afk_blocks.py` reads only the AFK and window buckets and never imports the timeline. Nothing in this change edits it. A pinning test compares `day_skeleton()` output for every fixture day with and without web buckets, byte for byte (US-4/AC-1).
 5. **Setup.** After the guided-setup build lands, the step-2 text and its check (wherever that build placed them: `setup/references/checks.md` if it exists, else `setup/SKILL.md` step 2) gain: a store link per browser family, Edge steps (open the Chrome Web Store in the Edge work profile; Edge asks to allow extensions from other stores; one click), a one-line supported statement per browser, the managed-browser pointer to `references/endpoint-security.md` (spec E6), and URL in title still marked **required** for Chromium browsers (US-4/AC-3). A new small script `skills/daily/scripts/web_watchers.py` verifies each browser by its own bucket and recent event and names the missing one (D8).
 6. **Daily gains almost nothing.** One `!ADDR` bullet and one changed clause in the existing `activity_timeline.py` entry, offset by a cut elsewhere so the post-#106 5,000-word ceiling holds (T13, D12).
-7. **Evidence for judged criteria.** All fixtures are synthetic: `portal.client-a.example`, `portal.client-b.example`, `news.personal.example` (reserved `.example` TLD; no client host or name ships). The S1 instrument is a **paired Firefox/Edge fixture day**: same events, same sites, same clients, once with Firefox window titles and a `firefox` web bucket and no URL in title, once with Edge titles carrying the URL in title address and a `chrome` web bucket. Per-client browser minutes and unattributed minutes are compared in one test and recorded. The reviewer reruns it. Real Edge is PENDING-REAL-WINDOWS (T16).
+7. **Evidence for judged criteria.** All fixtures are synthetic: `portal.client-a.example`, `portal.client-b.example`, `news.personal.example` (reserved `.example` TLD; no client host or name ships). The S1 instrument is a **paired Firefox/Edge fixture day**: same events, same sites, same clients, once with Firefox window titles and a `firefox` web bucket and no URL in title, once with Edge titles carrying the URL in title address and a `chrome` web bucket. Per-client browser minutes and unattributed minutes are compared in one test and recorded. The reviewer reruns it. Real Edge is proven by the shared Windows end-to-end CI job (D14, T16); what CI cannot drive is stated as not verified for Atlas. Fixtures copy the real aw-watcher-web shapes (D15, T18).
 
 ## Autonomous-execution prerequisites
 - **Context established:** problem and benefit are above; the card's decisions (D3, D4, D5, D6, D9) are carried as written.
@@ -50,11 +50,14 @@ One change to the data flow, one to setup, and nothing to the skeleton.
 - D10: No-web identity. With no web-watcher events, `timeline()` returns the same dict as today (no new keys), and `main()` prints the same text and JSON. All new keys exist only when at least one web event was read. Pinned by a test over every golden day and scenario. — alternatives: always emit empty new keys (breaks byte identity, US-5/AC-1).
 - D11: Match host and path only (drop query and fragment). — alternatives: whole URL (a search for a client's name on a search engine, `?q=acme`, would attribute a personal search to the client: B3); host only (shared hosts cannot be told apart: spec E3). Why: personal browsing must not become billable because a word was in the URL.
 - D12: The word budget for `skills/daily/SKILL.md` is measured on post-#106 main; the change adds one bullet and one clause and removes at least as many words from the same step. A size test (the one #106 adds, or a new one) is the guard. If the offset cannot be found without cutting a rule, stop and send atlas the evidence.
+- D14: Windows proof is the shared end-to-end job on `windows-latest` in `.github/workflows/checks.yml` (Atlas, 2026-10-20), created by the earlier builds (check-in, guided setup). This build extends it with named steps and creates no second job. Steps: install `aw-server`, create `aw-watcher-web-firefox_<host>` and `aw-watcher-web-chrome_<host>` buckets (type `web.tab.current`) with real-shape events, run setup's per-browser verification (`web_watchers.py --browsers`), and assert Firefox and Chrome OK, Edge UNPROVEN on the shared bucket until a foreground Edge window event corroborates it, then OK; a missing browser is named. A real browser is not installed.
+- D15: Fixtures copy the real aw-watcher-web shapes, read from the extension source (`src/background/heartbeat.ts`, `client.ts`): bucket `aw-watcher-web-<browser>_<host>`, bucket type `web.tab.current`, event `data` = `{url, title, audible, incognito, tabCount}` plus `profile` only when the user named a profile. Edge reports as `chrome`, so Edge and Chrome share `aw-watcher-web-chrome_<host>`; newer extension versions detect `edge` for new installs but keep `chrome` for existing ones (`helpers.ts`), so both fixture shapes exist. T18 names the source file and line each shape was copied from.
+- D16: Verification is the build worktree's own venv, `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, plus `Checks` green on the PR head. The spec's `auto` probes read the latest completed `Checks` conclusion on main, so at the build gate the run's `headSha` must contain the build.
 - D13: No ADR. Every part is reversible by reverting the commits (new keys are additive, the new script is new, the setup text is prose). Findings go in the decision log, as AGENTS.md § Where a thing goes asks.
 
 ## Open questions (do not change scope)
-- Q1 (atlas): spec US-3/AC-3 reads as if Edge and Chrome had separate buckets, but Edge reports as `chrome`, so on a machine with both browsers one bucket serves both. D8 meets the AC as written on the fixture (renamed `edge` bucket) and proves the shared case by corroborating a recent event against the foreground window. If atlas wants the AC to name the shared-bucket case, that is a wording change to the bar, not scope.
-- Q2: Spec gate finding F1 (the auto probes use bare `python` and `pyright`) is open on #107. Build verification uses `.venv/bin/python -B -m pytest -q -p no:cacheprovider` and `.venv/bin/pyright` in the worktree whatever the final probe text.
+- Q1 (ruled by Atlas, 2026-10-20, under Connor's delegation; do not re-ask): keep D8. A shared Edge/Chrome bucket event counts as verified only when corroborated against the foreground window; otherwise the browser is UNPROVEN by name. The spec's US-3/AC-3 bar now names the shared-bucket case and real aw-watcher-web shapes.
+- Q2 (resolved, F1): the auto probes now read `Checks` on main. Build verification is D16.
 - Q3: US-1/AC-1's "within one sampling interval" is read as one web-watcher heartbeat interval; T2 confirms the number from the extension's config.
 
 ## Coverage
@@ -65,15 +68,15 @@ One change to the data flow, one to setup, and nothing to the skeleton.
 | US-2/AC-1 | Approach 1-3; D2 | T3, T6, T15 |
 | US-2/AC-2 | Approach 3; D6 | T8, T13, T15 |
 | US-3/AC-1 | Approach 5 | T12 |
-| US-3/AC-2 | Approach 5, 7 (PENDING-REAL-WINDOWS) | T16 |
-| US-3/AC-3 | Approach 5; D8; Q1 | T11 |
+| US-3/AC-2 | Approach 5, 7; D14 | T16, T18 |
+| US-3/AC-3 | Approach 5; D8, D15; Q1 | T11, T18 |
 | US-4/AC-1 | Approach 4; D5 | T5, T7, T9 |
 | US-4/AC-2 | Approach 2; D4, D11 | T7 |
 | US-4/AC-3 | Approach 5; D9 | T12 |
-| US-4/AC-4 | Approach 7 | T14 |
+| US-4/AC-4 | Approach 7; D16 | T14 |
 | US-5/AC-1 | D10 | T4, T14 |
-| US-5/AC-2 | Verification | T14 |
-| US-5/AC-3 | Verification | T14 |
+| US-5/AC-2 | Verification; D16 | T14 |
+| US-5/AC-3 | Verification; D16 | T14 |
 
 Decisions with no criterion of their own are carried by tasks citing them: D1 by T1; D7 by T10; D9 by T15; D12 by T13; D13 by T17.
 

@@ -1,8 +1,8 @@
 # Tasks: First-class browser address evidence in Firefox, Chrome and Edge
 
 **Plan:** [plan.md](plan.md)  **Spec:** [spec.md](spec.md)
-Check: `python3 <skill_dir>/scripts/trace_check.py .` must print OK (run with spec.md present; it merges via PR #107).
-Run tests as `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright` from the repo root of the build worktree. Every fixture host is `*.example`; no real client host or name anywhere.
+Check: `python3 /home/ubuntu/.hermes/sdd-skills/sdd-plan-and-tasks/scripts/trace_check.py intent/browser-web-watchers` must print OK.
+Verify from the repo root of the build worktree with its own venv: `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright`, and finish with `Checks` green on the PR head. Spec is merged at 41b5670. Every fixture host is `*.example`; no real client host or name anywhere.
 
 ### T1 — Preflight: fresh base, venv, baselines
 serves: D1
@@ -65,8 +65,9 @@ serves: D7
 - Evidence: failing then passing output for each of (a)-(e).
 
 ### T11 — `web_watchers.py`: per-browser verification
-serves: US-3/AC-3
+serves: US-3/AC-3, D8, D15
 - Test first: on a fixture bucket list with `aw-watcher-web-edge_<host>` and `aw-watcher-web-firefox_<host>` and no Chrome bucket: `--browsers edge,firefox,chrome` prints OK for Edge and Firefox and `WEB chrome MISSING` by name; an old-host bucket is not read (spec E5); a bucket with no event in the last N minutes reads `STALE`; the shared `chrome` bucket case reads `UNPROVEN` until a recent event corroborates a foreground Edge window.
+- Also test: Edge and Chrome sharing the one `aw-watcher-web-chrome_<host>` bucket: with a recent event whose title is a prefix of a foreground Edge window title, `WEB edge OK (shared chrome bucket)`; with a recent event and no foreground Edge window, `WEB edge UNPROVEN` with one plain retry step, never OK on the bucket alone (Atlas ruling, D8).
 - Do: write the script (stdlib; shares `aw_client`; no entry-point import); add it to the module-boundary list and to `daily`'s Files list in one short clause.
 - Evidence: the fixture run output for each case, failing then passing.
 
@@ -83,9 +84,9 @@ serves: US-2/AC-2, D12
 - Evidence: `wc -w` before and after; the passing size test.
 
 ### T14 — Guards and the full suite
-serves: US-4/AC-4, US-5/AC-1, US-5/AC-2, US-5/AC-3
+serves: US-4/AC-4, US-5/AC-1, US-5/AC-2, US-5/AC-3, D16
 - Test first: run `tests/test_provider_neutrality.py tests/test_redaction.py` over the new fixtures (they must see them, proved by planting a real-looking host in a scratch copy: red).
-- Do: fix whatever they find; run `.venv/bin/python -B -m pytest -q -p no:cacheprovider tests skills/daily/tests` and `.venv/bin/pyright` from the repo root; re-run the T4 identity test.
+- Do: fix whatever they find; from the build worktree's own venv run `.venv/bin/python -m pytest -q tests skills/daily/tests` and `.venv/bin/pyright` from the repo root; re-run the T4 identity test; push and wait for `Checks` (windows-latest, ubuntu-latest, including the shared Windows job) green on the PR head; record its `headSha`.
 - Evidence: the command lines and the observed pass counts and `0 errors`.
 
 ### T15 — Evidence for the judged criteria and the URL-in-title record
@@ -94,14 +95,21 @@ serves: US-1/AC-1, US-1/AC-2, US-2/AC-1, US-2/AC-2, D9
 - Do: run the timeline and daily drafting on the paired days and the Chromium day at main and at the build branch (the reviewer can repeat with one command, recorded). Write the decision-log entry: the S1 table, the comparison tables, the no-second-list reading, and the D9 finding (address covers hosts; tag covers profile-dedicated work; private windows; PARTIAL coverage; recommendation to keep the requirement) for atlas's amendment brief. Do not edit the requirement.
 - Evidence: the commands, the output tables, the decision-log path.
 
-### T16 — Record PENDING-REAL-WINDOWS
-serves: US-3/AC-2
-- Test first: n/a (no interactive Windows host is reachable from this box).
-- Do: write the exact steps a person does on Windows + Edge into the decision log: open setup, confirm the store page opens in the named Edge work profile, make the one click, wait one minute, run `web_watchers.py --browsers edge`, expect `WEB edge OK … last event N min ago`; and the optional real-day comparison for D9 (run the timeline with and without web buckets on one real Edge day; record per-client minutes). Mark US-3/AC-2 PENDING-REAL-WINDOWS. Never marked passed.
-- Evidence: the decision-log entry text; the criterion's status line reading PENDING-REAL-WINDOWS.
+### T16 — Extend the shared Windows end-to-end CI job with the web watcher steps
+serves: US-3/AC-2, D14
+- Test first: write the assertions first and see them fail without the feature. The job is the one on `windows-latest` in `.github/workflows/checks.yml` created by the earlier builds; extend it with new named steps. Do not create a second job; if it is not on main when this build starts, stop and `kanban_block(needs_input)` to atlas.
+- Do: on the runner, with the real `aw-server`, create the web buckets from T18 (Firefox, Chrome, and Edge sharing the chrome bucket) with real-shape events, run setup's per-browser verification (`web_watchers.py --browsers edge,firefox,chrome`), and assert: OK for each browser with its own recent event; a browser with no bucket is named missing; Edge on the shared bucket is UNPROVEN until a foreground Edge window event (injected into `aw-watcher-window_<host>`) corroborates it, then OK. Also assert the setup text's Edge store link answers.
+- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: the Edge Add click in the real work profile, and a real browser's heartbeats. Never marked passed; no step for Connor.
+- Evidence: <windows-latest run URL, head SHA, job output lines per assertion>
 
 ### T17 — CHANGELOG, PR, cleanup
 serves: D13
 - Test first: `git tag --list` and the newest CHANGELOG heading: add to the in-progress section; bump only if the newest heading is tagged, then stop. No tag, no release.
 - Do: CHANGELOG entry; open the PR to main (body starts "Dev:", lists each AC with its evidence path and the PENDING item); after the PR is up and evidence is committed, remove the worktree, the venv and `$TMPDIR` scratch. The shared checkout is never touched.
 - Evidence: PR URL and head SHA; the CHANGELOG diff; `git worktree list` showing the worktree gone.
+
+### T18 — Real-shape aw-watcher-web fixtures
+serves: US-3/AC-2, US-3/AC-3, D15
+- Test first: tests that the fixture builders emit the shapes aw-watcher-web writes: bucket id `aw-watcher-web-firefox_<host>` and `aw-watcher-web-chrome_<host>` (Edge shares the chrome bucket; a second variant uses `aw-watcher-web-edge_<host>`), bucket type `web.tab.current`, event `data` with exactly `url`, `title`, `audible`, `incognito`, `tabCount`, and `profile` only when named. Each test names the extension source file and line it copied from (`src/background/heartbeat.ts` for the data, `client.ts` for the bucket type, `helpers.ts` for the Edge-as-chrome rule). The tests fail if a key is missing or extra.
+- Do: add the builders next to `support.Day.web()` (synthetic `*.example` hosts) and use them in T3, T11 and T16.
+- Evidence: <pytest output; source paths and lines>
