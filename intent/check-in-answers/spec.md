@@ -68,7 +68,7 @@ criteria:
   - id: AC-5
     text: On a real Windows machine with the check-in watcher installed, stepping away about 10 minutes and answering "call with <client>" makes `daily` for today list that stretch as a question quoting the answer, not a drafted block; yes adds it for that client; nothing posts until the table is confirmed; answering "lunch" instead leaves the stretch a break. Serves O1, S1, S2, B2.
     check: usage
-    probe: Real Windows machine evidence (PENDING-REAL-WINDOWS, on the one for-connor checklist) — the daily review text for the test day and the provider showing no entry before confirmation.
+    probe: Windows evidence from the repo's Windows end-to-end CI job (windows-latest, real aw-server and check-in watcher, the away answer injected through the watcher's own bucket) — the daily review text for the test day and the test provider showing no entry before confirmation. Steps CI cannot drive (a person answering the dialog) are decided ship-or-hold by Atlas in the decision log and monitored after release.
     expect: {}
 ```
 
@@ -133,7 +133,7 @@ criteria:
   - id: AC-2
     text: An accepted watcher is installed by setup, keeps running after a reboot or sign-in, and is verified by finding its data for this host in the activity source after a test away period. Serves O3, S4.
     check: usage
-    probe: Real Windows machine evidence (the setup transcript showing install, the bucket found with an event after a test away, and the watcher still running after sign-out and sign-in).
+    probe: Windows evidence from the windows-latest end-to-end CI job where it can drive the step, otherwise the Atlas logged ship decision plus post-release monitoring (the setup transcript showing install, the bucket found with an event after a test away, and the watcher still running after sign-out and sign-in).
     expect: {}
   - id: AC-3
     text: A declined watcher is recorded as off, reported as a deliberate choice at the finish, and never re-asked as a failure by setup or the daily run. Serves O3, S4.
@@ -212,9 +212,10 @@ criteria:
 - No release is cut (AGENTS.md § Releasing).
 
 ## Open questions
-- Real-Windows evidence for US-4/AC-2 and S1 needs an interactive Windows session; there is no
-  Windows host reachable today. Dev proves everything non-interactive in CI (windows-latest) and
-  with fixtures; atlas arranges the one interactive check at build gate. Does not change scope.
+- Windows evidence for US-4/AC-2 and US-1/AC-5 comes from a Windows end-to-end CI job
+  (windows-latest, real aw-server, the watcher installed as setup installs it). No Windows host is
+  reachable from this box. What CI cannot drive (a person clicking a dialog) is a ship-or-hold
+  decision Atlas records in the decision log and monitors after release. Nothing goes to Connor.
 - In-work prompt cadence defaults (cooldown, daily cap, quiet hours) → dev, by "rarely enough that
   users keep it on", user-adjustable. Does not change scope.
 

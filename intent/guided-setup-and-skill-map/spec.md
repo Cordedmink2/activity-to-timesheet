@@ -76,7 +76,7 @@ criteria:
   - id: AC-2
     text: On a clean Windows machine, setup reaches a stated "collecting data" state with each step recorded as verified by its own check. Serves S1.
     check: usage
-    probe: Real Windows machine evidence (setup transcript ending in collecting data, with the verify output of each step).
+    probe: Windows evidence from the windows-latest end-to-end CI job where it can drive the step, otherwise the Atlas logged ship decision plus post-release monitoring (setup transcript ending in collecting data, with the verify output of each step).
     expect: {}
   - id: AC-3
     text: Setup never asks for or handles a password or token in chat, and no check it runs prints a credential; a repo guard test fails if any shipped setup path asks the user to type or paste a password, token or API key into chat, and the guard is shown to catch a planted violation. Serves B3.

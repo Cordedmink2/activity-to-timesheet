@@ -88,7 +88,7 @@ criteria:
   - id: AC-2
     text: On Edge, the install link and the verification both work and the web watcher's bucket for this host is found with a recent event. Serves S2.
     check: usage
-    probe: Real Windows + Edge evidence (setup transcript showing the store page opened in the named profile, the bucket found, and its last event within minutes).
+    probe: Windows evidence from the windows-latest end-to-end CI job where it can drive the step, otherwise the Atlas logged ship decision plus post-release monitoring (setup transcript showing the store page opened in the named profile, the bucket found, and its last event within minutes).
     expect: {}
   - id: AC-3
     text: Setup verifies each browser's web watcher by its own bucket and recent event, reporting a browser where it is missing by name rather than in aggregate. Serves O3.

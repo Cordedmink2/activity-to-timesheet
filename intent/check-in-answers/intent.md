@@ -121,5 +121,11 @@ Foundational refusals and this accepted intent text are not delegated and are un
   outcome 1, which carries the phone-call benefit.
 - Windows third-party binary (Zenity port for aw-watcher-ask) → not recommended. Why: KISS and
   no new install; checkin covers the use case with Python packaging only.
+- PR #5 outcome → reviewer t_d30c6616 FAILED it at aada3d3 (its own README says keep the block
+  flags off for unattended use; no quiet hours, cooldown or daily cap; untested on Windows; stacked
+  on unmerged PR #4). Billables ships return-from-AFK check-ins only. Revisit if upstream merges.
+- Windows verification → Atlas owns it (Connor, 2026-10-20: "Stop making me do stuff. That's the
+  whole purpose of atlas."): a windows-latest end-to-end CI job; anything it cannot drive is a
+  logged ship decision with monitoring, never a checklist for Connor.
 - Release cut → Atlas cuts it once every build gate has merged and `Checks` is green on main;
   the CHANGELOG records that Connor delegated this release on 2026-10-20.

@@ -53,7 +53,7 @@ criteria:
   - id: AC-3
     text: On a real Windows machine the prompt appears, is quick to answer with one click or key, does not steal typing focus in a way that sends keystrokes into it, and its yes/no/ignore outcomes match AC-1 and AC-2. Serves O2, S1.
     check: usage
-    probe: Real Windows machine evidence (a short session log with three prompts answered yes, no and ignored, and the dated folder listing).
+    probe: Windows evidence from the windows-latest end-to-end CI job where it can drive the step, otherwise the Atlas logged ship decision plus post-release monitoring (a short session log with three prompts answered yes, no and ignored, and the dated folder listing).
     expect: {}
 ```
 
