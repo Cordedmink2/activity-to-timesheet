@@ -18,7 +18,7 @@ serves: D4, D11
 
 ### T3 — Fixtures: the paired day and the hazard days
 serves: US-1/AC-1, US-2/AC-1
-- Test first: use `support.Day` (`.web()` exists). Build, in one fixture module under `skills/daily/tests/`: (1) a paired Firefox/Edge day (same sites, same clients; Firefox with a `firefox` bucket, no tag, titles `… - Mozilla Firefox`; Edge with a `chrome` bucket and the URL-in-title address in titles); (2) a Chromium day where some tabs lack the tag but have a known client host; (3) a conflict span (title tag client A, address client B's host); (4) a personal site in focus with a client tab open in the background; (5) a shared host with and without the org path (`dev.azure.com/<org>`); (6) a private-window event (`incognito: true`); (7) a second browser active in the same minute. Fixtures fail the neutrality and redaction guards if any real name slips in.
+- Test first: use `support.Day` (`.web()` exists). Build, in one fixture module under `skills/daily/tests/`: (1) a paired Firefox/Edge day with real 60 s alarm / 80 s pulse-merge semantics and deliberately offset web/window boundaries (Firefox source: `heartbeat.ts`, `config.ts`, `main.ts`); Firefox has a `firefox` bucket, no URL in title, and real `… - Mozilla Firefox` window-title suffixes; Edge's baseline is today's URL-in-title title with **no chrome web bucket**, plus a separately reported Edge-with-web-bucket variant; include at least one realistic corroboration miss (post-load title change or `Title and N more pages - Profile - Microsoft Edge`); (2) a Chromium day where some tabs lack the tag but have a known client host; (3) a conflict span (title tag client A, address client B's host); (4) a personal site in focus with a client tab open in the background; (5) a shared host with and without the org path (`dev.azure.com/<org>`); (6) a private-window event (`incognito: true`); (7) a second browser active in the same minute. Fixtures fail the neutrality and redaction guards if any real name slips in.
 - Do: add the fixtures and a test per day that asserts today's (red) behaviour: unattributed browser minutes on main.
 - Evidence: the tests collected and failing for the expected reason on main, with the output.
 
@@ -36,7 +36,7 @@ serves: D5, US-4/AC-1
 
 ### T6 — Address attribution in `activity_timeline.py`
 serves: US-1/AC-1, US-1/AC-2, US-2/AC-1
-- Test first: on the T3 fixtures: the Firefox day's per-client browser minutes are within one heartbeat interval of the Edge day's and its unattributed browser minutes are no greater; the Chromium partial-tag day has fewer uncategorized browser spans than at main and the spans carry the client; a test that reads the source of `activity_timeline.py` and `--json` and proves the only term source is the loaded classes (a second host list cannot exist: a planted `HOSTS = ` constant or a `hosts` key in any shipped file fails `tests/test_provider_neutrality`-style scan, mutation recorded).
+- Test first: on the T3 fixtures: compare Firefox's per-client browser minutes with today's Edge URL-in-title baseline **without a chrome web bucket**; assert totals within one real 60 s sampling interval and Firefox unattributed minutes no greater; report Edge-with-web-bucket separately. The unaligned event boundaries and 80 s pulse merge must be included in the timeline, and the deliberate corroboration miss must fall back to title-only rather than be hidden by a hand-made matching title. Also assert the Chromium partial-tag day has fewer uncategorized browser spans than at main and the spans carry the client; a test that reads the source of `activity_timeline.py` and `--json` and proves the only term source is the loaded classes (a second host list cannot exist: a planted `HOSTS = ` constant or a `hosts` key in any shipped file fails `tests/test_provider_neutrality`-style scan, mutation recorded).
 - Do: implement `address_evidence()` per plan (event-level slice, corroboration, host+path, same `categorize`); `main()` always fetches the web buckets and the AFK events; JSON adds `source: address` and counts of slices dropped for no corroboration, only when web events exist (D10); zoom's web rows gain the category.
 - Evidence: failing then passing test output; the paired-day comparison table printed by the test.
 
@@ -48,7 +48,7 @@ serves: US-4/AC-1, US-4/AC-2
 
 ### T8 — The `!ADDR` flag
 serves: US-2/AC-2
-- Test first: the conflict fixture (title tag A, address host B) gives a span with `conflict`, both labels cited, text line `!ADDR title=A address=B`; agreeing signals give no flag.
+- Test first: with ActivityWatch's default classes loaded (including `Work>Programming`, `Media`, and `Comms`): a client-tagged title whose address matches only a default non-client category emits no `!ADDR`; title client A plus address client B still flags with both client labels. Agreeing client signals give no flag.
 - Do: add the `conflict` field and the text and JSON rendering (only with web events).
 - Evidence: the fixture's compact output and its drafting reading, failing then passing.
 
@@ -60,13 +60,13 @@ serves: US-4/AC-1
 
 ### T10 — `category_rules.py` stays coherent
 serves: D7
-- Test first: (a) a Firefox fixture whose client's term appears only in addresses: the gate reports no `UNVERIFIED` for it and `--inspect` is unchanged for title-only terms; (b) `verify` never raises "labels none of them" for an address-only match (the activity source's answer is title-only); (c) `dormant` does not report an address-only client DORMANT while its addresses matched on the day; (d) `--status`, the stamp's `rules` and `context_fingerprint` are byte-identical to main for the same context file, and a context edit still reads `STALE` exactly as before; (e) with no web buckets all outputs are identical to main.
+- Test first: (a) a Firefox fixture whose client's term appears only in addresses: the gate reports no `UNVERIFIED` for it and `--inspect` is unchanged for title-only terms; (b) `verify` never raises "labels none of them" for an address-only match (the activity source's answer is title-only); (c) `dormant` does not report an address-only client DORMANT while its addresses matched on the day; (d) `--status`, the stamp's `rules` and `context_fingerprint` are byte-identical to main for the same context file, and a context edit still reads `STALE` exactly as before; (e) with no web buckets all outputs are identical to main; (f) on a day with web buckets, run the gate on the same fixture at main and branch and assert each title-only term's verdict and `max_share` denominator/per-term share are identical—addresses may be recognized separately but are excluded from `sample` and its denominator.
 - Do: gate sample and `matched_addresses`; `dormant` address read; no change to `merged`, the stamp or the fingerprint.
 - Evidence: failing then passing output for each of (a)-(e).
 
 ### T11 — `web_watchers.py`: per-browser verification
 serves: US-3/AC-3, D8, D15
-- Test first: on a fixture bucket list with `aw-watcher-web-edge_<host>` and `aw-watcher-web-firefox_<host>` and no Chrome bucket: `--browsers edge,firefox,chrome` prints OK for Edge and Firefox and `WEB chrome MISSING` by name; an old-host bucket is not read (spec E5); a bucket with no event in the last N minutes reads `STALE`; the shared `chrome` bucket case reads `UNPROVEN` until a recent event corroborates a foreground Edge window.
+- Test first: a fixture bucket list including `aw-watcher-web-vivaldi_<host>` (or `zen`) proves the shared `aw_client` discovery helper returns it, and both daily and `web_watchers.py` consume it; a setup-only fixed browser list must not report WEB OK while daily omits that bucket. Also include `aw-watcher-web-edge_<host>` and `aw-watcher-web-firefox_<host>` with no Chrome bucket: `--browsers edge,firefox,chrome` prints OK for Edge and Firefox and `WEB chrome MISSING` by name; an old-host bucket is not read (spec E5); a bucket with no event in the last N minutes reads `STALE`; the shared `chrome` bucket case reads `UNPROVEN` until a recent event corroborates a foreground Edge window.
 - Also test: Edge and Chrome sharing the one `aw-watcher-web-chrome_<host>` bucket: with a recent event whose title is a prefix of a foreground Edge window title, `WEB edge OK (shared chrome bucket)`; with a recent event and no foreground Edge window, `WEB edge UNPROVEN` with one plain retry step, never OK on the bucket alone (Atlas ruling, D8).
 - Do: write the script (stdlib; shares `aw_client`; no entry-point import); add it to the module-boundary list and to `daily`'s Files list in one short clause.
 - Evidence: the fixture run output for each case, failing then passing.
@@ -99,7 +99,7 @@ serves: US-1/AC-1, US-1/AC-2, US-2/AC-1, US-2/AC-2, D9
 serves: US-3/AC-2, D14
 - Test first: write the assertions first and see them fail without the feature. The job is the one on `windows-latest` in `.github/workflows/checks.yml` created by the earlier builds; extend it with new named steps. Do not create a second job; if it is not on main when this build starts, stop and `kanban_block(needs_input)` to atlas.
 - Do: on the runner, with the real `aw-server`, create the web buckets from T18 (Firefox, Chrome, and Edge sharing the chrome bucket) with real-shape events, run setup's per-browser verification (`web_watchers.py --browsers edge,firefox,chrome`), and assert: OK for each browser with its own recent event; a browser with no bucket is named missing; Edge on the shared bucket is UNPROVEN until a foreground Edge window event (injected into `aw-watcher-window_<host>`) corroborates it, then OK. Also assert the setup text's Edge store link answers.
-- Not verified by CI, stated in the PR and decision log for Atlas's ship decision: the Edge Add click in the real work profile, and a real browser's heartbeats. Never marked passed; no step for Connor.
+- Not verified by CI (listed explicitly for Atlas): **a real Firefox day**, the Edge Add click in the real work profile, and a real browser's heartbeats. Never marked passed; no step for Connor.
 - Evidence: <windows-latest run URL, head SHA, job output lines per assertion>
 
 ### T17 — CHANGELOG, PR, cleanup
