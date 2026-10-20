@@ -6,7 +6,7 @@ Verify from the repo root of the build worktree with its own venv: `.venv/bin/py
 
 ### T1 — Preflight: fresh base, venv, baselines
 serves: D1
-- Test first: confirm the check-in build, the guided-setup build and #106 are merged (`git log origin/main`); read the skill map they left (where step 2's text and check live now).
+- Test first: confirm the check-in build, the guided-setup build and #106 are merged (`git log origin/main`); record the exact current `origin/main` SHA and re-read the current source versions of every file named in the plan's Problem and evidence section, plus the skill map they left (where step 2's text and check live now).
 - Do: worktree from fresh origin/main; `python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`; run the suite and pyright green; record `wc -w skills/daily/SKILL.md skills/setup/SKILL.md`. Capture, before any edit, the text and `--json` output of `activity_timeline.py`, `afk_blocks.py` and the skeleton for every golden day and scenario into `$TMPDIR/before/`. Add `hotspot:` comments for both SKILL.md files on the build card. Nothing is changed in the repo.
 - Evidence: commit SHA of the base, green suite and pyright output, word counts, list of captured files.
 
