@@ -52,7 +52,7 @@ serves: US-1/AC-1, US-1/AC-2, US-2/AC-4, US-4/AC-1, D6
 
 ### T8 — The readers stay unchanged; a cleaned day is not "capture task dead"
 serves: US-3/AC-1, US-3/AC-2, US-5/AC-1, D3
-- Test first: on the pinned fixture, before and after confirmed clean-up, assert the three S1 outcomes together: January's images are gone; every January date remains in reconcile's index; and every unbilled day keeps all its images. Also assert byte-identical no-date picker candidates, `afk_blocks.captures()` for a cleaned folder returns a `cleaned` result, the skeleton line reads `captures: removed by clean-up on <date>`, and `capture task dead all day` is not printed for it. Assert every existing golden is byte-identical, and that a day with no folder still prints the existing dead-capture line.
+- Test first: add the single named S1 test `test_s1_retention_removes_january_images_but_preserves_index_dates_and_unbilled_images`. On the pinned fixture, before and after confirmed clean-up, this test asserts all three S1 outcomes together: January's images are gone; every January date remains in reconcile's index; and every unbilled day keeps all its images. In this same test also assert byte-identical no-date picker candidates, `afk_blocks.captures()` for a cleaned folder returns a `cleaned` result, the skeleton line reads `captures: removed by clean-up on <date>`, and `capture task dead all day` is not printed for it. Assert every existing golden is byte-identical, and that a day with no folder still prints the existing dead-capture line.
 - Do: add the `.cleaned` rule to `captures()` and to the skeleton line; no other output changes.
 - Evidence: <pytest output: goldens green; index before/after identical; the skeleton lines>
 
