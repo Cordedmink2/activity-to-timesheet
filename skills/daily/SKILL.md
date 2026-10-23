@@ -97,7 +97,7 @@ Read in parallel:
   - **`ERR the calendar is off: TIMESHEET_OUTLOOK_CALENDAR is not set to true …`** — the only benign refusal; most installs. Read the day from the other sources and say nothing more. (If the line names a shell, you are in the wrong shell.)
   - **Anything else stops the run** — report the `ERR` line as it stands. A calendar the user turned *on* and did not get silently loses meetings; don't retry without the toggle or run the adapter yourself. `the calendar stays *off*: …` is not the bullet above: the toggle is on and the calendar cannot be read here.
   - **One reason is neither** — ActivityWatch unreachable while you read `compact.jsonl`: say once the calendar could not be read either. An event with no verdict is an unanswered question, not an uncorroborated one.
-- `python scripts/checkin_answers.py <date>` — typed answers on return; `off`, `absent`, `empty` need nothing said, else read `references/check-in-answers.md`.
+- `scripts/checkin_answers.py` — typed answers on return. Do not run it bare: the full command is in `references/check-in-answers.md`. `off`, `absent`, `empty` need nothing said, else read it.
 - Screenshot index: list the day's folder (PowerShell). Don't open PNGs yet.
   - **`captures: none for this date` in the skeleton is the capture task dead all day** — treat every block as having no screenshot fallback; raise it at Step 11.
   - **Compare the last capture's timestamp against `work_end`.** If captures stop well before it, say so with the skeleton and flag later blocks 🔸 on weaker evidence. A dead capture task is maintenance: finish the day first (`references/first-run.md`).

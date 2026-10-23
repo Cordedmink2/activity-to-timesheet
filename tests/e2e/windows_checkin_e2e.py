@@ -104,8 +104,10 @@ def step_start_server(binary):
 def step_inject_answers():
     """Two away answers through the watcher's own bucket, shape from the real watcher."""
     d = (support.day(host=HOST).active("09:00", "12:00").afk("12:00", "12:40")
-         .active("12:40", "15:00").afk("15:00", "15:40").active("15:40", "17:00")
-         .checkin("12:00", "12:40", "call with ACME").checkin("15:00", "15:40", "lunch"))
+         .active("12:40", "15:00").afk("15:00", "15:40").active("15:40", "16:00")
+         .afk("16:00", "16:40").active("16:40", "17:30")
+         .checkin("12:00", "12:40", "call with ACME").checkin("15:00", "15:40", "lunch")
+         .checkin("16:00", "16:20", "lunch").checkin("16:20", "16:40", "call with ACME"))
     state["day"] = d
     for bucket, events in d.buckets().items():
         kind = "afktask" if bucket.startswith("aw-watcher-ask-away") else (
@@ -146,13 +148,18 @@ def step_assert_question_not_block():
     with tempfile.TemporaryDirectory() as tmp:
         skeleton, result, sk, terms = _read(tmp)
         questions = result["questions"]
-        check(len(questions) == 1, "exactly one check-in question")
+        check(len(questions) == 2, "two check-in questions: the whole break and the clipped one")
         q = questions[0]
         check(q["words"] == "call with ACME" and q["clients"] == ["ACME"],
               "the question quotes the answer and names ACME")
         check((q["start"], q["end"]) == ("12:00:00", "12:40:00"), "the question spans the break")
         check("blocks" not in result and "block" not in json.dumps(questions),
               "nothing in the result is a block")
+        lunch_call = questions[1]
+        check((lunch_call["start"], lunch_call["end"]) == ("16:20:00", "16:40:00"),
+              "lunch then a call in one break: the question is the call only, 16:20-16:40")
+        check(all(q["end"] <= "16:00:00" or q["start"] >= "16:20:00" for q in questions),
+              "the lunch stretch 16:00-16:20 is in no question")
         check(all(not (b["start"] == "12:00:00" and b["end"] == "12:40:00")
                   for b in skeleton.get("blocks", [])),
               "the skeleton has no block over the answered break")
@@ -163,8 +170,9 @@ def step_assert_question_not_block():
         code, out, _ = script("checkin_answers.py", *_day_args(), "--skeleton", sk,
                               "--terms", terms, "--rulings", rulings)
         again = json.loads(out)
-        check(code == 0 and again["questions"] == [] and len(again["ruled"]) == 1,
-              "a recorded yes is not asked again")
+        check(code == 0 and [(x["start"], x["end"]) for x in again["questions"]]
+              == [("16:20:00", "16:40:00")] and len(again["ruled"]) == 1,
+              "a recorded yes is not asked again, and does not silence the other question")
 
 
 def step_assert_lunch_stays_break():
@@ -175,6 +183,8 @@ def step_assert_lunch_stays_break():
         check(len(lunch) == 1 and lunch[0]["class"] == "personal", "lunch is classed personal")
         check(all(q["words"] != "lunch" for q in result["questions"] + result["hints"]),
               "lunch raises no question and no hint")
+        check(all(q["words"] != "lunch" for q in result["questions"]),
+              "no question carries the lunch words")
         check(any(b["start"] == "15:00:00" and b["end"] == "15:40:00"
                   for b in skeleton.get("breaks", [])), "the lunch gap is still a break")
 

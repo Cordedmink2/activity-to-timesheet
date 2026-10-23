@@ -132,6 +132,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   program. Not verified: that the watcher writes after a real away period, that the logon task starts
   after a real sign-in, and a person answering the real window. A new `windows-e2e` CI job registers
   the task for real and checks the answers end to end on Windows. See ADR-0009.
+  A check-in question spans the answer clipped to the break, never the whole break: a "lunch"
+  then "call with ACME" in one break asks about the call only, two answers in one break are two
+  questions, and an answer over two breaks is one question per break. Setup now gives the exact
+  install, two weekday prompts, check and removal for the ask watcher (Mac and Linux).
 - **A category rule that went quiet is flagged** (#99). `category_rules.py --dormant <date>`
   asks the activity source which rules labelled something in the previous fortnight and label
   nothing on the day, and the daily run raises each one at the end, with the date it last

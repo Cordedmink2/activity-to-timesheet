@@ -294,7 +294,7 @@ Optional, and entered either way: *off* is an outcome to state, not a step to sk
 >
 > Do you want the check-in watcher? Do you want the ask watcher?
 
-On Windows, offer only the check-in watcher. The ask watcher needs a program Windows does not have, so it is not offered there. Install only what the user says yes to. On Windows, run `<daily>/scripts/setup_checkin_watcher.ps1` — add `-DryRun` first and read it back; it needs Python 3.11 or newer and no admin rights. On Mac and Linux, follow the reference. A **no** is written as `Check-in watcher: off` or `Ask watcher: off` under `## Preferences` in `Timesheets/.context.md`, and asked about never again.
+On Windows, offer only the check-in watcher. The ask watcher needs a program Windows does not have, so it is not offered there. Install only what the user says yes to. On Windows, run `<daily>/scripts/setup_checkin_watcher.ps1` — add `-DryRun` first and read it back; it needs Python 3.11 or newer and no admin rights. On Mac and Linux, follow the reference; for the ask watcher it has the install, the two weekday prompts, the check and the removal. A **no** is written as `Check-in watcher: off` or `Ask watcher: off` under `## Preferences` in `Timesheets/.context.md`, and asked about never again.
 
 **Verify** — for a watcher the user said yes to, run `python "<daily>/scripts/checkin_answers.py" --probe checkin` (or `--probe ask`) and read `found`. `true` with a `newest_event` is recording. `true` with none means it is installed and has not yet been answered: say so, and do not call it a failure. For a watcher the user declined, nothing is run, and the finish says "off, by your choice".
 

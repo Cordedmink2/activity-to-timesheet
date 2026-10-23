@@ -28,6 +28,8 @@ Rules, the same as for a calendar question:
 - A no, or no answer, leaves it unbilled. Ask once.
 - Step 10 records the answer under `checkin_questions` in `Timesheets/<date>_harvest_responses.json`: `{"start": "12:00:00", "end": "12:40:00", "ruling": "yes", "words": "..."}`. Keyed by start and end. A recorded ruling binds: a re-run lists it under `ruled`, not `questions`, and the already-covered branch of Step 1 does not ask again.
 
+**The span is the answer clipped to the break**, never the whole break: from the later of the answer's start and the break's start, to the earlier of the answer's end and the break's end. Two answers in one break give two questions that do not overlap, and a personal stretch (lunch) is in no question. An answer over two breaks gives one question per break, each clipped to its break. The ruling is keyed by that span, so a ruling on one question leaves the others open.
+
 A personal answer (lunch, school run, an exclusion) stays a break and gets no question. A personal word wins over a client name: "lunch with ACME" is a break.
 
 ## Hints
