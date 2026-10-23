@@ -1,7 +1,7 @@
 ---
 name: setup
-description: Walk a first-time user through installing this plugin — offering to install what the machine is missing, installing the activity source and the browser extensions, interviewing them about their clients to tag single-client browser profiles, write a starter workspace context file and write and verify their category rules, getting the screenshot task past endpoint security, and settling whether the Outlook calendar is read — verifying each one before moving on, in plain language for a non-technical user. User-invoked.
-compatibility: Windows-first. Reads a running ActivityWatch server over HTTP (default http://localhost:5600). Step 5 registers a Windows scheduled task and needs PowerShell plus Python 3.10+; on macOS and Linux there is no screenshot capture to set up and that step is skipped. Step 6 is entered everywhere, and reports the calendar off on any machine without classic Outlook. Needs a harness that can execute local commands and make HTTP requests. Posts nothing to any timesheet provider.
+description: Walk a first-time user through installing this plugin — offering to install what the machine is missing, installing the activity source and the browser extensions, interviewing them about their clients to tag single-client browser profiles, write a starter workspace context file and write and verify their category rules, getting the screenshot task past endpoint security, settling whether the Outlook calendar is read, and offering the two optional check-in watchers that ask what you were doing while you were away — verifying each one before moving on, in plain language for a non-technical user. User-invoked.
+compatibility: Windows-first. Reads a running ActivityWatch server over HTTP (default http://localhost:5600). Step 5 registers a Windows scheduled task and needs PowerShell plus Python 3.10+; on macOS and Linux there is no screenshot capture to set up and that step is skipped. Step 6 reports the calendar off without classic Outlook. Step 7 offers the optional check-in watchers (Python 3.11+). Needs a harness that can execute local commands and make HTTP requests. Posts nothing to any timesheet provider.
 disable-model-invocation: true
 ---
 
@@ -33,7 +33,7 @@ It covers what a person has to do, and does for them what a machine can once the
   **The check is the other way a token reaches the transcript, and it is the way that has actually happened.** A command run to find out whether a value is set writes its own output to the same transcript, so *no command in this skill may expand a credential into its output* — the answer is `set` or `MISSING`, never the value. **Use the probe given below rather than composing one.** The version this replaces paired the two default-substitution forms in one string, on the reading that each supplies a word for its own case; in fact only one of the pair substitutes a word, and the other substitutes the variable itself, so the line printed `set` followed by the user's API key. Nothing failed and nothing looked wrong. If a run has already printed a credential, treat it exactly as a pasted token above: say so at the time, and tell the user to rotate it.
 - **The rest of the workspace context.** Step 4 scaffolds the workspace and writes the half of `Timesheets/.context.md` this walkthrough learns — the clients, their codes, profile tags and category terms. The half it does not learn — colleagues, external contacts, work kinds (which need the credentials), billing voice, exclusions — stays as template for the `daily` skill's first run. Point at it at the end.
 
-Six steps, and then a stated finish.
+Seven steps, and then a stated finish.
 
 ## Finding the files this skill needs
 
@@ -281,16 +281,40 @@ That one command is the whole check, whatever the toggle says. **Do not read the
 - **`No such file`, or a `ModuleNotFoundError`.** The sibling path, not the calendar: `daily` on a plugin install and `billables-daily` in the shared export, per "Finding the files this skill needs".
 - **`ERR the calendar adapter … is not there: this copy of the skill does not ship it`.** The wrapper is present and the adapter beside it is not, which is a half-copied install rather than anything the user configured. Re-install rather than re-configure — and until it is fixed the toggle has to go off, for the reason in outcome 3.
 
+### 7. The check-in watchers are offered — on and recording, or off on purpose
+
+Optional, and entered either way: *off* is an outcome to state, not a step to skip. Two small watchers can ask the user what they were doing, so time the computer could not see is put back to them as a question at review. Nothing is billed from an answer without the user's own yes.
+
+**Do** — offer each watcher in one plain sentence, and ask once. Details, install and removal are in `references/checkin-watchers.md`.
+
+> **Do you want to be asked what you were doing?** Two small helpers can ask you. Each one is optional.
+>
+> - **The check-in watcher** asks when you come back after being away for a while. You type a few words, like "call with ACME". It does not bill anything. At review, I ask you if that time was work.
+> - **The ask watcher** asks you twice a day, on weekdays, what you are working on. It is for Mac and Linux only.
+>
+> Do you want the check-in watcher? Do you want the ask watcher?
+
+On Windows, offer only the check-in watcher. The ask watcher needs a program Windows does not have, so it is not offered there. Install only what the user says yes to. On Windows, run `<daily>/scripts/setup_checkin_watcher.ps1` — add `-DryRun` first and read it back; it needs Python 3.11 or newer and no admin rights. On Mac and Linux, follow the reference. A **no** is written as `Check-in watcher: off` or `Ask watcher: off` under `## Preferences` in `Timesheets/.context.md`, and asked about never again.
+
+**Verify** — for a watcher the user said yes to, run `python "<daily>/scripts/checkin_answers.py" --probe checkin` (or `--probe ask`) and read `found`. `true` with a `newest_event` is recording. `true` with none means it is installed and has not yet been answered: say so, and do not call it a failure. For a watcher the user declined, nothing is run, and the finish says "off, by your choice".
+
+**If it fails** — `found` is `false` after an install:
+
+- Run `python "<daily>/scripts/checkin_answers.py" --diagnose`. If it names `two-afk-buckets`, the check-in watcher stops itself because it finds two activity records from two computers. Say that in plain words, name the old one it reports, and offer to export it first. Delete it only after the export is saved and the user says yes to that named record. Never delete without both.
+- The watcher needs Python 3.11 or newer. A Python 3.10 install is the next most likely cause: say so, and offer the install table in "Before you start".
+- A watcher that is installed but never prompts: on Windows check `Get-ScheduledTask -TaskName CheckinWatcher`. Whether the task starts after the next sign-in cannot be seen from here; say that, and ask the user to tell you after their next sign-in.
+
 ## When endpoint security is the answer
 
 `references/endpoint-security.md` holds two things: how to establish that a step was actually blocked rather than merely broken, and the exact allow-list requests to hand over once it has been. Read it at the point a step fails in a way that looks like a block — never earlier, and never instead of the checks above.
 
 ## Done
 
-Setup is finished when steps 1 to 6 have each passed their own check on this machine, and the two required configuration values are present. Step 6 passes on a calendar that was read *and* on a calendar deliberately left off; it is unfinished only where the toggle is on and the read failed. If either came back `MISSING` at the start, re-run **the same probe from "Before you start"** — not a new one written for the occasion, which is where the value-printing version came from the first time.
+Setup is finished when steps 1 to 7 have each passed their own check on this machine, and the two required configuration values are present. Step 6 passes on a calendar that was read *and* on a calendar deliberately left off; it is unfinished only where the toggle is on and the read failed. If either came back `MISSING` at the start, re-run **the same probe from "Before you start"** — not a new one written for the occasion, which is where the value-printing version came from the first time.
 
 Say so plainly, and say what is now true: the activity source is recording, browser titles carry their addresses and, in a one-client profile, its client code, the rules classify them, the workspace holds a context file naming each client, and screenshots are being captured on a schedule. **Where step 6 left the calendar on, say that too** — the calendar is read as a fourth source, so a meeting sat through without touching the keyboard is drafted as a block rather than lost as a break, and one the activity source cannot corroborate is put as a question at review rather than billed. It is the one thing here whose result is invisible until a day is drafted, so a user not told about it meets it as a surprise in their first timesheet. Leave the sentence out where the calendar is off. Then hand over the two things that are not this skill's:
 
+- The check-in watchers are on, or off by your choice. Say which, in one line each. A watcher that is on only asks; a work answer comes back to the user as a question at review and is never billed without their yes.
 - The `daily` skill has its own first run. It finds the sections of `Timesheets/.context.md` step 4 left as template — colleagues, external contacts, work kinds, how they bill, what to exclude — and walks the user through them. Tell the user where the file is, that it is theirs to edit, and that the category rules are rebuilt from its **Category terms** lines, so a new word for a client goes there. Then tell them to invoke that skill next, for a day they have already worked.
 - Two things go stale on their own and are worth naming now: a new client needs its **Category terms** adding to `.context.md` — its rule follows on the next run, and a single-client browser profile also wants its own tag — and a screenshot task that stops firing does so silently. `Get-ScheduledTaskInfo -TaskName WorkScreenshots` with a `LastTaskResult` of `0` is the health check.
 
