@@ -180,7 +180,8 @@ def step_assert_lunch_stays_break():
     with tempfile.TemporaryDirectory() as tmp:
         skeleton, result, _, _ = _read(tmp)
         lunch = [a for a in result["answers"] if a["words"] == "lunch"]
-        check(len(lunch) == 1 and lunch[0]["class"] == "personal", "lunch is classed personal")
+        check(len(lunch) == 2 and all(a["class"] == "personal" for a in lunch),
+              "both lunch answers are classed personal")
         check(all(q["words"] != "lunch" for q in result["questions"] + result["hints"]),
               "lunch raises no question and no hint")
         check(all(q["words"] != "lunch" for q in result["questions"]),

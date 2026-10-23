@@ -20,7 +20,7 @@ The watcher finds the AFK record by looking for any name that contains `afk`. Wi
 
 `aw-watcher-ask` asks a short question on a schedule. It is offered on **Mac and Linux only**: it needs a program Windows does not ship, and Billables adds no new program to Windows. A point-in-time answer cannot explain a gap, so its answers are hints for the day, never questions.
 
-It is not on PyPI. It installs from GitHub, pinned to one commit, and it needs `zenity` (the dialog program) and Python 3.9 or newer.
+It is not on PyPI. It installs from GitHub, pinned to one commit, and it needs `zenity` (the dialog program) and Python 3.10 or newer.
 
 **Install**
 
@@ -28,7 +28,7 @@ It is not on PyPI. It installs from GitHub, pinned to one commit, and it needs `
 2. `pipx install "git+https://github.com/bcbernardo/aw-watcher-ask.git@4a4536c3b012d3b681f6dff7d1ab22d0de02a738"`. If there is no `pipx`, use `python3 -m venv ~/.local/share/aw-watcher-ask` and install into it with its own `pip`.
 3. Check `aw-watcher-ask run --help` prints the options. If it does not, stop and tell the user.
 
-**Schedule: two prompts on weekdays.** The program stays running and asks at the times of a cron line. The line `0 10,15 * * 1-5 0` means 10:00 and 15:00, Monday to Friday. Ask the user for other times if they want them. The command is:
+**Schedule: two prompts on weekdays.** The program stays running and asks at the times of a cron line. The line `0 10,15 * * 1-5 0` means 10:00 and 15:00 local time, Monday to Friday. Ask the user for other times if they want them. The command is (`--text` is passed on to `zenity`, which is why `--help` does not list it):
 
 `aw-watcher-ask run --question-id work.now --question-type entry --title "What are you working on?" --text "A few words, for example: call with ACME" --timeout 120 --schedule "0 10,15 * * 1-5 0"`
 
@@ -39,7 +39,7 @@ Keep it running after sign-in, and ask the user before you write any of these fi
 
 **Verify.** Run `python checkin_answers.py --probe ask`. `found: true` means the bucket `aw-watcher-ask_<host>` exists. It appears after the first prompt is answered, so before 10:00 the honest answer is "installed, not yet answered". On Linux also run `systemctl --user is-active aw-watcher-ask`; it must print `active`. An unanswered prompt writes nothing that is used. A person must answer the real dialog; setup cannot do that for them.
 
-**Remove.** Linux: `systemctl --user disable --now aw-watcher-ask`, delete the service file, then `pipx uninstall aw-watcher-ask`. Mac: `launchctl unload` the plist, delete it, then `pipx uninstall aw-watcher-ask`. The old answers stay in ActivityWatch; they are not deleted.
+**Remove.** Linux: `systemctl --user disable --now aw-watcher-ask`, delete the service file, then `pipx uninstall aw-watcher-ask` (or delete `~/.local/share/aw-watcher-ask` if you used the venv). Mac: `launchctl unload` the plist, delete it, then `pipx uninstall aw-watcher-ask`. The old answers stay in ActivityWatch; they are not deleted.
 
 This was read from the program's own help and source and the schedule line was parsed with its `croniter` library. It was not run through a real dialog, a systemd unit or launchd on a Mac.
 
