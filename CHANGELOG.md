@@ -64,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   catalog alone (`--dataverse-only`); the provider's catalog is `timesheet-provider refresh`.
 
 ### Fixed
+- **A Teams meeting whose window title spells out an abbreviation in the calendar subject is corroborated** (#114).
+  `Vendor - ABBR and AI` on the calendar against `Vendor - Abbreviation spelled out and AI` in the window
+  used to come back uncorroborated and surface as "no meeting window seen". A subject-titled window now
+  also counts when it shares the subject's prefix before the last ` - ` and opens within two minutes of the
+  event's start. Nothing for a user to do.
 - **A catalog refresh that comes back with no projects is a failure, not an empty catalog** (#35).
   It used to be written, so every later lookup quietly fell through to the history fallback.
 - **A missing credential keeps its whole setup message on `list` and `refresh`** (#35). Adding
