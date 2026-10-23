@@ -332,3 +332,29 @@ def test_diagnose_over_one_host_is_clean(live_aw):
     live_aw(worked(day()))
     out = probe("--diagnose").json()
     assert out["clean"] is True and out["condition"] is None
+
+
+# --------------------------------------------------------------------------------------
+# T12 - answers stay on the machine and out of bug reports
+# --------------------------------------------------------------------------------------
+import ast  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+SCRIPT_SRC = Path(ca.__file__).read_text(encoding="utf-8")
+
+
+def test_the_report_redaction_list_names_check_in_answers():
+    ref = (Path(ca.__file__).parents[1] / "references" / "reporting-issues.md").read_text(encoding="utf-8")
+    assert "check-in answers" in ref.lower()
+
+
+def test_the_reader_opens_no_file_for_writing_and_has_no_network_of_its_own():
+    tree = ast.parse(SCRIPT_SRC)
+    imported = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+    imported |= {n.module.split(".")[0] for n in ast.walk(tree)
+                 if isinstance(n, ast.ImportFrom) and n.module and n.level == 0}
+    assert not imported & {"urllib", "socket", "http", "requests", "subprocess", "shutil"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "open":
+            mode = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else "r"
+            assert not set(str(mode)) & set("wax+"), "the reader must never write"
