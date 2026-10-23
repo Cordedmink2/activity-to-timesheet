@@ -445,8 +445,31 @@ def markdown_docs() -> list[Path]:
     for any document a reader can click — an ADR citing a sibling ADR most of all, since
     the ADRs are how a decision reaches the next person.
     """
-    return sorted(p for p in REPO.rglob("*.md")
-                  if not {".git", "__pycache__", "node_modules"} & set(p.parts))
+    skip = {".git", "__pycache__", "node_modules", ".venv", "venv"}
+    try:
+        # Tracked plus new-but-not-ignored: a developer's local `.venv` or build tree
+        # holds third-party prose that is not this repo's to keep link-clean.
+        out = subprocess.run(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard",
+             "--", "*.md"],
+            cwd=REPO, capture_output=True, check=True).stdout
+        found = [REPO / n for n in out.decode("utf-8").split("\0") if n]
+        return sorted(p for p in found if p.is_file())
+    except (OSError, subprocess.CalledProcessError):
+        return sorted(p for p in REPO.rglob("*.md") if not skip & set(p.parts))
+
+
+def test_markdown_docs_ignores_untracked_third_party_trees():
+    """A developer's local `.venv` holds vendored READMEs that are not this repo's prose."""
+    bait = REPO / ".venv" / "regression-bait" / "README.md"
+    created = not (REPO / ".venv" / "regression-bait").exists()
+    bait.parent.mkdir(parents=True, exist_ok=True)
+    bait.write_text("[gone](does-not-exist.md)\n", encoding="utf-8")
+    try:
+        assert bait not in markdown_docs()
+    finally:
+        if created:
+            shutil.rmtree(bait.parent)
 
 
 @pytest.mark.parametrize("doc", markdown_docs(), ids=lambda p: p.as_posix())
