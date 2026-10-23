@@ -26,6 +26,9 @@ from shipped import SKILLS, shipped_text
 NEEDS_A_SIBLING = [
     pytest.param("setup", "the screenshot setup script", id="setup"),
     pytest.param("reconcile", "the scripts it runs", id="reconcile"),
+    pytest.param("onboard-client", "the category rule compiler and the check list",
+                 id="onboard-client"),
+    pytest.param("troubleshoot", "the check list and the scripts it runs", id="troubleshoot"),
 ]
 
 INSTALL_SHAPES = ["daily", "billables-daily"]
