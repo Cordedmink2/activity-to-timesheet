@@ -85,3 +85,174 @@ def test_an_answer_across_local_midnight_is_clipped_to_the_day(live_aw):
     out = run_cli(ca, [d.date_str()]).json()
     [a] = out["answers"]
     assert (a["start"], a["end"]) == ("23:30:00", "00:00:00")
+
+
+# --------------------------------------------------------------------------------------
+# T4 - classify: personal, one client, several clients, no client
+# --------------------------------------------------------------------------------------
+
+TERMS = {"clients": [{"client": "ACME", "terms": ["acme"]},
+                     {"client": "BETA", "terms": ["beta", "beta corp"]}],
+         "exclusions": ["physio"]}
+
+
+@pytest.mark.parametrize("words,cls,clients", [
+    ("lunch", "personal", []),
+    ("school run", "personal", []),
+    ("physio appointment", "personal", []),          # the user's own exclusion
+    ("", "personal", []),                            # dismissed
+    ("   ", "personal", []),
+    ("call with ACME", "work", ["ACME"]),
+    ("call with ACME and BETA", "work", ["ACME", "BETA"]),   # E4
+    ("meeting", "work", []),                         # work, no client
+    ("lunch with ACME", "personal", []),             # D6: personal wins
+    ("Lunch", "personal", []),                       # case-insensitive
+    ("launch planning", "work", []),                 # whole words: not "lunch"
+])
+def test_classify(words, cls, clients):
+    got = ca.classify(words, TERMS)
+    assert (got["class"], got["clients"]) == (cls, clients)
+
+
+def test_the_shipped_personal_list_names_no_client_or_person():
+    assert "acme" not in " ".join(ca.PERSONAL_WORDS).lower()
+    assert {"lunch", "school run", "coffee", "gym"} <= set(ca.PERSONAL_WORDS)
+
+
+# --------------------------------------------------------------------------------------
+# T5 / T6 / T8 - place each answer, rulings bind, off is settled
+# --------------------------------------------------------------------------------------
+import json  # noqa: E402
+
+import afk_blocks as ab  # noqa: E402
+
+
+def files(tmp_path, d, terms=TERMS, calendar=None, rulings=None):
+    """The three inputs the agent hands the script, written as the skill's steps write them."""
+    sk = ab.day_skeleton(d.afk_events(), d.window_events(), d.date, d.tz,
+                         afk_bucket=f"aw-watcher-afk_{d.host}")
+    paths = {"--skeleton": sk, "--terms": terms, "--calendar": calendar, "--rulings": rulings}
+    args = []
+    for flag, payload in paths.items():
+        if payload is None:
+            continue
+        f = tmp_path / (flag.strip("-") + ".json")
+        f.write_text(json.dumps(payload), encoding="utf-8")
+        args += [flag, str(f)]
+    return args
+
+
+def cal(*events):
+    return {"date": "2026-05-28", "events": [
+        {"id": f"evt-{s}", "subject": subj, "start": f"{s}:00", "end": f"{e}:00",
+         "corroborated": corr, "block": ({"start": f"{s}:00", "end": f"{e}:00"} if corr else None)}
+        for s, e, subj, corr in events], "dropped": []}
+
+
+def test_a_work_answer_over_a_break_is_one_question_and_never_a_block(live_aw, tmp_path):
+    d = worked(day()).checkin("12:00", "12:40", "call with ACME")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert out["questions"] == [{"start": "12:00:00", "end": "12:40:00", "words": "call with ACME",
+                                 "clients": ["ACME"], "calendar": None}]
+    assert out["hints"] == []
+    assert "blocks" not in out and "block" not in json.dumps(out["questions"])
+
+
+def test_one_question_cites_the_answer_and_an_uncorroborated_calendar_event(live_aw, tmp_path):
+    """E1: the stretch overlaps a calendar event the machine could not corroborate."""
+    d = worked(day()).checkin("12:00", "12:40", "meeting")
+    live_aw(d)
+    c = cal(("12:10", "12:30", "ACME sync", False))
+    out = run(d, *files(tmp_path, d, calendar=c)).json()
+    [q] = out["questions"]
+    assert q["words"] == "meeting" and q["calendar"]["subject"] == "ACME sync"
+    assert q["clients"] == []
+
+
+def test_an_answer_inside_a_corroborated_calendar_block_is_context_only(live_aw, tmp_path):
+    """E2: the calendar path already asks about it."""
+    d = worked(day()).checkin("12:05", "12:35", "meeting")
+    live_aw(d)
+    c = cal(("12:00", "12:40", "ACME sync", True))
+    out = run(d, *files(tmp_path, d, calendar=c)).json()
+    assert out["questions"] == [] and out["hints"] == []
+    assert out["answers"][0]["placement"] == "context"
+
+
+def test_a_gap_shorter_than_the_break_threshold_is_a_hint_not_a_question(live_aw, tmp_path):
+    """E3: a 10-minute away is no break, so the answer cannot explain one."""
+    d = worked(day()).checkin("14:00", "14:10", "call with ACME")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert out["questions"] == []
+    assert [(h["words"], h["clients"]) for h in out["hints"]] == [("call with ACME", ["ACME"])]
+
+
+def test_an_ask_answer_over_a_break_is_a_hint_only(live_aw, tmp_path):
+    """D7: a point in time cannot explain a gap."""
+    d = worked(day()).ask("12:20", "writing the ACME spec")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert out["questions"] == []
+    assert [h["source"] for h in out["hints"]] == ["ask"]
+
+
+def test_an_answer_about_client_b_does_not_touch_the_skeleton_for_client_a(live_aw, tmp_path):
+    d = worked(day()).checkin("14:00", "14:12", "BETA call")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert out["questions"] == [] and out["hints"][0]["clients"] == ["BETA"]
+
+
+def test_a_personal_answer_stays_a_break_with_no_question(live_aw, tmp_path):
+    d = worked(day()).checkin("12:00", "12:40", "lunch with ACME")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert out["questions"] == [] and out["hints"] == []
+    assert out["answers"][0]["class"] == "personal"
+
+
+def test_a_ruled_question_is_not_asked_again_even_if_the_words_changed(live_aw, tmp_path):
+    d = (worked(day()).checkin("12:00", "12:40", "call with ACME"))
+    live_aw(d)
+    ruled = {"checkin_questions": [{"start": "12:00:00", "end": "12:40:00", "ruling": "yes",
+                                    "words": "an older wording"}]}
+    out = run(d, *files(tmp_path, d, rulings=ruled)).json()
+    assert out["questions"] == []
+    assert [(r["start"], r["end"], r["ruled"]) for r in out["ruled"]] == [("12:00:00", "12:40:00", "yes")]
+
+
+def test_a_rulings_file_without_the_list_reads_without_error(live_aw, tmp_path):
+    d = worked(day()).checkin("12:00", "12:40", "call with ACME")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d, rulings={"blocks": []})).json()
+    assert len(out["questions"]) == 1 and out["ruled"] == []
+
+
+def test_the_script_writes_no_file(live_aw, tmp_path, monkeypatch):
+    d = worked(day()).checkin("12:00", "12:40", "call with ACME")
+    live_aw(d)
+    args = files(tmp_path, d)
+    before = sorted(p.name for p in tmp_path.iterdir())
+    run(d, *args)
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+
+
+def test_a_watcher_turned_off_is_settled_and_nothing_is_read(live_aw, tmp_path):
+    d = worked(day()).checkin("12:00", "12:40", "call with ACME")
+    srv = live_aw(d)
+    off = {**TERMS, "off": ["checkin", "ask"]}
+    r = run(d, *files(tmp_path, d, terms=off))
+    assert r.code == 0 and r.json()["status"] == "off" and r.json()["questions"] == []
+    assert not [q for q in srv.sent("GET", "/events")]
+
+
+def test_an_empty_bucket_is_a_plain_empty_status(live_aw, tmp_path):
+    d = worked(day())
+    b = d.buckets()
+    b[f"aw-watcher-ask-away_{d.host}"] = []
+    d.buckets = lambda: b  # type: ignore[method-assign]
+    live_aw(d)
+    r = run(d, *files(tmp_path, d))
+    assert r.code == 0 and r.json()["status"] == "empty"

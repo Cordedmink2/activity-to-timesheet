@@ -13,6 +13,7 @@ Sources, both optional:
 import argparse
 import datetime as dt
 import json
+import re
 import sys
 
 from aw_client import SourceError, fetch_events, get, pick_bucket, unreachable
@@ -21,6 +22,32 @@ from timezone import local_clock, resolve_zone_with_source, utc_bounds
 CHECKIN_PREFIX = "aw-watcher-ask-away"
 ASK_PREFIX = "aw-watcher-ask"
 AFK_PREFIX = "aw-watcher-afk"
+
+
+# Small, generic, ships no user's words (D11). The user's own exclusions extend it.
+PERSONAL_WORDS = ("lunch", "break", "coffee", "tea", "school run", "school pickup", "gym",
+                  "commute", "errand", "personal", "nap", "doctor", "dentist", "kids")
+
+
+def _has_word(text, term):
+    """Whole-word, case-insensitive: "launch" is not "lunch"."""
+    return re.search(rf"(?<!\w){re.escape(term.strip())}(?!\w)", text, re.IGNORECASE) is not None
+
+
+def classify(words, terms):
+    """One class per answer, in this order (D6: a personal match always wins).
+
+    personal: empty, or a shipped or user-excluded word. Otherwise work, naming the clients
+    whose terms appear - one, several (E4), or none ("meeting")."""
+    text = (words or "").strip()
+    if not text:
+        return {"class": "personal", "clients": []}
+    personal = list(PERSONAL_WORDS) + list((terms or {}).get("exclusions") or [])
+    if any(t.strip() and _has_word(text, t) for t in personal):
+        return {"class": "personal", "clients": []}
+    clients = [c["client"] for c in (terms or {}).get("clients") or []
+               if any(t.strip() and _has_word(text, t) for t in c.get("terms") or [])]
+    return {"class": "work", "clients": clients}
 
 
 def host_of(bucket):
@@ -63,24 +90,100 @@ def read_answers(events, source, zone, lo, hi):
     return sorted(out, key=lambda a: (a["start"], a["source"]))
 
 
-def read_day(date, zone):
+def _secs(clock, floor=0):
+    """Seconds since local midnight of an `HH:MM:SS` reading; a span end that reads at or
+    before its start has crossed midnight, which `floor` lifts by a day."""
+    h, m, sec = (int(x) for x in clock.rstrip("*").split(":"))
+    v = h * 3600 + m * 60 + sec
+    return v + 86400 if v < floor else v
+
+
+def _load(path):
+    if not path:
+        return None
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _span(a):
+    start = _secs(a["start"])
+    return start, _secs(a["end"], start + 1 if a["end"] != a["start"] else 0)
+
+
+def _ruling_for(rulings, start, end):
+    for r in (rulings or {}).get("checkin_questions") or []:
+        if r.get("start") == start and r.get("end") == end:
+            return r.get("ruling")
+    return None
+
+
+def place(answers, terms, skeleton, calendar, rulings):
+    """Sort each answer into question, hint or context. Never emits a block.
+
+    A check-in answer overlapping a break is clipped to it and becomes a question (D7: only
+    check-in answers do); a ruling already on file takes it out of `questions`. One that
+    overlaps no break, or any ask answer, is a hint. An answer inside a corroborated
+    calendar block is context only - the calendar path already asks."""
+    breaks = [(_secs(b["start"]), _secs(b["end"], _secs(b["start"]) + 1), b)
+              for b in (skeleton or {}).get("breaks") or []]
+    events = (calendar or {}).get("events") or []
+    questions, hints, ruled = [], [], []
+    for a in answers:
+        a.update(classify(a["words"], terms))
+        a["placement"] = "personal" if a["class"] == "personal" else "hint"
+        if a["class"] == "personal":
+            continue
+        lo, hi = _span(a)
+        if any(e.get("corroborated") and e.get("block")
+               and _secs(e["block"]["start"]) <= lo and hi <= _secs(e["block"]["end"])
+               for e in events):
+            a["placement"] = "context"
+            continue
+        over = [(max(lo, bs), min(hi, be), b) for bs, be, b in breaks
+                if a["source"] == "checkin" and min(hi, be) > max(lo, bs)]
+        if not over:
+            hints.append({k: a[k] for k in ("source", "start", "end", "words", "clients")})
+            continue
+        bs, be, b = max(over, key=lambda o: o[1] - o[0])
+        start, end = b["start"], b["end"]
+        a["placement"] = "question"
+        verdict = _ruling_for(rulings, start, end)
+        if verdict:
+            ruled.append({"start": start, "end": end, "ruled": verdict})
+            continue
+        cite = next(({"subject": e["subject"], "start": e["start"], "end": e["end"]}
+                     for e in events if not e.get("corroborated")
+                     and min(be, _secs(e["end"], _secs(e["start"]) + 1)) > max(bs, _secs(e["start"]))),
+                    None)
+        questions.append({"start": start, "end": end, "words": a["words"],
+                          "clients": a["clients"], "calendar": cite})
+    return questions, hints, ruled
+
+
+def read_day(date, zone, terms=None, skeleton=None, calendar=None, rulings=None):
     start_utc, end_utc = utc_bounds(date, zone)
     lo, hi = _parse(start_utc), _parse(end_utc)
-    result = {"date": date.isoformat(), "status": "absent", "host": None,
-              "answers": [], "questions": [], "hints": []}
+    off = set((terms or {}).get("off") or [])
+    result = {"date": date.isoformat(), "status": "absent", "host": None, "answers": [],
+              "questions": [], "hints": [], "ruled": []}
+    if {"checkin", "ask"} <= off:
+        result["status"] = "off"
+        return result
     try:
         buckets = get("/buckets/")
         afk = pick_bucket(buckets, AFK_PREFIX)
         host = host_of(afk)
         result["host"] = host
-        checkin = pick_for_host(buckets, CHECKIN_PREFIX, host)
-        ask = pick_for_host(buckets, ASK_PREFIX, host)
+        checkin = None if "checkin" in off else pick_for_host(buckets, CHECKIN_PREFIX, host)
+        ask = None if "ask" in off else pick_for_host(buckets, ASK_PREFIX, host)
         answers = (read_answers(fetch_events(checkin, start_utc, end_utc), "checkin", zone, lo, hi)
                    + read_answers(fetch_events(ask, start_utc, end_utc), "ask", zone, lo, hi))
     except Exception as exc:
         raise SourceError(unreachable(exc)) from None
     if checkin or ask:
         result["status"] = "ok" if answers else "empty"
+    result["questions"], result["hints"], result["ruled"] = place(
+        answers, terms, skeleton, calendar, rulings)
     result["answers"] = answers
     return result
 
@@ -89,6 +192,11 @@ def main():
     ap = argparse.ArgumentParser(description="Read one day's check-in answers (read-only).")
     ap.add_argument("date", help="YYYY-MM-DD (local date)")
     ap.add_argument("--utc-offset", type=float, default=None)
+    ap.add_argument("--terms", help="JSON: {clients: [{client, terms}], exclusions: [..], "
+                                    "off: [checkin|ask]}")
+    ap.add_argument("--skeleton", help="the day's `afk_blocks.py --json` output (breaks)")
+    ap.add_argument("--calendar", help="the day's `calendar_day.py` output")
+    ap.add_argument("--rulings", help="Timesheets/<date>_harvest_responses.json")
     args = ap.parse_args()
     try:
         date = dt.datetime.strptime(args.date, "%Y-%m-%d").date()
@@ -97,7 +205,12 @@ def main():
         return 2
     zone, _ = resolve_zone_with_source(args.utc_offset)
     try:
-        result = read_day(date, zone)
+        inputs = [_load(p) for p in (args.terms, args.skeleton, args.calendar, args.rulings)]
+    except (OSError, ValueError) as e:
+        print(f"ERR cannot read an input file: {e}", file=sys.stderr)
+        return 2
+    try:
+        result = read_day(date, zone, *inputs)
     except SourceError as e:
         print(f"ERR {e}", file=sys.stderr)
         return 1
