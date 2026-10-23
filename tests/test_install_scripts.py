@@ -25,6 +25,7 @@ PS_SCRIPTS = [
     INSTALL / "install_skill.ps1",
     INSTALL / "setup_workspace.ps1",
     SKILL / "scripts" / "setup_screenshot_pipeline.ps1",
+    SKILL / "scripts" / "setup_checkin_watcher.ps1",
     # The calendar adapter: `calendar_day.py` runs it under `powershell`, not `pwsh`.
     SKILL / "scripts" / "outlook_calendar.ps1",
 ]
