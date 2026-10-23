@@ -137,7 +137,10 @@ TOGGLE = "TIMESHEET_OUTLOOK_CALENDAR"
 #   prefix at all, and `Meeting join | <Subject> | …` on joining. Corroborates only the event
 #   whose subject it names — the first `|` segment, or the one after `Meeting join` — compared
 #   ignoring case and surrounding space, and only from the meeting client (#89): a folder or a
-#   document that happens to share a subject's words is not attendance.
+#   document that happens to share a subject's words is not attendance. A title that only
+#   nearly names it (#114: Teams spells out an abbreviation the invite kept short) counts
+#   when it shares the subject's prefix before the last ` - ` and opens within
+#   NEAR_TITLE_START of the event's start.
 #
 # The soft boundary in SKILL.md Step 3 is the looser, model-applied counterpart: any Teams
 # window *except* the screens in NON_MEETING_SCREENS. A false positive there only splits a
@@ -156,6 +159,14 @@ NON_MEETING_SCREENS = frozenset({"chat", "activity", "calendar", "teams", "files
 # clients' work. A minute is still well under a meeting anyone attended; `--min-evidence`
 # moves it.
 MIN_EVIDENCE = 60.0
+
+# How far from an event's start a subject-titled window may open and still be the same meeting
+# when its title only *nearly* names the subject (#114). Teams can show the meeting's own title
+# where the calendar item carries the invite's: an abbreviation spelled out. Equality then
+# fails, so the series prefix (everything before the last ` - `) plus a start this close is
+# what vouches for it. Two minutes: a person joins about when it begins; a window that opens
+# later is another meeting of the series, or its chat.
+NEAR_TITLE_START = 120.0
 
 # The adapter the toggle names. Beside this script rather than configured, because there
 # is one, and a second calendar earns a toggle of its own rather than a path setting a user
@@ -291,6 +302,26 @@ def _normal(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
+def _series(normal_subject: str) -> str:
+    """Everything before the last ` - ` of a normalised subject, or "" when it has none."""
+    head, sep, _ = normal_subject.rpartition(" - ")
+    return head.strip() if sep else ""
+
+
+def _names_event(key, run_start: dt.datetime, wanted: str | None,
+                 event_start: dt.datetime) -> bool:
+    """Whether a run's key corroborates the event: a prefixed title for any event, the same
+    subject, or (#114) a title sharing the subject's series prefix that opens within
+    `NEAR_TITLE_START` of the event's start."""
+    if key is ANY_EVENT or key == wanted:
+        return True
+    if wanted is None or not isinstance(key, str):
+        return False
+    series = _series(wanted)
+    return bool(series) and series == _series(key) and (
+        abs((run_start - event_start).total_seconds()) <= NEAR_TITLE_START)
+
+
 def meeting_key(app: str, title: str) -> str | None | bool:
     """What a window can corroborate: `ANY_EVENT` for a prefixed meeting or call title, the
     normalised subject it names for a subject-titled Teams window, or False for a window
@@ -372,7 +403,7 @@ def verdict(start: dt.datetime, end: dt.datetime, runs: list[Run],
     block already covers, and nothing here re-times what the calendar said.
     """
     wanted = None if subject is None else _normal(subject)
-    usable = [(s, e) for key, s, e in runs if key is ANY_EVENT or key == wanted]
+    usable = [(s, e) for key, s, e in runs if _names_event(key, s, wanted, start)]
     seen = [(s, e) for s, e in usable if e > start and s < end] if end > start else []
     inside = sum((min(e, end) - max(s, start)).total_seconds() for s, e in seen)
     if not seen or inside < min_evidence:

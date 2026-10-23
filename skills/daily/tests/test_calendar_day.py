@@ -987,3 +987,37 @@ def test_the_evidence_share_counts_only_the_time_inside_the_event():
 def test_an_uncorroborated_event_has_no_share():
     s = dt.datetime(2026, 5, 28, 9, tzinfo=dt.timezone.utc)
     assert cd.verdict(s, s + dt.timedelta(hours=1), [])["evidence_share"] is None
+
+
+# --------------------------------------------------------------------------------------
+# A window that spells out an abbreviation in the subject (#114)
+# --------------------------------------------------------------------------------------
+
+ABBREVIATED = "Vendor A // Product B - PCK and AI"
+SPELLED_OUT = "Vendor A // Product B - Package Kit spelled out and AI"
+SPELLED_TITLED = f"{SPELLED_OUT} | Northwind | user@example.com | Microsoft Teams"
+
+
+def test_a_window_that_spells_out_an_abbreviation_in_the_subject_corroborates_the_event():
+    """#114: the calendar item says `<Series> - <ABBR> and AI`, Teams shows the meeting's own
+    title with the abbreviation spelled out. Same series prefix, and the window opens within
+    seconds of the event's start: an attended meeting, not an unseen one."""
+    d = day().active("12:00", "13:30")
+    d.window("12:30:15", "12:36:04", TEAMS, SPELLED_TITLED)
+    assert verdict_of(event("12:30", "13:00", subject=ABBREVIATED), d) == (
+        True, {"start": "12:30:15", "end": "12:36:04"}, span("12:30", "13:00"))
+
+
+def test_a_near_title_that_opens_long_after_the_event_started_does_not_corroborate():
+    """The prefix match is a guess, so it is held to the event's start: a window that opens
+    ten minutes in is another meeting of the same series, or its chat."""
+    d = day().active("12:00", "13:30")
+    d.window("12:40", "12:50", TEAMS, SPELLED_TITLED)
+    assert verdict_of(event("12:30", "13:00", subject=ABBREVIATED), d) == (False, None, None)
+
+
+def test_a_near_title_with_no_shared_series_prefix_does_not_corroborate():
+    d = day().active("12:00", "13:30")
+    d.window("12:30:15", "12:40", TEAMS,
+             "Vendor C // Product D - Package Kit | Northwind | Microsoft Teams")
+    assert verdict_of(event("12:30", "13:00", subject=ABBREVIATED), d) == (False, None, None)
