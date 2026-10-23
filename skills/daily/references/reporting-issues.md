@@ -36,6 +36,16 @@ are usually the whole evidence.
 
 Never paste `.env`, a Harvest token, or any part of `.context.md`.
 
+## From the setup menu
+
+The `setup` skill's menu offers "Report a problem or ask for a change" as its own path, outside a drafted day. There you **draft and hand over; you never run `gh issue create` and never post anything.** Write the redacted draft (see "Redact before drafting, not after") to `Timesheets/<date>_skill-issue.md`, show it to the user, and give them the exact line to run themselves when they are ready:
+
+```
+gh issue create -R Cordedmink2/activity-to-timesheet --title "<title>" --body-file Timesheets/<date>_skill-issue.md
+```
+
+The draft holds no client name, host or answer from this machine: replace each with its placeholder before you save it. A run of the `daily` skill that finds a defect keeps the route in "Filing" below, which asks for a yes first.
+
 ## Filing
 
 **You may file it — after showing the user and getting an explicit yes.** Not filing at all

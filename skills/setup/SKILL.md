@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Walk a first-time user through installing this plugin — offering to install what the machine is missing, installing the activity source and the browser extensions, interviewing them about their clients to tag single-client browser profiles, write a starter workspace context file and write and verify their category rules, getting the screenshot task past endpoint security, settling whether the Outlook calendar is read, and offering the two optional check-in watchers that ask what you were doing while you were away — verifying each one before moving on, in plain language for a non-technical user. User-invoked.
+description: Open with a menu — set up on a new machine, finish a partial setup, add a new client, fix something that stopped, or report a problem — then walk the user through installing this plugin — offering to install what the machine is missing, installing the activity source and the browser extensions, interviewing them about their clients to tag single-client browser profiles, write a starter workspace context file and write and verify their category rules, getting the screenshot task past endpoint security, settling whether the Outlook calendar is read, and offering the two optional check-in watchers that ask what you were doing while you were away — verifying each one before moving on, in plain language for a non-technical user. User-invoked.
 compatibility: Windows-first. Reads a running ActivityWatch server over HTTP (default http://localhost:5600). Step 5 registers a Windows scheduled task and needs PowerShell plus Python 3.10+; on macOS and Linux there is no screenshot capture to set up and that step is skipped. Step 6 reports the calendar off without classic Outlook. Step 7 offers the optional check-in watchers (Python 3.11+). Needs a harness that can execute local commands and make HTTP requests. Posts nothing to any timesheet provider.
 disable-model-invocation: true
 ---
@@ -39,6 +39,34 @@ Seven steps, and then a stated finish.
 
 Steps 4, 5 and 6 run scripts that ship with the `daily` skill, in a directory beside this one. Resolve **this** skill's folder from where this `SKILL.md` was read, then look for a sibling named `daily` — or, in the shared export, `billables-daily`, because that directory is flat and every skill in it is prefixed. Check which of the two exists rather than guessing; a wrong prefix fails as "file not found", which reads like a broken install rather than a wrong path.
 
+## What do you want to do?
+
+Ask this first, before any install step, in plain words. Offer exactly these five and send the user down the path they pick:
+
+1. **Set up on a new machine** → "Before you start", then the Steps.
+2. **Finish setup on a machine that already has some of it** → "A machine that already has some of it", below.
+3. **Add a new client** → the `onboard-client` skill, a sibling of this one (resolved as below).
+4. **Fix something that stopped working** → the `troubleshoot` skill, a sibling of this one.
+5. **Report a problem or ask for a change** → `daily/references/reporting-issues.md`, "From the setup menu". You draft it and hand it over. You never send, file or post it from here.
+
+A user who has already said what they want ("I've got a new client", "my screenshots stopped") has named their job: do not ask the menu. Take their first action on that path. A user whose answer fits two paths ("new laptop, same clients") gets choice 2, which finds what is missing.
+
+## What only a person does
+
+Setup does every other step itself, once, after one plain line on what it will do and why. These are the steps only a person can do, and the only ones to ask for:
+
+- **Click Add** on a browser-store page. Setup opens the page in the right profile. The store gives no way to do this for them.
+- **Accept an administrator prompt** for an install that already needs one today (the table in `references/install-commands.md`). No new install that needs administrator rights is added here; it is not setup's decision to make.
+- **Accept a consent page**, such as the one Firefox shows after the web watcher installs.
+- **Put a credential in the configuration dialog**, never in the conversation (`/plugin configure billables`, or the `.env` on an exported install).
+- **Type a category by hand**, only where this ActivityWatch build refuses the write. Step 4 says so out loud first.
+
+Each of these is recorded as verified by its own check in `references/checks.md`, and no other step asks the user to type a command, a pattern or a path.
+
+## A machine that already has some of it
+
+Run each check in `references/checks.md` in order and read the answer. **Skip every check that passes.** Offer only what is missing, as one list with a plain line on each, and do it after a yes. Never write over the user's context file or their category rules: show the diff first, and write only after a yes. A check that fails on an existing install is the `troubleshoot` skill's job to explain; here, fix the missing piece and go on. Their rules were written by an older version? Leave them alone. The daily run's own check says when they are stale.
+
 ## Before you start
 
 Five things before step 1 — the first four in parallel, then the fifth from what they found:
@@ -67,7 +95,7 @@ Five things before step 1 — the first four in parallel, then the fifth from wh
 
    The commands are in `references/install-commands.md`, one row per item.
 
-   Ask once — "Shall I install these for you?" — and run only what the user says yes to: a machine-wide install is theirs to choose. Say before you start that Windows may show an administrator prompt and that it is theirs to accept. Anything declined falls back to the step's own instruction, as if nothing had been offered.
+   Ask once — "Shall I install these for you?" — and run only what the user says yes to: a machine-wide install is theirs to choose. The administrator prompt is one of the steps in "What only a person does". Say before you start that Windows may show an administrator prompt and that it is theirs to accept. Anything declined falls back to the step's own instruction, as if nothing had been offered.
 
    **Verify each install by re-running its probe**, not by the installer's exit code. A new Python is not on this session's `PATH` until the shell restarts — probe it by `py` or by the path winget printed. A new Git Bash reaches nothing until a new session starts, because the hook that publishes the configuration runs at session start; say so, and have the user restart and invoke setup again rather than carrying on without it.
 
@@ -112,7 +140,7 @@ Window titles are the only client signal that survives into the activity stream.
 | URL in title — required | https://chromewebstore.google.com/detail/url-in-title/ignpacbgnbnkaiooknalneoeladjnfgb | none this plugin has been tested with |
 | ActivityWatch web watcher — recommended | https://chromewebstore.google.com/detail/activitywatch-web-watcher/nglaklhklhcoonedhgnpgddginnjdadi | https://addons.mozilla.org/firefox/addon/aw-watcher-web/ |
 
-**Do** — for each browser and work profile "Before you start" found, offer to open the store pages in that profile for them: `Start-Process "<browser exe>" -ArgumentList '--profile-directory="<profile dir>"', '<store url>'`, with the directory from `Local State`. The profile has to be named: without it the page opens in whichever profile was used last, and the extension lands in the wrong one. The user still clicks **Add** — a store install cannot be done for them without browser policy. Then give the user this:
+**Do** — for each browser and work profile "Before you start" found, offer to open the store pages in that profile for them: `Start-Process "<browser exe>" -ArgumentList '--profile-directory="<profile dir>"', '<store url>'`, with the directory from `Local State`. The profile has to be named: without it the page opens in whichever profile was used last, and the extension lands in the wrong one. The user still clicks **Add** ("What only a person does") — a store install cannot be done for them without browser policy. Then give the user this:
 
 > **Add two extensions to each browser profile you work in.** They let your timesheet see which website each window shows.
 >
