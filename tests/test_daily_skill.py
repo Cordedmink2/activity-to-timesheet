@@ -310,3 +310,58 @@ def test_final_verify_ships_is_linked_and_sits_between_review_and_the_gate():
     skill = shipped.skill_md_text(DAILY)
     assert "references/final-verify.md" in skill
     assert len(skill.split()) < 5000, "SKILL.md is over its 5,000-word ceiling"
+
+
+# --------------------------------------------------------------------------------------
+# Check-in answers (intent/check-in-answers, ADR-0009): an answer is a question, not a block
+# --------------------------------------------------------------------------------------
+CHECKIN_REF = DAILY / "references" / "check-in-answers.md"
+MAIN_WORD_BASELINE = 4939      # SKILL.md on main before this feature (plan D9)
+CHECKIN_WORD_BUDGET = 60       # net words the feature may add to SKILL.md
+
+
+def step(number: str) -> str:
+    found = [s for s in steps() if s.startswith(f"### Step {number} ")]
+    assert len(found) == 1, f"no single Step {number}"
+    return found[0]
+
+
+def test_the_glossary_defines_a_check_in_question():
+    assert "**Check-in question**" in CONTEXT_MD.read_text(encoding="utf-8")
+
+
+def test_step_2_names_the_reader_and_its_statuses():
+    text = step("2")
+    assert "scripts/checkin_answers.py" in text and "references/check-in-answers.md" in text
+    for status in ("off", "absent", "empty"):
+        assert says(text, status), f"Step 2 does not name the {status!r} status"
+
+
+def test_step_6_says_a_check_in_question_is_not_a_block():
+    text = step("6")
+    assert says(text, "check-in question")
+    low = text.lower()
+    assert "not a block" in low or "none is a block" in low
+    assert "--cover" in text and "batch-accept" in low
+
+
+def test_step_10_records_both_rulings_under_checkin_questions():
+    text = step("10")
+    assert "checkin_questions" in text and says(text, "yeses") and says(text, "noes")
+
+
+def test_the_check_in_reference_exists_and_skill_md_lists_it():
+    assert CHECKIN_REF.is_file()
+    assert "check-in-answers.md" in shipped.skill_md_text(DAILY)
+    body = CHECKIN_REF.read_text(encoding="utf-8")
+    for needed in ("--terms", "--calendar", "--rulings", "--skeleton", "checkin_questions",
+                   "never", "hint"):
+        assert needed in body, f"check-in-answers.md lost {needed!r}"
+
+
+def test_the_feature_fits_the_net_word_budget_of_the_plan():
+    words = len(shipped.skill_md_text(DAILY).split())
+    assert words <= MAIN_WORD_BASELINE + CHECKIN_WORD_BUDGET, (
+        f"SKILL.md is {words} words; D9 allows {CHECKIN_WORD_BUDGET} net over {MAIN_WORD_BASELINE}. "
+        "Do not move existing text: block for atlas.")
+    assert words < 5000

@@ -83,3 +83,35 @@ jobs:
 
       - name: Tests against the real server
         run: python -m pytest -q skills/daily/tests --real-aw
+
+  # The shared Windows end-to-end job for the check-in watchers (check-in-answers T14). It
+  # registers the logon task for real, serves answers from the real Windows aw-server and
+  # runs the daily scripts over them. Later builds add steps to the driver, not to this job.
+  # Not shown here, and said so in the driver: a real away period, the logon trigger after a
+  # real sign-in, a person answering the dialog, focus. The runner is an admin account.
+  windows-e2e:
+    name: check-in watchers end to end (windows-latest, ActivityWatch ${{ matrix.aw }})
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        aw: ["v0.14.1"]
+    steps:
+      - uses: actions/checkout@v4
+
+      # 3.11 or newer: the pinned `aw-watcher-ask-away` requires it.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Fetch the ActivityWatch server
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ matrix.aw }}" -R ActivityWatch/activitywatch `
+            -p "activitywatch-${{ matrix.aw }}-windows-x86_64.zip" -D "$env:RUNNER_TEMP"
+          Expand-Archive "$env:RUNNER_TEMP\activitywatch-*.zip" -DestinationPath "$env:RUNNER_TEMP\aw"
+          "AW_SERVER=$env:RUNNER_TEMP\aw\activitywatch\aw-server-rust\aw-server-rust.exe" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Check-in watchers end to end
+        run: python tests/e2e/windows_checkin_e2e.py "$env:AW_SERVER"

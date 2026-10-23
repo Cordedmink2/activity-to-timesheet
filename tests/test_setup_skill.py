@@ -779,3 +779,73 @@ def test_step_3_keeps_url_in_title_required_for_chrome_and_says_so_by_browser():
 def test_step_3_does_not_claim_firefox_support_for_profile_names():
     assert re.search(r"Firefox[^.\n]*(?:not (?:been )?(?:verified|measured|tested)|unverified)",
                      shipped_text())
+
+
+# --------------------------------------------------------------------------------------
+# Check-in answers (intent/check-in-answers, US-4): the watcher offer
+# --------------------------------------------------------------------------------------
+CHECKIN_REF = SETUP / "references" / "checkin-watchers.md"
+CHECKIN_PS = SKILLS / "daily" / "scripts" / "setup_checkin_watcher.ps1"
+CHECKIN_READER = SKILLS / "daily" / "scripts" / "checkin_answers.py"
+
+
+def checkin_step() -> tuple[str, str]:
+    return one_step_about(r"check-in")
+
+
+def test_the_checkin_step_offers_each_watcher_with_what_it_asks_and_when():
+    heading, body = checkin_step()
+    low = body.lower()
+    assert "check-in watcher" in low and "ask watcher" in low
+    assert "come back" in low or "return" in low, "it never says when the check-in watcher asks"
+    assert "twice a day" in low or "two prompts" in low, "it never says when the ask watcher asks"
+    assert re.search(r"what (you were|you are) doing|what you did", low)
+
+
+def test_the_windows_path_never_recommends_the_ask_watcher_or_zenity():
+    heading, body = checkin_step()
+    ref = CHECKIN_REF.read_text(encoding="utf-8")
+    # Zenity is the Mac and Linux ask watcher's own dialog program, named only in its section.
+    outside_ask = ref.split("## The ask watcher")[0] + ref.split("## Not used")[-1]
+    ask_section = ref.split("## The ask watcher")[1].split("## Not used")[0]
+    assert "mac and linux only" in ask_section.lower()
+    text = body + outside_ask
+    assert "zenity" not in text.lower().replace("no zenity", "").replace("not zenity", "")
+    assert re.search(r"windows[^.\n]*(not offered|never offered|only the check-in)", text, re.I) or \
+        re.search(r"(not offered|never offered|only the check-in)[^.\n]*windows", text, re.I)
+
+
+def test_a_decline_is_written_as_off_and_reported_by_the_user_s_choice():
+    heading, body = checkin_step()
+    assert "Check-in watcher: off" in body and "Ask watcher: off" in body
+    assert "by your choice" in (body + shipped.section(skill_text(), "Done")).lower()
+
+
+def test_the_step_uses_the_probe_and_diagnose_modes_and_deletes_only_on_a_named_yes():
+    heading, body = checkin_step()
+    assert "checkin_answers.py" in body and "--probe" in body and "--diagnose" in body
+    low = (body + CHECKIN_REF.read_text(encoding="utf-8")).lower()
+    assert "export" in low and re.search(r"only .*yes|yes .*by name|named", low)
+    assert CHECKIN_READER.is_file()
+
+
+def test_the_reference_says_how_to_install_verify_and_remove_and_why_pr_5_is_not_used():
+    body = CHECKIN_REF.read_text(encoding="utf-8")
+    for needed in ("0.0.6", "Python 3.11", "Get-ScheduledTask", "removal line", "aw-qt", "PR #5"):
+        assert needed in body, f"checkin-watchers.md lost {needed!r}"
+    assert CHECKIN_PS.name in body
+    assert "Unregister-ScheduledTask" in CHECKIN_PS.read_text(encoding="utf-8-sig")
+
+
+def test_the_finish_and_the_description_name_the_checkin_watchers():
+    assert "check-in" in shipped.frontmatter(skill_text()).get("description", "").lower()
+    assert "check-in" in shipped.section(skill_text(), "Done").lower()
+
+
+def test_the_ask_watcher_is_offered_only_with_install_pin_schedule_verify_and_remove():
+    ref = CHECKIN_REF.read_text(encoding="utf-8")
+    ask = ref.split("## The ask watcher")[1].split("## Not used")[0]
+    assert re.search(r"@[0-9a-f]{40}", ask), "the install is pinned to a commit"
+    assert "--schedule" in ask and "1-5" in ask, "two weekday prompts"
+    assert "--probe ask" in ask
+    assert "uninstall aw-watcher-ask" in ask

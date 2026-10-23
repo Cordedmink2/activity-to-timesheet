@@ -56,6 +56,8 @@ span) outranks one it does not, and an uncorroborated event is put to the user a
 **calendar question** rather than billed on the calendar's word alone. Outlook today, behind a narrow adapter, so a second
 calendar is an adapter rather than a rewrite.
 
+**Check-in question** — what the user typed when the check-in watcher asked, on return from away, what they were doing, put back to them at review as a question. An answer is context, not a block: it never creates time on its own, the user's own yes does, and a no or a silence leaves the stretch unbilled. Personal words (lunch, school run) keep a break a break. The same shape as a **calendar question**, and for the same reason (ADR-0009).
+
 **Timesheet provider**, or just **provider** — the service that holds billed time and invoices
 from it. The only one of the three that is *written* to, which is why the confirmation gate lives
 against it — once, in the dispatcher behind the `timesheet-provider` command. Harvest today,
