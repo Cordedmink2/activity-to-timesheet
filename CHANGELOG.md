@@ -130,7 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Setup has a new step 7 that offers each watcher; a decline is `Check-in watcher: off`, not a
   failure. On Windows, `setup_checkin_watcher.ps1` registers one per-user logon task: no admin, no new
   program. Not verified: that the watcher writes after a real away period, that the logon task starts
-  after a real sign-in, and a person answering the real window. See ADR-0009.
+  after a real sign-in, and a person answering the real window. A new `windows-e2e` CI job registers
+  the task for real and checks the answers end to end on Windows. See ADR-0009.
 - **A category rule that went quiet is flagged** (#99). `category_rules.py --dormant <date>`
   asks the activity source which rules labelled something in the previous fortnight and label
   nothing on the day, and the daily run raises each one at the end, with the date it last
