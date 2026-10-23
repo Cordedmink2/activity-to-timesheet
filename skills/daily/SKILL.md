@@ -97,6 +97,7 @@ Read in parallel:
   - **`ERR the calendar is off: TIMESHEET_OUTLOOK_CALENDAR is not set to true …`** — the only benign refusal; most installs. Read the day from the other sources and say nothing more. (If the line names a shell, you are in the wrong shell.)
   - **Anything else stops the run** — report the `ERR` line as it stands. A calendar the user turned *on* and did not get silently loses meetings; don't retry without the toggle or run the adapter yourself. `the calendar stays *off*: …` is not the bullet above: the toggle is on and the calendar cannot be read here.
   - **One reason is neither** — ActivityWatch unreachable while you read `compact.jsonl`: say once the calendar could not be read either. An event with no verdict is an unanswered question, not an uncorroborated one.
+- `python scripts/checkin_answers.py <date>` — typed answers on return; `off`, `absent`, `empty` need nothing said, else read `references/check-in-answers.md`.
 - Screenshot index: list the day's folder (PowerShell). Don't open PNGs yet.
   - **`captures: none for this date` in the skeleton is the capture task dead all day** — treat every block as having no screenshot fallback; raise it at Step 11.
   - **Compare the last capture's timestamp against `work_end`.** If captures stop well before it, say so with the skeleton and flag later blocks 🔸 on weaker evidence. A dead capture task is maintenance: finish the day first (`references/first-run.md`).
@@ -159,6 +160,7 @@ Show, for every block, its time range, duration, client and the note it will pos
 - **Batch-accept covers the drafted blocks only**; each calendar question takes its own answer.
 - **A yes makes it a block over the event's span**, classified like any other and declared naming the event and the answer. It may sit outside the active spans, across a break or past `work_end`; the guards don't touch it. It **replaces what it covers rather than doubling it** — a yes to a 15:00–15:30 call inside a drafted 13:30–17:00 stretch splits it in three, never a fourth entry on top (`--cover` can't see a double). Under 0.25 hr it folds into a same-client neighbour or goes back to the user. Step 8 lists it and passes it to `--cover`.
 - **A no, or no answer, leaves it unbilled** — out of the draft, `--cover` and Step 9; ask once.
+- **A check-in question** is not a block: own answer, never in `--cover` or batch-accept.
 
 **Show the AFK skeleton with the draft**: work span, breaks, active minutes, hours billed, active time left unaccounted.
 
@@ -211,7 +213,7 @@ Fix a wrong entry with `python scripts/provider/bin/timesheet-provider patch <en
 
 ### Step 10 — Wrap-up
 
-Summarise total hours posted, blocks deferred or skipped, and whether more days are outstanding — **don't name the next date here**; Step 12 does after the reset ask. Save the entry ids to `Timesheets/<date>_harvest_responses.json`: `{"entries": [{"id": 2933345845, "project_code": "NWC-001", "hours": 0.25, "notes": "..."}], ...}`. **Record every calendar question the user answered there too — yeses and noes, with the answer.** An accepted block has no activity evidence behind it, and Step 1's already-covered branch looks here for a ruling. A recorded no binds: that date does not ask again.
+Summarise total hours posted, blocks deferred or skipped, and whether more days are outstanding — **don't name the next date here**; Step 12 does after the reset ask. Save the entry ids to `Timesheets/<date>_harvest_responses.json`: `{"entries": [{"id": 2933345845, "project_code": "NWC-001", "hours": 0.25, "notes": "..."}], ...}`. **Record every calendar question the user answered there too — yeses and noes, with the answer — and check-in questions under `checkin_questions`.** An accepted block has no activity evidence behind it, and Step 1's already-covered branch looks here for a ruling. A recorded no binds: that date does not ask again.
 
 ### Step 11 — Surface skill or `.context.md` improvements
 
@@ -237,6 +239,6 @@ Present what the run revealed, **one fact per ask, as the exact diff**: this use
 
 ## Files in this skill
 
-`references/scripts.md` lists every script with its flags; read it before running one you have not used this session. The references: `first-run.md` (first-run setup, screenshot health check, category maintenance), `context.md.example` (the `.context.md` template), `classification-rules.md` (the rubric, read at Step 2 on every run), `disambiguation.md` (Step 5), `final-verify.md` (Step 6b), `day-reading.md` (mechanism behind Steps 1–3 and the screenshot folder), `review-and-posting.md` (mechanism behind Steps 6–12), `scripts.md`, `activitywatch.md`, `output-format.md`, `catalog-refresh.md`, `new-client-work.md`, `reporting-issues.md`.
+`references/scripts.md` lists every script with its flags; read it before running one you have not used this session. The references: `first-run.md` (first-run setup, screenshot health check, category maintenance), `context.md.example` (the `.context.md` template), `classification-rules.md` (the rubric, read at Step 2 on every run), `disambiguation.md` (Step 5), `final-verify.md` (Step 6b), `check-in-answers.md` (Step 2 answers), `day-reading.md` (mechanism behind Steps 1–3 and the screenshot folder), `review-and-posting.md` (mechanism behind Steps 6–12), `scripts.md`, `activitywatch.md`, `output-format.md`, `catalog-refresh.md`, `new-client-work.md`, `reporting-issues.md`.
 
 `.env.example` is the credential template. `docs/CONTRIBUTING.md` and `docs/skills/daily/decision-log.md` are in the repository, not an installed copy: **for changing this skill, not running it**.
