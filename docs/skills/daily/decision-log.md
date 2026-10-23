@@ -3336,3 +3336,12 @@ whether `aw_client.py` ought to drop `LockApp.exe` spans from the timeline altog
   deletion condition written into its entry.
 - `tests/` has no coverage asserting `SKILL.md`'s *behavioural* claims, and by the
   method above it never usefully will — don't add doc-behaviour assertions there.
+
+### Check-in answers: what the build found and what it could not verify — `SKILL.md` Steps 2, 6, 10; setup step 7
+Rung: tests against fixtures copied from the watchers' source (rung 3); the rest named below is unverified.
+- **0.0.6 is the pinned install (H1).** `aw-watcher-ask-away` 0.0.6 is the newest release on PyPI (published 2023; versions 0.0.2 to 0.0.6). Read from its `core.py`: bucket `aw-watcher-ask-away_<host>`, event type `afktask`, one event over the away gap, `data["message"]`. The same names are in the upstream default branch, last commit 2023-11-01. It needs Python 3.11 or newer, which setup now says. It was not started on Windows here.
+- **The watcher has no host or bucket option (H3).** `find_afk_bucket` matches every bucket whose name contains `afk`, so two AFK buckets from two computers make it stop. The fix is therefore removing the stale bucket, after an export, and only on the user's yes naming it; `checkin_answers.py --diagnose` names it and deletes nothing.
+- **`aw-qt` starts any `aw-*` program on its path (H2)**, read from `aw_qt/manager.py` `_discover_modules_in_directory`; its default autostart list is the server and the two stock watchers, so the check-in watcher is added to that list by the user. Read, not run on a Mac.
+- **PR #5 (block check-ins) is not used.** Independent review t_d30c6616 failed it at aada3d3: its README says to keep the window flags off for unattended use, it has no quiet hours, cooldown or daily cap, nobody tested it on Windows, and it is unmerged and stacked on PR #4. Setup never offers it.
+- **A personal word wins over a client name** (D6): "lunch with ACME" stays a break. The cost is a client lunch missed unless the user dictates it at review.
+- **Not verified, and not marked passed.** (1) The watcher writing an event after a real away period. (2) The logon task starting after a real sign-in or reboot. (3) A person answering the real window, and focus. The Windows CI job drives the injectable parts only. For Atlas's ship decision. Owner of the pin: dev, re-checked when Atlas next reviews the plugin; look at the upstream release state of `aw-watcher-ask-away` on 2027-01-15.

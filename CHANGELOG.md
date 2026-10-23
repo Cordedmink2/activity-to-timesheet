@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   catalog alone (`--dataverse-only`); the provider's catalog is `timesheet-provider refresh`.
 
 ### Fixed
+- **The link test no longer reads a developer's local `.venv`** (check-in answers prerequisite). `markdown_docs()` walked
+  every `*.md` under the repo, so a `.venv/` held vendored READMEs the test then failed on. It now reads the repo's own
+  documents (`git ls-files`), and `.venv/` is gitignored. Nothing for a user to do.
 - **A Teams meeting whose window title spells out an abbreviation in the calendar subject is corroborated** (#114).
   `Vendor - ABBR and AI` on the calendar against `Vendor - Abbreviation spelled out and AI` in the window
   used to come back uncorroborated and surface as "no meeting window seen". A subject-titled window now
@@ -116,6 +119,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every rule write reported itself unconfirmed.
 
 ### Added
+- **What you typed when a check-in watcher asked what you were doing now reaches your review.**
+  `checkin_answers.py` reads the answers of `aw-watcher-ask-away` (on return from away) and
+  `aw-watcher-ask` (Mac and Linux), read-only, for this computer only. A work answer over a break
+  is put to you as a **check-in question**: listed apart from the table, its own answer,
+  never covered by batch-accept, never drafted. A yes makes a block you dictated; a no or a
+  silence leaves the time unbilled, and both are recorded so a re-run does not ask twice.
+  Personal words (lunch, school run, your own exclusions) keep a break a break. A shorter gap, or an
+  answer from the ask watcher, is a hint for Step 5 and never settles a block the activity settled.
+  Setup has a new step 7 that offers each watcher; a decline is `Check-in watcher: off`, not a
+  failure. On Windows, `setup_checkin_watcher.ps1` registers one per-user logon task: no admin, no new
+  program. Not verified: that the watcher writes after a real away period, that the logon task starts
+  after a real sign-in, and a person answering the real window. See ADR-0009.
 - **A category rule that went quiet is flagged** (#99). `category_rules.py --dormant <date>`
   asks the activity source which rules labelled something in the previous fortnight and label
   nothing on the day, and the daily run raises each one at the end, with the date it last

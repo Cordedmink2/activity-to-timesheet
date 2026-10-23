@@ -51,7 +51,8 @@ It offers to install whatever your machine is missing — ActivityWatch, Python,
 each install only once you say yes. It walks you through the browser extensions, asks you about
 your clients in plain language, tags the profiles that belong to one client, creates your workspace
 with a starter `.context.md` naming each client, writes your category rules for you, sets up the
-screenshot task and settles whether your Outlook calendar is read — and *verifies each one before
+screenshot task, settles whether your Outlook calendar is read and offers the optional check-in watchers that ask
+what you were doing while you were away — and *verifies each one before
 moving on*, which is the difference that matters: every one of those
 steps can look like it worked and have done nothing, and the symptom arrives days later as an
 empty timesheet. It tells you when setup is finished.
