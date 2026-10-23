@@ -223,28 +223,19 @@ def compiler_max_terms() -> int:
     raise AssertionError("no MAX_TERMS in the compiler — the check has nothing to read")
 
 
-def test_the_category_step_hands_the_compiler_the_candidate_shape_it_reads():
-    """The step shows a run the file it writes; the script decides what the file means.
-
-    The walkthrough once offered signal types the compiler had renamed, and a candidate
-    refused on every install is a step whose recourse — recompose and try again — keeps
-    handing back the same refusal. So the step's own example is parsed and held to the keys
-    the compiler reads, and the cap it states is the compiler's.
-    """
+def test_the_category_step_hands_the_compiler_the_context_file_it_reads():
+    """The step used to show a candidates file; since guided-setup the compiler reads the
+    clients and their terms from the context file (`--from-context`), so the step's
+    example is the context file's own template line, and the cap it states is the
+    compiler's."""
     _, body = one_step_about(r"categor")
-    example = re.search(r"```json\n(.*?)```", body, re.S)
-    assert example, "the category step shows no candidates file, so a run has to invent one"
-    candidates = json.loads(example.group(1))
-    assert candidates and all(set(c) <= {"client", "terms", "adopts"} and "terms" in c
-                              for c in candidates), (
-        f"the category step's example is not the {{client, terms, adopts}} shape the "
-        f"compiler reads: {candidates}")
-    assert all(len(c["terms"]) <= compiler_max_terms() for c in candidates)
+    assert "--from-context" in body and "--candidates" not in body
+    terms = (SETUP / "references" / "choosing-terms.md").read_text(encoding="utf-8")
     cap = {n: word for word, n in NUMBER_WORDS.items()}[compiler_max_terms()]
-    assert f"up to {cap}" in body, (
-        "the category step does not state the compiler's cap on a client's terms")
-    assert f"over the {compiler_max_terms()} a client's rule takes" in body, (
-        "the category step quotes a cap refusal the compiler no longer prints")
+    assert f"up to {cap}" in terms, (
+        "choosing-terms.md does not state the compiler's cap on a client's terms")
+    assert f"over the {compiler_max_terms()} a client's rule takes" in check_entry(
+        "category-rules"), "the category check quotes a cap refusal the compiler no longer prints"
 
 
 def test_the_category_step_offers_the_addresses_the_titles_carry():
@@ -269,7 +260,7 @@ def test_the_category_step_writes_the_context_file_before_the_rules_and_never_ov
     the template landing on top of their clients."""
     heading, body = one_step_about(r"categor")
     context = body.find("context.md.example")
-    candidates = body.find("--candidates <file>")
+    candidates = body.find("--from-context")
     assert context != -1, f"step '{heading.strip()}' never writes the starter context file"
     assert candidates != -1 and context < candidates, (
         f"step '{heading.strip()}' writes the context file after the rules, so their "
