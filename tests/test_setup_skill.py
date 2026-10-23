@@ -55,14 +55,34 @@ def shipped_text() -> str:
     return shipped.shipped_text(SETUP)
 
 
+CHECKS_MD = SETUP / "references" / "checks.md"
+INSTALL_COMMANDS_MD = SETUP / "references" / "install-commands.md"
+
+
+def check_entry(check_id: str) -> str:
+    """One `## Check <id>` entry of `references/checks.md`, where the probes now live
+    once (guided-setup T6)."""
+    if not CHECKS_MD.is_file():
+        return ""
+    found = re.split(r"^## Check ([a-z-]+)\b.*$", CHECKS_MD.read_text(encoding="utf-8"),
+                     flags=re.M)[1:]
+    return dict(zip(found[0::2], found[1::2])).get(check_id, "")
+
+
 def steps() -> list[tuple[str, str]]:
-    """Each `### ` step under `## Steps`, as (heading, body)."""
+    """Each `### ` step under `## Steps`, as (heading, body) — the body as a run reads it,
+    with the check entry the step cites appended, because the Verify and the If-it-fails
+    moved out of SKILL.md into `references/checks.md` and a run follows the citation."""
     text = skill_text()
     if "## Steps" not in text:
         return []
     section = text.split("## Steps", 1)[1].split("\n## ", 1)[0]
     found = re.split(r"^### (.+)$", section, flags=re.M)[1:]
-    return list(zip(found[0::2], found[1::2]))
+    expanded = []
+    for body in found[1::2]:
+        cited = re.search(r"\(check `([a-z-]+)`\)", body)
+        expanded.append(body + (check_entry(cited.group(1)) if cited else ""))
+    return list(zip(found[0::2], expanded))
 
 
 def step_ids() -> list[str]:
@@ -366,7 +386,8 @@ def test_nothing_is_installed_on_the_users_machine_without_their_yes():
     """Setup offers to run the installs it finds missing (#67) — machine-wide software, so
     the decision is the user's every time, and an install that runs unasked is a change to
     their machine they did not choose."""
-    before = shipped.section(skill_text(), "Before you start")
+    before = (shipped.section(skill_text(), "Before you start")
+              + INSTALL_COMMANDS_MD.read_text(encoding="utf-8"))
     assert "winget install" in before, "\"Before you start\" offers nothing to install"
     assert re.search(r"run only what the user says yes to", before, re.I), (
         "the install offer does not wait for the user's yes")
@@ -448,9 +469,9 @@ def test_the_elevated_registration_fix_has_one_copy_in_the_shipped_skills():
     """
     carriers = sorted(p.relative_to(REPO).as_posix() for p in SKILLS.rglob("*.md")
                       if "Unregister-ScheduledTask" in p.read_text(encoding="utf-8"))
-    assert carriers == [SETUP_MD.relative_to(REPO).as_posix()], (
+    assert carriers == [CHECKS_MD.relative_to(REPO).as_posix()], (
         "the two-shell fix for a task registered elevated is written out in "
-        f"{len(carriers)} shipped files ({carriers}) — the `setup` skill's step 5 owns it, "
+        f"{len(carriers)} shipped files ({carriers}) — the `screenshot-task` check owns it, "
         "and a second copy is one that goes stale without anything failing")
 
 
@@ -831,8 +852,9 @@ def test_the_step_uses_the_probe_and_diagnose_modes_and_deletes_only_on_a_named_
 
 def test_the_reference_says_how_to_install_verify_and_remove_and_why_pr_5_is_not_used():
     body = CHECKIN_REF.read_text(encoding="utf-8")
-    for needed in ("0.0.6", "Python 3.11", "Get-ScheduledTask", "removal line", "aw-qt", "PR #5"):
+    for needed in ("0.0.6", "Python 3.11", "removal line", "aw-qt", "PR #5"):
         assert needed in body, f"checkin-watchers.md lost {needed!r}"
+    assert "Get-ScheduledTask -TaskName CheckinWatcher" in check_entry("checkin-watchers")
     assert CHECKIN_PS.name in body
     assert "Unregister-ScheduledTask" in CHECKIN_PS.read_text(encoding="utf-8-sig")
 
