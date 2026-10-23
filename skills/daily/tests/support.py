@@ -179,6 +179,8 @@ class Day:
         self._afk: list[tuple[str, str, str]] = []
         self._window: list[tuple[str, str, str, str]] = []
         self._web: list[tuple[str, str, str, str, str]] = []   # browser, start, end, title, url
+        self._checkin: list[tuple[str, str, str]] = []          # start, end, message
+        self._ask: list[tuple[str, str, bool]] = []             # at, answer, success
         self.classes: list[dict] = []
 
     # -- absolute time helpers ---------------------------------------------------------
@@ -258,6 +260,18 @@ class Day:
         self._web.append((browser, start, end, title, url))
         return self
 
+    def checkin(self, start: str, end: str, message: str) -> "Day":
+        """What `aw-watcher-ask-away` writes when the user answers on return: one event
+        over the away gap, `data.message` holding the words."""
+        self._checkin.append((start, end, message))
+        return self
+
+    def ask(self, at: str, answer: str, success: bool = True) -> "Day":
+        """What `aw-watcher-ask` writes: a point event per prompt, `data.success` false when
+        the prompt went unanswered, the answer under the prompt's title key."""
+        self._ask.append((at, answer, success))
+        return self
+
     def classify(self, label: str, regex: str, ignore_case: bool = True) -> "Day":
         """Add an AW category rule, the way the AW settings endpoint returns them."""
         self.classes.append({"name": label.split(">"),
@@ -310,12 +324,30 @@ class Day:
         return self._events([(r[1], r[2], r[3], r[4]) for r in rows],
                             lambda r: {"title": r[2], "url": r[3]})
 
+    def checkin_events(self) -> list[dict]:
+        """Shape copied from aw-watcher-ask-away 0.0.6 `core.py` (`DATA_KEY = "message"`,
+        `AWAskAwayState.add_event`): the AFK-gap event with `data.message` set."""
+        return self._events(self._checkin, lambda r: {"message": r[2]})
+
+    def ask_events(self) -> list[dict]:
+        out = []
+        for at, answer, success in self._ask:
+            data: dict = {"success": success}
+            if success:
+                data["What are you working on?"] = answer
+            out.append({"timestamp": iso_z(self.at(at)), "duration": 0, "data": data})
+        return out
+
     def buckets(self) -> dict[str, list[dict]]:
         """The bucket -> events mapping a fake AW server serves for this day."""
         out = {
             f"aw-watcher-afk_{self.host}": self.afk_events(),
             f"aw-watcher-window_{self.host}": self.window_events(),
         }
+        if self._checkin:
+            out[f"aw-watcher-ask-away_{self.host}"] = self.checkin_events()
+        if self._ask:
+            out[f"aw-watcher-ask_{self.host}"] = self.ask_events()
         for browser in sorted({row[0] for row in self._web}):
             evs = self.web_events(browser)
             if evs:
