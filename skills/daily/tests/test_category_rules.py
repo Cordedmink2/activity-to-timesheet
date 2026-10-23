@@ -931,3 +931,128 @@ def test_a_sample_with_nothing_in_it_refuses_rather_than_writing_unjudged_rules(
     result = compile_run(tmp_path, [ACME], "--days", "0")
     assert result.code == 1
     assert "nothing to test a category rule against" in result.err
+
+
+# --------------------------------------------------------------------------------------
+# `--from-context`: the context file is the one home of the terms (guided-setup T4)
+# --------------------------------------------------------------------------------------
+
+CONTEXT_TWO_CLIENTS = """# Context
+
+## Active client projects
+
+One section per client.
+
+### Acme Ltd
+
+**Client name**: `Acme`
+**Default project**: `ACME-1` `Support`
+**Category terms**: `ACME`, `AcmePortal` — words only this client's work puts in a title
+
+Signals:
+- some free text with `backticks` that is not a term
+
+Common activities: whatever I do for them, with `code` in it.
+
+### Beta Co
+
+**Client name**: `Beta`
+**Category terms**: `BETA`
+
+## Work kinds
+
+**Category terms**: `NOT-A-CLIENT`
+"""
+
+
+def from_context_run(workspace: Path, text: str, *args) -> CliResult:
+    context_file(workspace, text)
+    return run_cli(cr, ["--from-context", *args])
+
+
+def test_from_context_writes_what_candidates_would_have_written(live_aw, workspace, tmp_path):
+    """The compile result is the same as the equivalent `--candidates` run."""
+    context_file(workspace, CONTEXT_TWO_CLIENTS)
+    by_file = live_aw(sample_day([ACME_PAGE, ACME_EDITOR, BETA_PAGE, PERSONAL]))
+    assert compile_run(tmp_path, [ACME, BETA]).code == 0
+    expected = posted(by_file)
+    by_context = live_aw(sample_day([ACME_PAGE, ACME_EDITOR, BETA_PAGE, PERSONAL]))
+    result = run_cli(cr, ["--from-context"])
+    assert result.code == 0, result.err
+    assert posted(by_context) == expected
+
+
+def test_from_context_keeps_file_order_as_priority(live_aw, workspace):
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    assert from_context_run(workspace, CONTEXT_TWO_CLIENTS).code == 0
+    assert names(posted(server)) == ["Acme", "Beta"]
+
+
+def test_from_context_reads_terms_only_from_the_client_sections(live_aw, workspace):
+    """Free text, backticks in signals and a `Category terms` line outside the client
+    sections are not terms."""
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    result = from_context_run(workspace, CONTEXT_TWO_CLIENTS)
+    assert result.code == 0, result.err
+    regexes = " ".join(entry["rule"]["regex"] for entry in posted(server))
+    for stray in ("backticks", "NOT-A-CLIENT", "code"):
+        assert stray not in regexes
+
+
+def test_from_context_leaves_out_a_client_with_no_terms_and_says_so(live_aw, workspace):
+    text = CONTEXT_TWO_CLIENTS.replace("**Category terms**: `BETA`\n", "")
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    result = from_context_run(workspace, text)
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme"]
+    assert "NOTERMS Beta" in result.out
+
+
+def test_from_context_refuses_a_terms_line_it_cannot_read_and_writes_nothing(
+        live_aw, workspace):
+    text = CONTEXT_TWO_CLIENTS.replace("`BETA`", "BETA without backticks")
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    result = from_context_run(workspace, text)
+    assert result.code == 1
+    assert "ERR" in result.err and "Category terms" in result.err and "line" in result.err
+    assert server.sent("POST", "/settings/classes") == []
+
+
+def test_from_context_refuses_a_file_that_declares_no_clients(live_aw, workspace):
+    live_aw(sample_day([ACME_PAGE]))
+    result = from_context_run(workspace, "# Context\n\nnothing here\n")
+    assert result.code == 1
+    assert "no client" in result.err.lower()
+
+
+def test_from_context_refuses_when_there_is_no_context_file(live_aw, workspace):
+    live_aw(sample_day([ACME_PAGE]))
+    result = run_cli(cr, ["--from-context"])
+    assert result.code == 1
+    assert ".context.md" in result.err
+
+
+def test_from_context_skips_template_placeholders(live_aw, workspace):
+    text = ("## Active client projects\n\n### X\n\n**Client name**: `<exact name>`\n"
+            "**Category terms**: `<CODE>`, `<product>`\n")
+    live_aw(sample_day([ACME_PAGE]))
+    result = from_context_run(workspace, text)
+    assert result.code == 1
+    assert "placeholder" in result.err.lower()
+
+
+def test_from_context_adopts_an_existing_rule(live_aw, workspace):
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Old Acme", "AcmePortal")]))
+    result = from_context_run(workspace, CONTEXT_TWO_CLIENTS, "--adopts", "Acme=Old Acme")
+    assert result.code == 0, result.err
+    assert names(posted(server)).count("Old Acme") == 0
+    assert names(posted(server)) == ["Acme", "Beta"]
+
+
+def test_from_context_leaves_the_context_file_fingerprint_alone(live_aw, workspace):
+    live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    path = context_file(workspace, CONTEXT_TWO_CLIENTS)
+    before = path.read_bytes()
+    assert run_cli(cr, ["--from-context"]).code == 0
+    assert path.read_bytes() == before
+    assert run_cli(cr, ["--status"]).out.startswith("CURRENT")

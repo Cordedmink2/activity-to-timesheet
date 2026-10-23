@@ -6,9 +6,9 @@ products or apps, the client's full name — and this script judges them and wri
 that survive. The user sees the terms, never a regex or a JSON body.
 
 **Choosing the terms is the model's, enforcement is this script's.** The context file
-legitimately holds prose, hints and free text, so no parser should be asked to read it —
-which is why this takes *candidates* rather than the file. What it does with them is
-deterministic:
+legitimately holds prose, hints and free text, so only one narrow slice of it is parsed
+(`--from-context`: each client's name and `Category terms` line); `--candidates` takes the
+list directly for adopting rules. What it does with them is deterministic:
 
   1. **Gate.** A client with no terms or with more than `MAX_TERMS`, and a term matching an
      implausible share of the sampled window titles, are refused, and a refusal anywhere
@@ -29,8 +29,12 @@ deterministic:
 A term is literal, matched case-insensitively anywhere in the app name or the title — each
 field on its own, because that is how the activity source matches (`matching()`).
 
-Three modes:
-  * `--candidates <file|->`  gate, back up, write, verify
+Modes:
+  * `--from-context`         the same, with the candidates read from the workspace context
+                             file's client sections: the one home of the terms. Narrow parser
+                             — `**Client name**` and `**Category terms**` lines only
+  * `--candidates <file|->`  gate, back up, write, verify, from a list given directly
+                             (adopting rules the plugin did not author)
   * `--inspect`              what the activity source holds now, each rule marked managed
                              or not and carrying the share of the sample it matches — the
                              read behind adopting rules the plugin did not author — and,
@@ -43,6 +47,7 @@ Three modes:
 No third-party deps — stdlib urllib, via the shared aw_client.py.
 
 Usage:
+  python scripts/category_rules.py --from-context
   python scripts/category_rules.py --candidates candidates.json
   python scripts/category_rules.py --inspect
   python scripts/category_rules.py --status
@@ -609,8 +614,90 @@ def load_candidates(source: str) -> list[dict]:
     return loaded
 
 
-def compile_rules(source: str, days: int, max_share: float, directory: Path) -> int:
-    candidates = load_candidates(source)
+CLIENT_SECTIONS = re.compile(r"^## Active client projects\s*$(.*?)(?=^## |\Z)",
+                             re.MULTILINE | re.DOTALL)
+SPAN = re.compile(r"`([^`]*)`")
+
+
+def _line_value(section: str, label: str) -> tuple[str, int] | None:
+    """The text after `**label**:` in a client section, and its offset, or None."""
+    found = re.search(rf"^\*\*{re.escape(label)}\*\*:[ \t]*(.*)$", section, re.MULTILINE)
+    return (found.group(1), found.start()) if found else None
+
+
+def parse_context(text: str) -> tuple[list[dict], list[str]]:
+    """The candidates the workspace context file declares, in file order, and the names of
+    the clients left out for declaring no terms.
+
+    Narrow on purpose: only each `###` client section under `## Active client projects`,
+    only its `**Client name**` and `**Category terms**` lines, and only the backticked words
+    before the line's ` — ` note. Everything else in the file is prose and is not read. A
+    terms line it cannot read is a refusal naming the line, so nothing is guessed.
+    """
+    block = CLIENT_SECTIONS.search(text)
+    if not block:
+        raise Refusal("the context file has no `## Active client projects` section, so no "
+                      "client is declared")
+    body = block.group(1)
+    base = text[:block.start(1)].count("\n")
+    candidates: list[dict] = []
+    left_out: list[str] = []
+    placeholders = 0
+    parts = re.split(r"^### (.+)$", body, flags=re.MULTILINE)
+    for index in range(1, len(parts), 2):
+        heading, section = parts[index].strip(), parts[index + 1]
+        named = _line_value(section, "Client name")
+        named_span = SPAN.search(named[0]) if named else None
+        client = named_span.group(1).strip() if named_span else heading
+        terms_line = _line_value(section, "Category terms")
+        if terms_line is None:
+            if client.startswith("<"):
+                placeholders += 1
+            else:
+                left_out.append(client)
+            continue
+        value, offset = terms_line
+        number = base + body[:body.find(section)].count("\n") + section[:offset].count("\n") + 1
+        words = value.split(" \u2014 ")[0].split(" - ")[0]
+        spans = [m.strip() for m in SPAN.findall(words)]
+        leftover = SPAN.sub("", words).replace(",", "").replace(" and ", "").strip()
+        if leftover or not spans:
+            raise Refusal(f"cannot read the `Category terms` line for {client} (line {number}): "
+                          f"give each term in backticks, separated by commas")
+        if client.startswith("<") or all(t.startswith("<") for t in spans):
+            placeholders += 1
+            continue
+        candidates.append({"client": client, "terms": spans})
+    if not candidates:
+        why = ("only template placeholders, which are not clients" if placeholders
+               else "no client with `Category terms`")
+        raise Refusal(f"no client to build rules for: the context file holds {why}"
+                      if placeholders or left_out else
+                      "no client is declared in the context file")
+    return candidates, left_out
+
+
+def context_candidates(root: Path, adopts: list[str]) -> list[dict]:
+    """The candidates read from the workspace context file (`--from-context`)."""
+    path = root / CONTEXT_FILE
+    if not path.is_file():
+        raise Refusal(f"there is no {path} to build rules from")
+    candidates, left_out = parse_context(path.read_text(encoding="utf-8"))
+    for name in left_out:
+        print(f"NOTERMS {name} — no `Category terms` line, so no rule is written for it")
+    for pair in adopts:
+        client, _, existing = pair.partition("=")
+        match = next((c for c in candidates if c["client"] == client.strip()), None)
+        if not existing or match is None:
+            raise Refusal(f"--adopts wants Client=existing category name for a declared "
+                          f"client, not '{pair}'")
+        match.setdefault("adopts", []).append(existing.strip())
+    return candidates
+
+
+def compile_rules(source: str | list[dict], days: int, max_share: float,
+                  directory: Path) -> int:
+    candidates = source if isinstance(source, list) else load_candidates(source)
     bucket, start_utc, end_utc, sample = sample_windows(days)
     if not sample:
         raise Refusal(f"no window events in the last {days} days, so there is nothing to "
@@ -917,6 +1004,13 @@ def main():
     ap.add_argument("--candidates",
                     help="JSON file of {client, terms} candidates, or `-` for stdin. Gates, "
                          "backs up, writes and verifies.")
+    ap.add_argument("--from-context", action="store_true",
+                    help="Read the clients and their `Category terms` from the workspace "
+                         ".context.md, then gate, back up, write and verify. The one home "
+                         "of the terms; no candidates file is made by hand.")
+    ap.add_argument("--adopts", action="append", default=[], metavar="CLIENT=EXISTING",
+                    help="With --from-context: replace the existing category EXISTING "
+                         "with CLIENT's rule (repeatable)")
     ap.add_argument("--inspect", action="store_true",
                     help="Report the rules the activity source holds now, each with the "
                          "share of the sample it matches. Writes nothing.")
@@ -942,9 +1036,11 @@ def main():
                          "the configured TIMESHEET_WORKSPACE for this run")
     args = ap.parse_args()
 
-    chosen = [bool(args.candidates), args.inspect, args.status, bool(args.dormant)]
+    chosen = [bool(args.candidates), args.from_context, args.inspect, args.status,
+              bool(args.dormant)]
     if sum(chosen) != 1:
-        print("ERR give exactly one of --candidates, --inspect, --status or --dormant",
+        print("ERR give exactly one of --candidates, --from-context, --inspect, --status or "
+              "--dormant",
               file=sys.stderr)
         return 2
     local_date = None
@@ -972,6 +1068,9 @@ def main():
             # whatever folder the session started in, nor fail because it could not.
             return status(state_dir(args.workspace, create=False))
         directory = state_dir(args.workspace)
+        if args.from_context:
+            return compile_rules(context_candidates(directory.parent, args.adopts),
+                                 args.days, args.max_share, directory)
         return compile_rules(args.candidates, args.days, args.max_share, directory)
     except Refusal as exc:
         print(f"ERR {exc}", file=sys.stderr)
