@@ -28,7 +28,7 @@ least only reaches the client it belongs to.
 This plugin reads window titles, screenshots, the calendar and the timesheet provider's
 entries, so **everything it can quote is client-identifying**: client and project names,
 project codes, work-item numbers, colleague names, meeting subjects and attendees,
-SharePoint and CRM URLs, environment names, local paths, and the words in a check-in answer (what the user typed when asked what they were doing). Replace each one with a stable
+SharePoint and CRM URLs, environment names, local paths, and check-in answers (the words the user typed when asked what they were doing). Replace each one with a stable
 placeholder as you draft — `Client A`, `ACME-001`, `<work item>`, `<env>` — and
 keep the shape, because a rollup with realistic minutes and category counts is what makes a
 report reproducible. Timestamps, durations, ratios, hours and script flags are all safe and
