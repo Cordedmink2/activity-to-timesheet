@@ -256,3 +256,79 @@ def test_an_empty_bucket_is_a_plain_empty_status(live_aw, tmp_path):
     live_aw(d)
     r = run(d, *files(tmp_path, d))
     assert r.code == 0 and r.json()["status"] == "empty"
+
+
+# --------------------------------------------------------------------------------------
+# T7 - the skeleton cannot move
+# --------------------------------------------------------------------------------------
+import activity_timeline as at  # noqa: E402
+import calendar_day as cdy  # noqa: E402
+
+
+def test_the_skeleton_and_timeline_are_byte_identical_with_and_without_the_watchers(live_aw):
+    plain = worked(day())
+    with_answers = worked(day()).checkin("12:00", "12:40", "call with ACME").ask("10:00", "ACME spec")
+    outputs = []
+    for d in (plain, with_answers):
+        with_srv = live_aw(d)
+        outputs.append((run_cli(ab, [d.date_str(), "--utc-offset", d.offset]).out,
+                        run_cli(ab, [d.date_str(), "--utc-offset", d.offset, "--json"]).out,
+                        run_cli(at, [d.date_str(), "--utc-offset", d.offset]).out))
+        del with_srv
+    assert outputs[0] == outputs[1]
+
+
+# --------------------------------------------------------------------------------------
+# T9 - probe and diagnose, for setup
+# --------------------------------------------------------------------------------------
+
+def probe(*extra):
+    return run_cli(ca, [*extra])
+
+
+def test_probe_finds_this_hosts_checkin_bucket_and_its_newest_event(live_aw):
+    d = worked(day()).checkin("12:00", "12:40", "call with ACME")
+    srv = live_aw(d)
+    r = probe("--probe", "checkin")
+    assert r.code == 0, r.err
+    out = r.json()
+    assert out["found"] is True and out["bucket"] == "aw-watcher-ask-away_TESTHOST"
+    assert out["newest_event"].startswith("2026-05-28T00:00")   # 12:00 at +12 is 00:00 UTC
+    assert not srv.sent("POST") and not srv.sent("DELETE")
+
+
+def test_probe_says_not_found_plainly(live_aw):
+    live_aw(worked(day()))
+    out = probe("--probe", "checkin").json()
+    assert out["found"] is False and out["bucket"] is None
+
+
+def test_probe_never_offers_the_checkin_bucket_for_the_ask_watcher(live_aw):
+    live_aw(worked(day()).checkin("12:00", "12:40", "x"))
+    assert probe("--probe", "ask").json()["found"] is False
+
+
+def two_hosts(live_aw):
+    a = worked(day(host="new.example"))
+    b = worked(day(host="old.example"))
+    buckets = {**b.buckets(), **a.buckets()}
+    a.buckets = lambda: buckets  # type: ignore[method-assign]
+    return live_aw(a, last_updated={"aw-watcher-afk_old.example": "2025-01-01T00:00:00+00:00",
+                                    "aw-watcher-afk_new.example": "2026-05-28T04:00:00+00:00"})
+
+
+def test_diagnose_names_the_two_host_afk_condition_and_the_stale_bucket(live_aw):
+    srv = two_hosts(live_aw)
+    out = probe("--diagnose").json()
+    assert out["clean"] is False
+    assert out["condition"] == "two-afk-buckets"
+    assert out["buckets"] == ["aw-watcher-afk_new.example", "aw-watcher-afk_old.example"]
+    assert out["stale"] == "aw-watcher-afk_old.example"
+    assert any("export" in f.lower() for f in out["fixes"])
+    assert not srv.sent("POST") and not srv.sent("DELETE")
+
+
+def test_diagnose_over_one_host_is_clean(live_aw):
+    live_aw(worked(day()))
+    out = probe("--diagnose").json()
+    assert out["clean"] is True and out["condition"] is None

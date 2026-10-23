@@ -188,16 +188,66 @@ def read_day(date, zone, terms=None, skeleton=None, calendar=None, rulings=None)
     return result
 
 
+def probe(which):
+    """Setup's check: is this host's watcher bucket there, and when did it last write?
+    Reads only. The newest event is the one a person can be told about."""
+    prefix = CHECKIN_PREFIX if which == "checkin" else ASK_PREFIX
+    try:
+        buckets = get("/buckets/")
+        bucket = pick_for_host(buckets, prefix, host_of(pick_bucket(buckets, AFK_PREFIX)))
+        events = get(f"/buckets/{bucket}/events?limit=1") if bucket else []
+    except Exception as exc:
+        raise SourceError(unreachable(exc)) from None
+    return {"watcher": which, "found": bucket is not None, "bucket": bucket,
+            "newest_event": events[0]["timestamp"] if events else None}
+
+
+def diagnose():
+    """The condition that makes the check-in watcher refuse to start: more than one AFK
+    bucket (its `find_afk_bucket` matches every bucket with `afk` in its name). Names the
+    buckets and the stale one by `last_updated`; deletes and posts nothing (US-4/AC-4).
+    The watcher has no host or bucket option (H3), so the only fix is to remove the stale
+    bucket - after an export, and only on the user's yes naming it."""
+    try:
+        buckets = get("/buckets/")
+    except Exception as exc:
+        raise SourceError(unreachable(exc)) from None
+    afk = sorted(b for b in buckets if "afk" in b)
+    result = {"clean": len(afk) <= 1, "condition": None, "buckets": afk, "stale": None, "fixes": []}
+    if len(afk) > 1:
+        stale = min(afk, key=lambda b: buckets[b].get("last_updated") or "")
+        result.update(condition="two-afk-buckets", stale=stale, fixes=[
+            f"Export {stale} from the ActivityWatch web page (Raw data, Export) and save the file.",
+            f"After the export is saved, and only if you say yes to {stale} by name, delete that bucket.",
+        ])
+    return result
+
+
 def main():
     ap = argparse.ArgumentParser(description="Read one day's check-in answers (read-only).")
-    ap.add_argument("date", help="YYYY-MM-DD (local date)")
+    ap.add_argument("date", nargs="?", help="YYYY-MM-DD (local date)")
     ap.add_argument("--utc-offset", type=float, default=None)
+    ap.add_argument("--probe", choices=("checkin", "ask"),
+                    help="setup: is this host's watcher bucket there, and its newest event")
+    ap.add_argument("--diagnose", action="store_true",
+                    help="setup: name the two-AFK-bucket condition that stops the check-in watcher")
     ap.add_argument("--terms", help="JSON: {clients: [{client, terms}], exclusions: [..], "
                                     "off: [checkin|ask]}")
     ap.add_argument("--skeleton", help="the day's `afk_blocks.py --json` output (breaks)")
     ap.add_argument("--calendar", help="the day's `calendar_day.py` output")
     ap.add_argument("--rulings", help="Timesheets/<date>_harvest_responses.json")
     args = ap.parse_args()
+    if args.probe or args.diagnose:
+        try:
+            print(json.dumps(probe(args.probe) if args.probe else diagnose(), indent=2))
+        except SourceError as e:
+            print(f"ERR {e}", file=sys.stderr)
+            return 1
+        return 0
+    if not args.date:
+        print("ERR a date (YYYY-MM-DD) is required unless --probe or --diagnose is given",
+              file=sys.stderr)
+        return 2
     try:
         date = dt.datetime.strptime(args.date, "%Y-%m-%d").date()
     except ValueError:

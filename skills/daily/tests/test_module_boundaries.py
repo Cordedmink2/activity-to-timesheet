@@ -163,3 +163,15 @@ def test_every_module_that_names_the_zone_resolver_imports_the_shared_one():
     assert not offenders, (
         "these call resolve_zone() without importing the module that defines it:\n  "
         + "\n  ".join(offenders))
+
+
+# The check-in reader is read-only context (ADR-0009). Nothing that builds the skeleton, the
+# timeline or the calendar verdict may import it, or an answer could come to move them.
+READER = "checkin_answers"
+SKELETON_SIDE = ("afk_blocks", "activity_timeline", "calendar_day", "aw_client", "category_rules")
+
+
+@pytest.mark.parametrize("stem", SKELETON_SIDE)
+def test_nothing_that_builds_the_skeleton_imports_the_checkin_reader(stem):
+    assert READER not in imports(script_path(stem)), (
+        f"{stem}.py imports {READER} - an answer must never reach the skeleton (US-1/AC-4).")
