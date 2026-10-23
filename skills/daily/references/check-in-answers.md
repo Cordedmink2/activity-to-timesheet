@@ -10,7 +10,7 @@ Write three small files from what you already hold, then run:
 python scripts/checkin_answers.py <date> --terms <file> --skeleton <file> --calendar <file> --rulings <file>
 ```
 
-- `--terms`: `{"clients": [{"client": "ACME", "terms": ["acme"]}], "exclusions": [...], "off": [...]}`. Clients are the same `{client, terms}` list you build for `category_rules.py --candidates`. `exclusions` are the user's own personal words from `.context.md`. Put `"checkin"` or `"ask"` in `off` when `.context.md` says `Check-in watcher: off` or `Ask watcher: off` under `## Preferences`.
+- `--terms`: `{"exclusions": [...], "off": [...]}`. The clients and their terms are read by the script from `Timesheets/.context.md`, the one home of the terms; do not copy them here. `exclusions` are the user's own personal words from `.context.md`. Put `"checkin"` or `"ask"` in `off` when `.context.md` says `Check-in watcher: off` or `Ask watcher: off` under `## Preferences`.
 - `--skeleton`: the output of `afk_blocks.py <date> --json`.
 - `--calendar`: the output of `calendar_day.py <date>`, if the calendar is on. Leave it out if not.
 - `--rulings`: `Timesheets/<date>_harvest_responses.json`, if it exists.

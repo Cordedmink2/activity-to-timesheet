@@ -66,6 +66,7 @@ import urllib.error
 from pathlib import Path
 
 import skill_config
+from context_terms import ContextError, load_clients
 from aw_client import (SourceError, fetch_events, get, parse_ts, pick_bucket, post_setting,
                        query, unreachable, window_day)
 from timezone import resolve_zone, utc_bounds
@@ -629,69 +630,6 @@ def load_candidates(source: str) -> list[dict]:
     return loaded
 
 
-CLIENT_SECTIONS = re.compile(r"^## Active client projects\s*$(.*?)(?=^## |\Z)",
-                             re.MULTILINE | re.DOTALL)
-SPAN = re.compile(r"`([^`]*)`")
-
-
-def _line_value(section: str, label: str) -> tuple[str, int] | None:
-    """The text after `**label**:` in a client section, and its offset, or None."""
-    found = re.search(rf"^\*\*{re.escape(label)}\*\*:[ \t]*(.*)$", section, re.MULTILINE)
-    return (found.group(1), found.start()) if found else None
-
-
-def parse_context(text: str) -> tuple[list[dict], list[str]]:
-    """The candidates the workspace context file declares, in file order, and the names of
-    the clients left out for declaring no terms.
-
-    Narrow on purpose: only each `###` client section under `## Active client projects`,
-    only its `**Client name**` and `**Category terms**` lines, and only the backticked words
-    before the line's ` — ` note. Everything else in the file is prose and is not read. A
-    terms line it cannot read is a refusal naming the line, so nothing is guessed.
-    """
-    block = CLIENT_SECTIONS.search(text)
-    if not block:
-        raise Refusal("the context file has no `## Active client projects` section, so no "
-                      "client is declared")
-    body = block.group(1)
-    base = text[:block.start(1)].count("\n")
-    candidates: list[dict] = []
-    left_out: list[str] = []
-    placeholders = 0
-    parts = re.split(r"^### (.+)$", body, flags=re.MULTILINE)
-    for index in range(1, len(parts), 2):
-        heading, section = parts[index].strip(), parts[index + 1]
-        named = _line_value(section, "Client name")
-        named_span = SPAN.search(named[0]) if named else None
-        client = named_span.group(1).strip() if named_span else heading
-        terms_line = _line_value(section, "Category terms")
-        if terms_line is None:
-            if client.startswith("<"):
-                placeholders += 1
-            else:
-                left_out.append(client)
-            continue
-        value, offset = terms_line
-        number = base + body[:body.find(section)].count("\n") + section[:offset].count("\n") + 1
-        words = value.split(" \u2014 ")[0].split(" - ")[0]
-        spans = [m.strip() for m in SPAN.findall(words)]
-        leftover = SPAN.sub("", words).replace(",", "").replace(" and ", "").strip()
-        if leftover or not spans:
-            raise Refusal(f"cannot read the `Category terms` line for {client} (line {number}): "
-                          f"give each term in backticks, separated by commas")
-        if client.startswith("<") or all(t.startswith("<") for t in spans):
-            placeholders += 1
-            continue
-        candidates.append({"client": client, "terms": spans})
-    if not candidates:
-        why = ("only template placeholders, which are not clients" if placeholders
-               else "no client with `Category terms`")
-        raise Refusal(f"no client to build rules for: the context file holds {why}"
-                      if placeholders or left_out else
-                      "no client is declared in the context file")
-    return candidates, left_out
-
-
 def _present_seconds(window: list[dict], afk: list[dict] | None, start: dt.datetime,
                      end: dt.datetime) -> float:
     """Seconds inside [start, end) with window activity while the AFK watcher says the user
@@ -780,10 +718,10 @@ def data_days(directory: Path, zone, min_days: int | None) -> int:
 
 def context_candidates(root: Path, adopts: list[str]) -> list[dict]:
     """The candidates read from the workspace context file (`--from-context`)."""
-    path = root / CONTEXT_FILE
-    if not path.is_file():
-        raise Refusal(f"there is no {path} to build rules from")
-    candidates, left_out = parse_context(path.read_text(encoding="utf-8"))
+    try:
+        candidates, left_out = load_clients(root)
+    except ContextError as exc:
+        raise Refusal(str(exc)) from None
     for name in left_out:
         print(f"NOTERMS {name} — no `Category terms` line, so no rule is written for it")
     for pair in adopts:

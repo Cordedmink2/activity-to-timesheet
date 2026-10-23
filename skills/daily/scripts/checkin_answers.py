@@ -15,8 +15,11 @@ import datetime as dt
 import json
 import re
 import sys
+from pathlib import Path
 
+import skill_config
 from aw_client import SourceError, fetch_events, get, pick_bucket, unreachable
+from context_terms import ContextError, load_clients
 from timezone import local_clock, resolve_zone_with_source, utc_bounds
 
 CHECKIN_PREFIX = "aw-watcher-ask-away"
@@ -166,7 +169,24 @@ def place(answers, terms, skeleton, calendar, rulings):
     return questions, hints, ruled
 
 
+def with_context_clients(terms):
+    """`terms` with the clients read from the workspace context file, the one home of the
+    terms, unless the caller named some. A context file with no readable clients leaves the
+    answers with no client rather than failing the day."""
+    terms = dict(terms or {})
+    if terms.get("clients"):
+        return terms
+    root = skill_config.find_workspace() or Path.cwd()
+    try:
+        clients, _ = load_clients(root)
+    except (ContextError, OSError):
+        return terms
+    terms["clients"] = clients
+    return terms
+
+
 def read_day(date, zone, terms=None, skeleton=None, calendar=None, rulings=None):
+    terms = with_context_clients(terms)
     start_utc, end_utc = utc_bounds(date, zone)
     lo, hi = _parse(start_utc), _parse(end_utc)
     off = set((terms or {}).get("off") or [])
@@ -237,8 +257,8 @@ def main():
                     help="setup: is this host's watcher bucket there, and its newest event")
     ap.add_argument("--diagnose", action="store_true",
                     help="setup: name the two-AFK-bucket condition that stops the check-in watcher")
-    ap.add_argument("--terms", help="JSON: {clients: [{client, terms}], exclusions: [..], "
-                                    "off: [checkin|ask]}")
+    ap.add_argument("--terms", help="JSON: {exclusions: [..], off: [checkin|ask]}. Clients "
+                                    "are read from the workspace context file")
     ap.add_argument("--skeleton", help="the day's `afk_blocks.py --json` output (breaks)")
     ap.add_argument("--calendar", help="the day's `calendar_day.py` output")
     ap.add_argument("--rulings", help="Timesheets/<date>_harvest_responses.json")
