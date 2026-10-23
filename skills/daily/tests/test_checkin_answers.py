@@ -358,3 +358,54 @@ def test_the_reader_opens_no_file_for_writing_and_has_no_network_of_its_own():
         if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "open":
             mode = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else "r"
             assert not set(str(mode)) & set("wax+"), "the reader must never write"
+
+
+# --------------------------------------------------------------------------------------
+# PR #116 build gate R1/R2 - a question is the answer clipped to the break, never the break
+# --------------------------------------------------------------------------------------
+def spans(out):
+    return [(q["start"], q["end"], q["words"]) for q in out["questions"]]
+
+
+def test_an_answer_that_covers_part_of_a_break_is_asked_for_that_part_only(live_aw, tmp_path):
+    d = worked(day()).checkin("12:15", "12:40", "call with ACME")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert spans(out) == [("12:15:00", "12:40:00", "call with ACME")]
+
+
+def test_lunch_then_a_call_in_one_break_never_puts_the_lunch_in_a_question(live_aw, tmp_path):
+    d = worked(day()).checkin("12:00", "12:20", "lunch").checkin("12:20", "12:40", "call with ACME")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert spans(out) == [("12:20:00", "12:40:00", "call with ACME")]
+    assert all(q["start"] >= "12:20:00" for q in out["questions"])
+
+
+def test_two_work_answers_in_one_break_are_two_questions_that_do_not_overlap(live_aw, tmp_path):
+    d = (worked(day()).checkin("12:00", "12:20", "call with ACME")
+         .checkin("12:20", "12:40", "call with BETA"))
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert spans(out) == [("12:00:00", "12:20:00", "call with ACME"),
+                          ("12:20:00", "12:40:00", "call with BETA")]
+
+
+def test_a_ruling_for_one_question_leaves_the_other_open(live_aw, tmp_path):
+    d = (worked(day()).checkin("12:00", "12:20", "call with ACME")
+         .checkin("12:20", "12:40", "call with BETA"))
+    live_aw(d)
+    ruled = {"checkin_questions": [{"start": "12:00:00", "end": "12:20:00", "ruling": "yes"}]}
+    out = run(d, *files(tmp_path, d, rulings=ruled)).json()
+    assert spans(out) == [("12:20:00", "12:40:00", "call with BETA")]
+    assert [(r["start"], r["end"], r["ruled"]) for r in out["ruled"]] == [("12:00:00", "12:20:00", "yes")]
+
+
+def test_an_answer_over_two_breaks_is_one_question_per_break_each_clipped(live_aw, tmp_path):
+    d = (day().active("09:00", "12:00").afk("12:00", "12:40").active("12:40", "15:00")
+         .afk("15:00", "15:40").active("15:40", "17:00")
+         .checkin("12:20", "15:20", "call with ACME"))
+    live_aw(d)
+    out = run(d, *files(tmp_path, d)).json()
+    assert spans(out) == [("12:20:00", "12:40:00", "call with ACME"),
+                          ("15:00:00", "15:20:00", "call with ACME")]

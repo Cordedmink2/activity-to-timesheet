@@ -120,8 +120,9 @@ def _ruling_for(rulings, start, end):
 def place(answers, terms, skeleton, calendar, rulings):
     """Sort each answer into question, hint or context. Never emits a block.
 
-    A check-in answer overlapping a break is clipped to it and becomes a question (D7: only
-    check-in answers do); a ruling already on file takes it out of `questions`. One that
+    A check-in answer overlapping a break becomes one question per overlapped break, spanning
+    the answer clipped to that break and never more (D7: only check-in answers do); a ruling
+    already on file for that span takes it out of `questions`. One that
     overlaps no break, or any ask answer, is a hint. An answer inside a corroborated
     calendar block is context only - the calendar path already asks."""
     breaks = [(_secs(b["start"]), _secs(b["end"], _secs(b["start"]) + 1), b)
@@ -139,24 +140,29 @@ def place(answers, terms, skeleton, calendar, rulings):
                for e in events):
             a["placement"] = "context"
             continue
-        over = [(max(lo, bs), min(hi, be), b) for bs, be, b in breaks
-                if a["source"] == "checkin" and min(hi, be) > max(lo, bs)]
+        over = []
+        for bs, be, b in breaks:
+            if a["source"] != "checkin" or min(hi, be) <= max(lo, bs):
+                continue
+            # Clip the answer to the break: keep the clock text of whichever edge is inner.
+            s_sec, s_txt = (lo, a["start"]) if lo >= bs else (bs, b["start"])
+            e_sec, e_txt = (hi, a["end"]) if hi <= be else (be, b["end"])
+            over.append((s_sec, e_sec, s_txt, e_txt))
         if not over:
             hints.append({k: a[k] for k in ("source", "start", "end", "words", "clients")})
             continue
-        bs, be, b = max(over, key=lambda o: o[1] - o[0])
-        start, end = b["start"], b["end"]
         a["placement"] = "question"
-        verdict = _ruling_for(rulings, start, end)
-        if verdict:
-            ruled.append({"start": start, "end": end, "ruled": verdict})
-            continue
-        cite = next(({"subject": e["subject"], "start": e["start"], "end": e["end"]}
-                     for e in events if not e.get("corroborated")
-                     and min(be, _secs(e["end"], _secs(e["start"]) + 1)) > max(bs, _secs(e["start"]))),
-                    None)
-        questions.append({"start": start, "end": end, "words": a["words"],
-                          "clients": a["clients"], "calendar": cite})
+        for bs, be, start, end in over:  # one question per overlapped break
+            verdict = _ruling_for(rulings, start, end)
+            if verdict:
+                ruled.append({"start": start, "end": end, "ruled": verdict})
+                continue
+            cite = next(({"subject": e["subject"], "start": e["start"], "end": e["end"]}
+                         for e in events if not e.get("corroborated")
+                         and min(be, _secs(e["end"], _secs(e["start"]) + 1)) > max(bs, _secs(e["start"]))),
+                        None)
+            questions.append({"start": start, "end": end, "words": a["words"],
+                              "clients": a["clients"], "calendar": cite})
     return questions, hints, ruled
 
 
