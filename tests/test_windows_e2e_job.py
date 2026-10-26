@@ -19,6 +19,7 @@ DRIVER = REPO / "tests" / "e2e" / "windows_checkin_e2e.py"
 
 STEPS = ("step_install_watcher", "step_start_server", "step_inject_answers",
          "step_assert_question_not_block", "step_assert_lunch_stays_break",
+         "step_setup_checks_pass_and_collecting", "step_category_stage_from_a_week",
          "step_uninstall")
 
 
@@ -66,3 +67,27 @@ def test_the_driver_injects_the_real_watcher_shape_and_runs_setup_for_real():
                    "Get-ScheduledTask", "Unregister-ScheduledTask", "call with ACME", "lunch"):
         assert needle in src, f"driver never mentions {needle}"
     assert "-DryRun" not in src, "the job must register the task for real"
+
+
+def test_the_guided_setup_steps_assert_and_run_against_the_real_server_before_uninstall():
+    src = DRIVER.read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    funcs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    for name in ("step_setup_checks_pass_and_collecting", "step_category_stage_from_a_week"):
+        calls = [c for c in ast.walk(funcs[name]) if isinstance(c, ast.Call)
+                 and getattr(c.func, "id", "") == "check"]
+        assert len(calls) >= 3, f"{name} asserts too little"
+    order = [c.func.id for c in ast.walk(funcs["main"]) if isinstance(c, ast.Call)
+             and isinstance(c.func, ast.Name)]
+    assert order.index("step_category_stage_from_a_week") < order.index("step_uninstall")
+    for needle in ("aw-watcher-window_", "aw-watcher-afk_", "COLLECTING", "READY",
+                   "--from-context", "--data-days", "ACME", "BETA", "VERIFY", "HOST",
+                   "/api/0/buckets/"):
+        assert needle in src, f"the guided-setup steps never mention {needle}"
+
+
+def test_the_driver_lists_what_the_guided_setup_steps_cannot_show():
+    doc = ast.get_docstring(ast.parse(DRIVER.read_text(encoding="utf-8"))) or ""
+    for gap in ("browser-store", "administrator prompt", "consent page",
+                "week of titles", "runner is an administrator", "first-run"):
+        assert gap in doc, f"the driver does not list '{gap}' as unverified"
