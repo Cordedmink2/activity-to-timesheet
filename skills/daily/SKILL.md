@@ -88,7 +88,7 @@ Read in parallel:
 - `python scripts/category_rules.py --status` — **before the timeline**, which labels every span with these rules. Branch on the word (every verdict exits 0):
   - **`CURRENT …`** — nothing to do.
   - **`BROKEN …`** — rules the activity source never matches. **Stop before the timeline**; tell the user `/billables:setup` replaces them. Don't rebuild them here.
-  - **`STALE …`** — a client's **Category terms** moved, or the rules were never written. Rebuild before the timeline: one `{"client", "terms"}` candidate per client from the **Category terms** lines you read, in a file, via `python scripts/category_rules.py --candidates <file>`. **Pass every client that has terms** — the set is regenerated whole, and one left out is `DROPPED`. Invent none for a client without terms; say so at Step 11. Tell the user what changed and carry on; a refused rebuild is raised at Step 11, not a stop.
+  - **`STALE …`** — a client's **Category terms** moved: rebuild before the timeline with `python scripts/category_rules.py --from-context` (`NOTERMS` → `DROPPED`; say so at Step 11), tell the user and carry on; a refused rebuild is raised at Step 11. If it says this plugin **has not written** the rules, rebuild nothing: run `python scripts/category_rules.py --data-days` and relay its `say:` line once, unless `## Preferences` holds a *Category stage reminder* line saying `off` (declined for good). `COLLECTING` writes no rule; `READY` offers `/billables:setup`.
   - **`UNVERIFIED`**: `dormant` needs nothing said; `suspect` means the client was worked on and a term never appeared — finish the day, then at Step 11 tell the user to run `/billables:setup` (its `SEEN` lines name the profile tags the titles carry). `OVERLAP` is raised at Step 11 the same way.
 - `python scripts/category_rules.py --dormant <date>` — read-only; `DORMANT <category>` is a rule that matched in the fortnight before and nothing on the day. Draft anyway and say at Step 11 which went quiet.
 - `python scripts/afk_blocks.py <date>` — the day skeleton (work_start/end, breaks, active spans)
@@ -219,7 +219,7 @@ Summarise total hours posted, blocks deferred or skipped, and whether more days 
 
 Present what the run revealed, **one fact per ask, as the exact diff**: this user's clients/signals/preferences → `.context.md`; a generic heuristic or API quirk → `SKILL.md`/`references/`; the skill being wrong (a script answers wrongly, a guard didn't fire) → `references/reporting-issues.md` if installed, `docs/CONTRIBUTING.md` if maintained.
 
-**A yes to a diff that adds or changes a client's Category terms rebuilds the category rules in the same breath** — write the file, run `scripts/category_rules.py --candidates <file>` with every client's terms, report what it wrote in a line, and don't ask twice. A refusal or `suspect` line is reported here.
+**A yes to a diff that adds or changes a client's Category terms rebuilds the category rules in the same breath** — write the file, run `scripts/category_rules.py --from-context`, report what it wrote in a line, and don't ask twice. A refusal or `suspect` line is reported here.
 
 **`.context.md` size budget — check after every edit**: `(Get-Item Timesheets/.context.md).Length` under **14,000 bytes** (override in `## Preferences`). Over → compact now: (1) move generic rules into this skill's references; (2) delete facts proven wrong or superseded; (3) shorten examples to the date stamp. If that would drop a live user fact, ask which — never silently delete, never read part of the file instead.
 

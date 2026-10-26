@@ -31,7 +31,7 @@ That one is worth avoiding rather than diagnosing — it looks identical to havi
 nothing, and it is missing in *both* shells, so none of the usual fixes apply.
 `claude plugin list` shows which scope you got and whether the plugin is enabled where you are.
 
-That gives you `/billables:daily`, `/billables:reconcile` and `/billables:setup`, and asks you
+That gives you `/billables:daily`, `/billables:reconcile` and `/billables:setup` (which also routes to `/billables:onboard-client` and `/billables:troubleshoot`), and asks you
 for your own details, once:
 
 | | |

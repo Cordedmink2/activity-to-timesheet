@@ -19,6 +19,7 @@ DRIVER = REPO / "tests" / "e2e" / "windows_checkin_e2e.py"
 
 STEPS = ("step_install_watcher", "step_start_server", "step_inject_answers",
          "step_assert_question_not_block", "step_assert_lunch_stays_break",
+         "step_setup_checks_pass_and_collecting", "step_category_stage_from_a_week",
          "step_uninstall")
 
 
@@ -66,3 +67,75 @@ def test_the_driver_injects_the_real_watcher_shape_and_runs_setup_for_real():
                    "Get-ScheduledTask", "Unregister-ScheduledTask", "call with ACME", "lunch"):
         assert needle in src, f"driver never mentions {needle}"
     assert "-DryRun" not in src, "the job must register the task for real"
+
+
+def test_the_guided_setup_steps_assert_and_run_against_the_real_server_before_uninstall():
+    src = DRIVER.read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    funcs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    for name in ("step_setup_checks_pass_and_collecting", "step_category_stage_from_a_week"):
+        calls = [c for c in ast.walk(funcs[name]) if isinstance(c, ast.Call)
+                 and getattr(c.func, "id", "") == "check"]
+        assert len(calls) >= 3, f"{name} asserts too little"
+    order = [c.func.id for c in ast.walk(funcs["main"]) if isinstance(c, ast.Call)
+             and isinstance(c.func, ast.Name)]
+    assert order.index("step_category_stage_from_a_week") < order.index("step_uninstall")
+    for needle in ("aw-watcher-window_", "aw-watcher-afk_", "COLLECTING", "READY",
+                   "--from-context", "--data-days", "ACME", "BETA", "VERIFY", "HOST",
+                   "/api/0/buckets/"):
+        assert needle in src, f"the guided-setup steps never mention {needle}"
+
+
+def test_the_driver_lists_what_the_guided_setup_steps_cannot_show():
+    doc = ast.get_docstring(ast.parse(DRIVER.read_text(encoding="utf-8"))) or ""
+    for gap in ("browser-store", "administrator prompt", "consent page",
+                "week of titles", "runner is an administrator", "first-run"):
+        assert gap in doc, f"the driver does not list '{gap}' as unverified"
+
+
+def test_posting_a_day_twice_tolerates_the_servers_304_for_an_existing_bucket():
+    """The real aw-server answers 304 when a bucket id already exists (found by the first CI
+    run of the guided-setup steps, which share `example-host` buckets with the check-in
+    steps). The driver must treat that as 'already there' and still post the events."""
+    import http.server
+    import importlib.util
+    import sys
+    import threading
+
+    seen = {"buckets": set(), "events": 0}
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, format, *args):  # noqa: A002 - base signature
+            pass
+
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            if self.path.endswith("/events"):
+                seen["events"] += 1
+                self.send_response(200)
+            elif self.path in seen["buckets"]:
+                self.send_response(304)
+            else:
+                seen["buckets"].add(self.path)
+                self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            assert body is not None
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        spec = importlib.util.spec_from_file_location("windows_checkin_e2e_under_test", DRIVER)
+        assert spec and spec.loader
+        sys.path[:0] = [str(REPO / "skills" / "daily" / "tests")]
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        setattr(module, "BASE", f"http://127.0.0.1:{server.server_port}")
+        from scenarios import week_of_work  # type: ignore[import-not-found]  # pyright: ignore[reportMissingImports]
+        built = week_of_work(1)[0]
+        module._post_buckets(built)
+        module._post_buckets(built)          # the second time every bucket already exists
+        assert seen["events"] >= 4
+    finally:
+        server.shutdown()
+        server.server_close()

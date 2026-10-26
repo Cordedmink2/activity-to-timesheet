@@ -119,6 +119,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every rule write reported itself unconfirmed.
 
 ### Added
+- **`/billables:setup` is now the one front door.** It opens with five choices: new machine, finish a
+  partly set-up machine, add a client, fix something, report a problem. Two new skills, `onboard-client`
+  and `troubleshoot`, take the jobs that are not an install. Feedback is drafted and handed over, never
+  sent. Setup does every step it can and lists the few only a person can do.
+- **A client's category terms live on one line in `.context.md`.** `category_rules.py --from-context`
+  writes the rules from it, `--data-days` says when enough days are recorded to learn from, and the
+  daily run offers the rules once, never after you decline. `daily` stays under 5,000 words.
+- Guards: terms have one home, and no skill asks for or prints a credential (planted-violation proofs).
 - **What you typed when a check-in watcher asked what you were doing now reaches your review.**
   `checkin_answers.py` reads the answers of `aw-watcher-ask-away` (on return from away) and
   `aw-watcher-ask` (Mac and Linux), read-only, for this computer only. A work answer over a break

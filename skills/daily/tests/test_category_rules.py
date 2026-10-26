@@ -931,3 +931,268 @@ def test_a_sample_with_nothing_in_it_refuses_rather_than_writing_unjudged_rules(
     result = compile_run(tmp_path, [ACME], "--days", "0")
     assert result.code == 1
     assert "nothing to test a category rule against" in result.err
+
+
+# --------------------------------------------------------------------------------------
+# `--from-context`: the context file is the one home of the terms (guided-setup T4)
+# --------------------------------------------------------------------------------------
+
+CONTEXT_TWO_CLIENTS = """# Context
+
+## Active client projects
+
+One section per client.
+
+### Acme Ltd
+
+**Client name**: `Acme`
+**Default project**: `ACME-1` `Support`
+**Category terms**: `ACME`, `AcmePortal` — words only this client's work puts in a title
+
+Signals:
+- some free text with `backticks` that is not a term
+
+Common activities: whatever I do for them, with `code` in it.
+
+### Beta Co
+
+**Client name**: `Beta`
+**Category terms**: `BETA`
+
+## Work kinds
+
+**Category terms**: `NOT-A-CLIENT`
+"""
+
+
+def from_context_run(workspace: Path, text: str, *args) -> CliResult:
+    context_file(workspace, text)
+    return run_cli(cr, ["--from-context", *args])
+
+
+def test_from_context_writes_what_candidates_would_have_written(live_aw, workspace, tmp_path):
+    """The compile result is the same as the equivalent `--candidates` run."""
+    context_file(workspace, CONTEXT_TWO_CLIENTS)
+    by_file = live_aw(sample_day([ACME_PAGE, ACME_EDITOR, BETA_PAGE, PERSONAL]))
+    assert compile_run(tmp_path, [ACME, BETA]).code == 0
+    expected = posted(by_file)
+    by_context = live_aw(sample_day([ACME_PAGE, ACME_EDITOR, BETA_PAGE, PERSONAL]))
+    result = run_cli(cr, ["--from-context"])
+    assert result.code == 0, result.err
+    assert posted(by_context) == expected
+
+
+def test_from_context_keeps_file_order_as_priority(live_aw, workspace):
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    assert from_context_run(workspace, CONTEXT_TWO_CLIENTS).code == 0
+    assert names(posted(server)) == ["Acme", "Beta"]
+
+
+def test_from_context_reads_terms_only_from_the_client_sections(live_aw, workspace):
+    """Free text, backticks in signals and a `Category terms` line outside the client
+    sections are not terms."""
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    result = from_context_run(workspace, CONTEXT_TWO_CLIENTS)
+    assert result.code == 0, result.err
+    regexes = " ".join(entry["rule"]["regex"] for entry in posted(server))
+    for stray in ("backticks", "NOT-A-CLIENT", "code"):
+        assert stray not in regexes
+
+
+def test_from_context_leaves_out_a_client_with_no_terms_and_says_so(live_aw, workspace):
+    text = CONTEXT_TWO_CLIENTS.replace("**Category terms**: `BETA`\n", "")
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    result = from_context_run(workspace, text)
+    assert result.code == 0, result.err
+    assert names(posted(server)) == ["Acme"]
+    assert "NOTERMS Beta" in result.out
+
+
+def test_from_context_refuses_a_terms_line_it_cannot_read_and_writes_nothing(
+        live_aw, workspace):
+    text = CONTEXT_TWO_CLIENTS.replace("`BETA`", "BETA without backticks")
+    server = live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    result = from_context_run(workspace, text)
+    assert result.code == 1
+    assert "ERR" in result.err and "Category terms" in result.err and "line" in result.err
+    assert server.sent("POST", "/settings/classes") == []
+
+
+def test_from_context_refuses_a_file_that_declares_no_clients(live_aw, workspace):
+    live_aw(sample_day([ACME_PAGE]))
+    result = from_context_run(workspace, "# Context\n\nnothing here\n")
+    assert result.code == 1
+    assert "no client" in result.err.lower()
+
+
+def test_from_context_refuses_when_there_is_no_context_file(live_aw, workspace):
+    live_aw(sample_day([ACME_PAGE]))
+    result = run_cli(cr, ["--from-context"])
+    assert result.code == 1
+    assert ".context.md" in result.err
+
+
+def test_from_context_skips_template_placeholders(live_aw, workspace):
+    text = ("## Active client projects\n\n### X\n\n**Client name**: `<exact name>`\n"
+            "**Category terms**: `<CODE>`, `<product>`\n")
+    live_aw(sample_day([ACME_PAGE]))
+    result = from_context_run(workspace, text)
+    assert result.code == 1
+    assert "placeholder" in result.err.lower()
+
+
+def test_from_context_adopts_an_existing_rule(live_aw, workspace):
+    server = live_aw(sample_day([ACME_PAGE, PERSONAL], classes=[("Old Acme", "AcmePortal")]))
+    result = from_context_run(workspace, CONTEXT_TWO_CLIENTS, "--adopts", "Acme=Old Acme")
+    assert result.code == 0, result.err
+    assert names(posted(server)).count("Old Acme") == 0
+    assert names(posted(server)) == ["Acme", "Beta"]
+
+
+def test_from_context_leaves_the_context_file_fingerprint_alone(live_aw, workspace):
+    live_aw(sample_day([ACME_PAGE, BETA_PAGE]))
+    path = context_file(workspace, CONTEXT_TWO_CLIENTS)
+    before = path.read_bytes()
+    assert run_cli(cr, ["--from-context"]).code == 0
+    assert path.read_bytes() == before
+    assert run_cli(cr, ["--status"]).out.startswith("CURRENT")
+
+
+# --------------------------------------------------------------------------------------
+# `--data-days`: wait for about a week of real work before the category stage (T5)
+# --------------------------------------------------------------------------------------
+
+class Days:
+    """Several `Day`s served as one source, so the stage's lookback has a week to read."""
+
+    zone_name = None
+
+    def __init__(self, *days: Day):
+        self.days = days
+
+    def buckets(self) -> dict[str, list[dict]]:
+        merged: dict[str, list[dict]] = {}
+        for built in self.days:
+            for bucket, events in built.buckets().items():
+                merged.setdefault(bucket, []).extend(events)
+        return merged
+
+    def settings(self) -> dict:
+        return {"classes": []}
+
+
+def past_days(count: int, weekdays: bool = True) -> list[dt.date]:
+    """The `count` most recent completed days, weekdays only unless told otherwise."""
+    found, cursor = [], dt.date.today() - dt.timedelta(days=1)
+    while len(found) < count:
+        if not weekdays or cursor.weekday() < 5:
+            found.append(cursor)
+        cursor -= dt.timedelta(days=1)
+    return found
+
+
+def worked(date: dt.date, minutes: int = 240) -> Day:
+    built = day(date=date, offset=0)
+    built.active("09:00", f"{9 + minutes // 60:02d}:{minutes % 60:02d}")
+    built.window("09:00", f"{9 + minutes // 60:02d}:{minutes % 60:02d}", "Code.exe", "work")
+    return built
+
+
+def data_days(live_aw, *days: Day, args: tuple = ()) -> CliResult:
+    live_aw(Days(*days))
+    return run_cli(cr, ["--data-days", "--utc-offset", "0", *args])
+
+
+def test_data_days_under_the_threshold_says_collecting_and_names_the_day_to_come_back(
+        live_aw, workspace):
+    first, second = past_days(2)
+    result = data_days(live_aw, worked(first), worked(second))
+    assert result.code == 0, result.err
+    line = next(l for l in result.out.splitlines() if l.startswith("DATA"))
+    assert "2 of 5" in line and "COLLECTING" in line
+    assert "come back" in result.out.lower()
+    assert "say:" in result.out
+
+
+def test_data_days_come_back_date_is_the_workday_that_reaches_the_threshold(
+        live_aw, workspace):
+    first, second = past_days(2)
+    result = data_days(live_aw, worked(first), worked(second))
+    needed, cursor = 3, dt.datetime.now(dt.timezone.utc).date()  # the run is --utc-offset 0
+    while needed:
+        cursor += dt.timedelta(days=1)
+        if cursor.weekday() < 5:
+            needed -= 1
+    assert cursor.isoformat() in result.out
+
+
+def test_data_days_at_the_threshold_says_ready(live_aw, workspace):
+    result = data_days(live_aw, *[worked(d) for d in past_days(5)])
+    line = next(l for l in result.out.splitlines() if l.startswith("DATA"))
+    assert "5 of 5" in line and "READY" in line
+
+
+def test_data_days_writes_no_rule_and_makes_no_state(live_aw, workspace):
+    server = live_aw(Days(*[worked(d) for d in past_days(2)]))
+    run_cli(cr, ["--data-days", "--utc-offset", "0"])
+    assert server.sent("POST", "/settings/classes") == []
+    assert not list((workspace / ".mcp").iterdir())
+
+
+def test_data_days_does_not_count_a_weekend(live_aw, workspace):
+    weekend = [d for d in past_days(14, weekdays=False) if d.weekday() >= 5][:2]
+    result = data_days(live_aw, *[worked(d, 480) for d in weekend], worked(past_days(1)[0]))
+    assert "1 of 5" in result.out
+
+
+def test_data_days_does_not_count_a_day_under_thirty_minutes(live_aw, workspace):
+    short, full = past_days(2)
+    result = data_days(live_aw, worked(short, 29), worked(full, 30))
+    assert "1 of 5" in result.out
+
+
+def test_data_days_does_not_count_a_day_that_was_only_away(live_aw, workspace):
+    away, full = past_days(2)
+    idle = day(date=away, offset=0).afk("09:00", "17:00")
+    idle.window("09:00", "17:00", "Code.exe", "left open")
+    result = data_days(live_aw, idle, worked(full))
+    assert "1 of 5" in result.out
+
+
+def test_data_days_honours_min_days(live_aw, workspace):
+    result = data_days(live_aw, *[worked(d) for d in past_days(2)], args=("--min-days", "2"))
+    line = next(l for l in result.out.splitlines() if l.startswith("DATA"))
+    assert "2 of 2" in line and "READY" in line
+
+
+def test_data_days_reads_the_threshold_from_the_preferences_line(live_aw, workspace):
+    context_file(workspace, "## Preferences\n\n- **Workdays before the category stage**: `2`\n")
+    result = data_days(live_aw, *[worked(d) for d in past_days(2)])
+    assert "2 of 2" in result.out and "READY" in result.out
+
+
+def test_data_days_flag_beats_the_preferences_line(live_aw, workspace):
+    context_file(workspace, "## Preferences\n\n- **Workdays before the category stage**: `2`\n")
+    result = data_days(live_aw, *[worked(d) for d in past_days(2)], args=("--min-days", "4"))
+    assert "2 of 4" in result.out and "COLLECTING" in result.out
+
+
+def test_data_days_refuses_a_threshold_below_one(live_aw, workspace):
+    live_aw(Days(worked(past_days(1)[0])))
+    result = run_cli(cr, ["--data-days", "--min-days", "0"])
+    assert result.code == 2 and "ERR" in result.err
+
+
+def test_data_days_with_no_activity_bucket_is_an_error_not_an_empty_week(live_aw, workspace):
+    server_day = day(date=past_days(1)[0], offset=0)
+    live_aw(Days(server_day))
+    # no window events at all still has the buckets; remove them by serving none
+    live_aw(type("Empty", (), {"zone_name": None, "buckets": lambda s: {},
+                               "settings": lambda s: {"classes": []}})())
+    result = run_cli(cr, ["--data-days", "--utc-offset", "0"])
+    assert result.code == 1 and result.err.startswith("ERR")
+
+
+def test_data_days_is_one_of_exactly_one_mode(live_aw, workspace):
+    result = run_cli(cr, ["--data-days", "--status"])
+    assert result.code == 2

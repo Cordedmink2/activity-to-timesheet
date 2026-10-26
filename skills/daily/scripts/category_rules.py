@@ -6,9 +6,9 @@ products or apps, the client's full name — and this script judges them and wri
 that survive. The user sees the terms, never a regex or a JSON body.
 
 **Choosing the terms is the model's, enforcement is this script's.** The context file
-legitimately holds prose, hints and free text, so no parser should be asked to read it —
-which is why this takes *candidates* rather than the file. What it does with them is
-deterministic:
+legitimately holds prose, hints and free text, so only one narrow slice of it is parsed
+(`--from-context`: each client's name and `Category terms` line); `--candidates` takes the
+list directly for adopting rules. What it does with them is deterministic:
 
   1. **Gate.** A client with no terms or with more than `MAX_TERMS`, and a term matching an
      implausible share of the sampled window titles, are refused, and a refusal anywhere
@@ -29,8 +29,14 @@ deterministic:
 A term is literal, matched case-insensitively anywhere in the app name or the title — each
 field on its own, because that is how the activity source matches (`matching()`).
 
-Three modes:
-  * `--candidates <file|->`  gate, back up, write, verify
+Modes:
+  * `--from-context`         the same, with the candidates read from the workspace context
+                             file's client sections: the one home of the terms. Narrow parser
+                             — `**Client name**` and `**Category terms**` lines only
+  * `--candidates <file|->`  gate, back up, write, verify, from a list given directly
+                             (adopting rules the plugin did not author)
+  * `--data-days`            how many workdays of real work are recorded, against the wait
+                             before rules are written (`COLLECTING` or `READY`). Reads only
   * `--inspect`              what the activity source holds now, each rule marked managed
                              or not and carrying the share of the sample it matches — the
                              read behind adopting rules the plugin did not author — and,
@@ -43,6 +49,7 @@ Three modes:
 No third-party deps — stdlib urllib, via the shared aw_client.py.
 
 Usage:
+  python scripts/category_rules.py --from-context
   python scripts/category_rules.py --candidates candidates.json
   python scripts/category_rules.py --inspect
   python scripts/category_rules.py --status
@@ -59,7 +66,9 @@ import urllib.error
 from pathlib import Path
 
 import skill_config
-from aw_client import SourceError, get, post_setting, query, unreachable, window_day
+from context_terms import ContextError, load_clients
+from aw_client import (SourceError, fetch_events, get, parse_ts, pick_bucket, post_setting,
+                       query, unreachable, window_day)
 from timezone import resolve_zone, utc_bounds
 
 # How much of the day the sample covers. A week rather than a day so a client worked on
@@ -115,6 +124,18 @@ SHARED_HOSTS = frozenset({"dev.azure.com", "github.com", "gitlab.com", "bitbucke
 # How many `HOST` lines `--inspect` prints: enough to find each client's addresses, few enough
 # that the run is not handed the week's browsing.
 HOSTS_SHOWN = 25
+
+# A workday for the category stage (guided-setup D5): a local weekday with at least this much
+# window activity while the AFK watcher says the user was there. Under it the day is a
+# glance at the machine, not work to learn rules from.
+WORKDAY_FLOOR_SECONDS = 30 * 60
+# How many workdays of recorded work the stage waits for, and how far back they are counted.
+DEFAULT_MIN_DAYS = 5
+DATA_LOOKBACK_DAYS = 30
+MIN_DAYS_PREFERENCE = re.compile(
+    r"^- \*\*Workdays before the category stage\*\*:[ \t]*`(\d+)`", re.MULTILINE)
+AFK_BUCKET = "aw-watcher-afk"
+WINDOW_BUCKET = "aw-watcher-window"
 
 # Where the backup and the stamp live under the workspace. `.mcp/` already holds the cached
 # catalogs — machine state the user does not hand-edit — which is what both of these are.
@@ -609,8 +630,113 @@ def load_candidates(source: str) -> list[dict]:
     return loaded
 
 
-def compile_rules(source: str, days: int, max_share: float, directory: Path) -> int:
-    candidates = load_candidates(source)
+def _present_seconds(window: list[dict], afk: list[dict] | None, start: dt.datetime,
+                     end: dt.datetime) -> float:
+    """Seconds inside [start, end) with window activity while the AFK watcher says the user
+    was present. With no AFK bucket at all, window activity alone counts."""
+    def span(event: dict) -> tuple[dt.datetime, dt.datetime]:
+        begin = parse_ts(event["timestamp"])
+        return begin, begin + dt.timedelta(seconds=float(event.get("duration") or 0))
+
+    present = None if afk is None else [
+        span(e) for e in afk if (e.get("data") or {}).get("status") == "not-afk"]
+    total = 0.0
+    for event in window:
+        begin, finish = span(event)
+        begin, finish = max(begin, start), min(finish, end)
+        if finish <= begin:
+            continue
+        if present is None:
+            total += (finish - begin).total_seconds()
+            continue
+        for p_begin, p_finish in present:
+            low, high = max(begin, p_begin), min(finish, p_finish)
+            if high > low:
+                total += (high - low).total_seconds()
+    return total
+
+
+def recorded_workdays(zone, today: dt.date) -> list[dt.date]:
+    """Local weekdays in the lookback with at least `WORKDAY_FLOOR_SECONDS` of present window
+    activity, from the activity source's own buckets."""
+    first = today - dt.timedelta(days=DATA_LOOKBACK_DAYS)
+    buckets = get("/buckets/")
+    window_bucket = pick_bucket(buckets, WINDOW_BUCKET)
+    if not window_bucket:
+        raise SourceError(f"no {WINDOW_BUCKET} bucket found — the window watcher is not "
+                          f"reporting, so no day can be counted. Buckets seen: "
+                          f"{sorted(buckets) or '(none)'}")
+    afk_bucket = pick_bucket(buckets, AFK_BUCKET)
+    found = []
+    for offset in range(DATA_LOOKBACK_DAYS + 1):
+        date = first + dt.timedelta(days=offset)
+        if date.weekday() >= 5:
+            continue
+        day_start, day_end = utc_bounds(date, zone)
+        window = fetch_events(window_bucket, day_start, day_end)
+        afk = fetch_events(afk_bucket, day_start, day_end) if afk_bucket else None
+        seconds = _present_seconds(window, afk, parse_ts(day_start), parse_ts(day_end))
+        if seconds >= WORKDAY_FLOOR_SECONDS:
+            found.append(date)
+    return found
+
+
+def threshold_preference(root: Path) -> int | None:
+    path = root / CONTEXT_FILE
+    if not path.is_file():
+        return None
+    found = MIN_DAYS_PREFERENCE.search(path.read_text(encoding="utf-8"))
+    return int(found.group(1)) if found else None
+
+
+def data_days(directory: Path, zone, min_days: int | None) -> int:
+    """One `DATA` line: recorded workdays, the threshold, and COLLECTING or READY (D5).
+
+    Reads only; writes no rule and no state. Under the threshold it names the date to come
+    back — the workday on which the missing days would be reached if every one is worked —
+    and a `say:` line the run relays as it stands, so the wording is the script's, not a
+    skill's.
+    """
+    threshold = min_days or threshold_preference(directory.parent) or DEFAULT_MIN_DAYS
+    today = dt.datetime.now(zone).date()
+    counted = len(recorded_workdays(zone, today))
+    if counted >= threshold:
+        print(f"DATA {counted} of {threshold} workdays recorded — READY")
+        print("say: Enough of your work is recorded. We can write your category rules now.")
+        return 0
+    missing, back = threshold - counted, today
+    while missing:
+        back += dt.timedelta(days=1)
+        if back.weekday() < 5:
+            missing -= 1
+    print(f"DATA {counted} of {threshold} workdays recorded — COLLECTING, come back on {back}")
+    print(f"say: Only {counted} of the {threshold} workdays we want are recorded. Keep "
+          f"working as usual, and come back on {back}. Until then your daily run still "
+          f"works, with more questions.")
+    return 0
+
+
+def context_candidates(root: Path, adopts: list[str]) -> list[dict]:
+    """The candidates read from the workspace context file (`--from-context`)."""
+    try:
+        candidates, left_out = load_clients(root)
+    except ContextError as exc:
+        raise Refusal(str(exc)) from None
+    for name in left_out:
+        print(f"NOTERMS {name} — no `Category terms` line, so no rule is written for it")
+    for pair in adopts:
+        client, _, existing = pair.partition("=")
+        match = next((c for c in candidates if c["client"] == client.strip()), None)
+        if not existing or match is None:
+            raise Refusal(f"--adopts wants Client=existing category name for a declared "
+                          f"client, not '{pair}'")
+        match.setdefault("adopts", []).append(existing.strip())
+    return candidates
+
+
+def compile_rules(source: str | list[dict], days: int, max_share: float,
+                  directory: Path) -> int:
+    candidates = source if isinstance(source, list) else load_candidates(source)
     bucket, start_utc, end_utc, sample = sample_windows(days)
     if not sample:
         raise Refusal(f"no window events in the last {days} days, so there is nothing to "
@@ -917,6 +1043,19 @@ def main():
     ap.add_argument("--candidates",
                     help="JSON file of {client, terms} candidates, or `-` for stdin. Gates, "
                          "backs up, writes and verifies.")
+    ap.add_argument("--from-context", action="store_true",
+                    help="Read the clients and their `Category terms` from the workspace "
+                         ".context.md, then gate, back up, write and verify. The one home "
+                         "of the terms; no candidates file is made by hand.")
+    ap.add_argument("--data-days", action="store_true",
+                    help="Say how many workdays of activity are recorded and whether the "
+                         "category stage should wait. Reads only; writes nothing.")
+    ap.add_argument("--min-days", type=int, default=None,
+                    help=f"With --data-days: workdays to wait for (default "
+                         f"{DEFAULT_MIN_DAYS}, or the `## Preferences` line)")
+    ap.add_argument("--adopts", action="append", default=[], metavar="CLIENT=EXISTING",
+                    help="With --from-context: replace the existing category EXISTING "
+                         "with CLIENT's rule (repeatable)")
     ap.add_argument("--inspect", action="store_true",
                     help="Report the rules the activity source holds now, each with the "
                          "share of the sample it matches. Writes nothing.")
@@ -942,10 +1081,15 @@ def main():
                          "the configured TIMESHEET_WORKSPACE for this run")
     args = ap.parse_args()
 
-    chosen = [bool(args.candidates), args.inspect, args.status, bool(args.dormant)]
+    chosen = [bool(args.candidates), args.from_context, args.data_days, args.inspect,
+              args.status, bool(args.dormant)]
     if sum(chosen) != 1:
-        print("ERR give exactly one of --candidates, --inspect, --status or --dormant",
+        print("ERR give exactly one of --candidates, --from-context, --data-days, "
+              "--inspect, --status or --dormant",
               file=sys.stderr)
+        return 2
+    if args.min_days is not None and args.min_days < 1:
+        print("ERR --min-days must be at least 1", file=sys.stderr)
         return 2
     local_date = None
     if args.dormant:
@@ -965,6 +1109,9 @@ def main():
         if args.inspect:
             return inspect(args.days, args.max_share,
                            state_dir(args.workspace, create=False))
+        if args.data_days:
+            return data_days(state_dir(args.workspace, create=False),
+                             resolve_zone(args.utc_offset), args.min_days)
         if local_date is not None:
             return dormant(local_date, resolve_zone(args.utc_offset), args.lookback)
         if args.status:
@@ -972,6 +1119,9 @@ def main():
             # whatever folder the session started in, nor fail because it could not.
             return status(state_dir(args.workspace, create=False))
         directory = state_dir(args.workspace)
+        if args.from_context:
+            return compile_rules(context_candidates(directory.parent, args.adopts),
+                                 args.days, args.max_share, directory)
         return compile_rules(args.candidates, args.days, args.max_share, directory)
     except Refusal as exc:
         print(f"ERR {exc}", file=sys.stderr)

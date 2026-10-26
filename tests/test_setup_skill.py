@@ -55,14 +55,34 @@ def shipped_text() -> str:
     return shipped.shipped_text(SETUP)
 
 
+CHECKS_MD = SETUP / "references" / "checks.md"
+INSTALL_COMMANDS_MD = SETUP / "references" / "install-commands.md"
+
+
+def check_entry(check_id: str) -> str:
+    """One `## Check <id>` entry of `references/checks.md`, where the probes now live
+    once (guided-setup T6)."""
+    if not CHECKS_MD.is_file():
+        return ""
+    found = re.split(r"^## Check ([a-z-]+)\b.*$", CHECKS_MD.read_text(encoding="utf-8"),
+                     flags=re.M)[1:]
+    return dict(zip(found[0::2], found[1::2])).get(check_id, "")
+
+
 def steps() -> list[tuple[str, str]]:
-    """Each `### ` step under `## Steps`, as (heading, body)."""
+    """Each `### ` step under `## Steps`, as (heading, body) — the body as a run reads it,
+    with the check entry the step cites appended, because the Verify and the If-it-fails
+    moved out of SKILL.md into `references/checks.md` and a run follows the citation."""
     text = skill_text()
     if "## Steps" not in text:
         return []
     section = text.split("## Steps", 1)[1].split("\n## ", 1)[0]
     found = re.split(r"^### (.+)$", section, flags=re.M)[1:]
-    return list(zip(found[0::2], found[1::2]))
+    expanded = []
+    for body in found[1::2]:
+        cited = re.search(r"\(check `([a-z-]+)`\)", body)
+        expanded.append(body + (check_entry(cited.group(1)) if cited else ""))
+    return list(zip(found[0::2], expanded))
 
 
 def step_ids() -> list[str]:
@@ -203,28 +223,19 @@ def compiler_max_terms() -> int:
     raise AssertionError("no MAX_TERMS in the compiler — the check has nothing to read")
 
 
-def test_the_category_step_hands_the_compiler_the_candidate_shape_it_reads():
-    """The step shows a run the file it writes; the script decides what the file means.
-
-    The walkthrough once offered signal types the compiler had renamed, and a candidate
-    refused on every install is a step whose recourse — recompose and try again — keeps
-    handing back the same refusal. So the step's own example is parsed and held to the keys
-    the compiler reads, and the cap it states is the compiler's.
-    """
+def test_the_category_step_hands_the_compiler_the_context_file_it_reads():
+    """The step used to show a candidates file; since guided-setup the compiler reads the
+    clients and their terms from the context file (`--from-context`), so the step's
+    example is the context file's own template line, and the cap it states is the
+    compiler's."""
     _, body = one_step_about(r"categor")
-    example = re.search(r"```json\n(.*?)```", body, re.S)
-    assert example, "the category step shows no candidates file, so a run has to invent one"
-    candidates = json.loads(example.group(1))
-    assert candidates and all(set(c) <= {"client", "terms", "adopts"} and "terms" in c
-                              for c in candidates), (
-        f"the category step's example is not the {{client, terms, adopts}} shape the "
-        f"compiler reads: {candidates}")
-    assert all(len(c["terms"]) <= compiler_max_terms() for c in candidates)
+    assert "--from-context" in body and "--candidates" not in body
+    terms = (SETUP / "references" / "choosing-terms.md").read_text(encoding="utf-8")
     cap = {n: word for word, n in NUMBER_WORDS.items()}[compiler_max_terms()]
-    assert f"up to {cap}" in body, (
-        "the category step does not state the compiler's cap on a client's terms")
-    assert f"over the {compiler_max_terms()} a client's rule takes" in body, (
-        "the category step quotes a cap refusal the compiler no longer prints")
+    assert f"up to {cap}" in terms, (
+        "choosing-terms.md does not state the compiler's cap on a client's terms")
+    assert f"over the {compiler_max_terms()} a client's rule takes" in check_entry(
+        "category-rules"), "the category check quotes a cap refusal the compiler no longer prints"
 
 
 def test_the_category_step_offers_the_addresses_the_titles_carry():
@@ -249,7 +260,7 @@ def test_the_category_step_writes_the_context_file_before_the_rules_and_never_ov
     the template landing on top of their clients."""
     heading, body = one_step_about(r"categor")
     context = body.find("context.md.example")
-    candidates = body.find("--candidates <file>")
+    candidates = body.find("--from-context")
     assert context != -1, f"step '{heading.strip()}' never writes the starter context file"
     assert candidates != -1 and context < candidates, (
         f"step '{heading.strip()}' writes the context file after the rules, so their "
@@ -366,7 +377,8 @@ def test_nothing_is_installed_on_the_users_machine_without_their_yes():
     """Setup offers to run the installs it finds missing (#67) — machine-wide software, so
     the decision is the user's every time, and an install that runs unasked is a change to
     their machine they did not choose."""
-    before = shipped.section(skill_text(), "Before you start")
+    before = (shipped.section(skill_text(), "Before you start")
+              + INSTALL_COMMANDS_MD.read_text(encoding="utf-8"))
     assert "winget install" in before, "\"Before you start\" offers nothing to install"
     assert re.search(r"run only what the user says yes to", before, re.I), (
         "the install offer does not wait for the user's yes")
@@ -448,9 +460,9 @@ def test_the_elevated_registration_fix_has_one_copy_in_the_shipped_skills():
     """
     carriers = sorted(p.relative_to(REPO).as_posix() for p in SKILLS.rglob("*.md")
                       if "Unregister-ScheduledTask" in p.read_text(encoding="utf-8"))
-    assert carriers == [SETUP_MD.relative_to(REPO).as_posix()], (
+    assert carriers == [CHECKS_MD.relative_to(REPO).as_posix()], (
         "the two-shell fix for a task registered elevated is written out in "
-        f"{len(carriers)} shipped files ({carriers}) — the `setup` skill's step 5 owns it, "
+        f"{len(carriers)} shipped files ({carriers}) — the `screenshot-task` check owns it, "
         "and a second copy is one that goes stale without anything failing")
 
 
@@ -831,8 +843,9 @@ def test_the_step_uses_the_probe_and_diagnose_modes_and_deletes_only_on_a_named_
 
 def test_the_reference_says_how_to_install_verify_and_remove_and_why_pr_5_is_not_used():
     body = CHECKIN_REF.read_text(encoding="utf-8")
-    for needed in ("0.0.6", "Python 3.11", "Get-ScheduledTask", "removal line", "aw-qt", "PR #5"):
+    for needed in ("0.0.6", "Python 3.11", "removal line", "aw-qt", "PR #5"):
         assert needed in body, f"checkin-watchers.md lost {needed!r}"
+    assert "Get-ScheduledTask -TaskName CheckinWatcher" in check_entry("checkin-watchers")
     assert CHECKIN_PS.name in body
     assert "Unregister-ScheduledTask" in CHECKIN_PS.read_text(encoding="utf-8-sig")
 

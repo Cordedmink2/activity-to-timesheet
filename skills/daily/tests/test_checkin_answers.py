@@ -409,3 +409,52 @@ def test_an_answer_over_two_breaks_is_one_question_per_break_each_clipped(live_a
     out = run(d, *files(tmp_path, d)).json()
     assert spans(out) == [("12:20:00", "12:40:00", "call with ACME"),
                           ("15:00:00", "15:20:00", "call with ACME")]
+
+
+# --------------------------------------------------------------------------------------
+# Client terms come from the context file, the one home (guided-setup T22)
+# --------------------------------------------------------------------------------------
+
+CONTEXT_WITH_CLIENTS = """## Active client projects
+
+### Acme
+
+**Client name**: `ACME`
+**Category terms**: `acme`
+
+### Beta
+
+**Client name**: `BETA`
+**Category terms**: `beta`, `beta corp`
+"""
+
+
+def test_client_terms_are_read_from_the_context_file_when_terms_names_none(
+        live_aw, workspace, tmp_path):
+    (workspace / "Timesheets" / ".context.md").write_text(CONTEXT_WITH_CLIENTS,
+                                                           encoding="utf-8")
+    d = worked(day()).checkin("12:00", "12:40", "call with ACME")
+    live_aw(d)
+    only_exclusions = {"exclusions": ["physio"]}
+    out = run(d, *files(tmp_path, d, terms=only_exclusions)).json()
+    assert [q["clients"] for q in out["questions"]] == [["ACME"]]
+
+
+def test_client_terms_are_read_from_the_context_file_when_no_terms_file_is_given(
+        live_aw, workspace, tmp_path):
+    (workspace / "Timesheets" / ".context.md").write_text(CONTEXT_WITH_CLIENTS,
+                                                           encoding="utf-8")
+    d = worked(day()).checkin("12:00", "12:40", "call with beta corp")
+    live_aw(d)
+    args = [a for a in files(tmp_path, d, terms=None)]
+    out = run(d, *args).json()
+    assert [q["clients"] for q in out["questions"]] == [["BETA"]]
+
+
+def test_a_context_file_with_no_readable_clients_leaves_the_answer_with_no_client(
+        live_aw, workspace, tmp_path):
+    (workspace / "Timesheets" / ".context.md").write_text("# nothing here\n", encoding="utf-8")
+    d = worked(day()).checkin("12:00", "12:40", "call with ACME")
+    live_aw(d)
+    out = run(d, *files(tmp_path, d, terms=None)).json()
+    assert [q["clients"] for q in out["questions"]] == [[]]

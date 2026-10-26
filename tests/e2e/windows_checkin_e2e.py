@@ -15,6 +15,15 @@ NOT verified by this job, and never reported as passed (plan D12; Atlas decides 
   - "no admin": the runner is an admin account, so that stays with the dry-run assertions
     in tests/test_checkin_watcher_setup.py.
 
+Guided-setup steps (`step_setup_checks_pass_and_collecting`, `step_category_stage_from_a_week`)
+run the install checks of `skills/setup/references/checks.md` against the real aw-server and
+the category stage on a week of injected real-shape events (ACME / BETA, `example-host`).
+NOT verified by those steps, and never reported as passed (Atlas decides at ship):
+  - the browser-store Add click, the administrator prompt and the consent page (a person's);
+  - a real person's week of titles (the week here is injected and synthetic);
+  - the runner is an administrator account, so "no admin" is not shown;
+  - a person's first-run experience of the menu.
+
 Usage: python tests/e2e/windows_checkin_e2e.py <path-to-aw-server-rust.exe>
 """
 import json
@@ -23,6 +32,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -190,6 +200,87 @@ def step_assert_lunch_stays_break():
                   for b in skeleton.get("breaks", [])), "the lunch gap is still a break")
 
 
+def _post_buckets(built):
+    """Create each bucket of a day on the real server and post its events."""
+    for bucket, events in built.buckets().items():
+        kind = ("afktask" if bucket.startswith("aw-watcher-ask-away") else
+                "afkstatus" if "afk" in bucket else "currentwindow")
+        q = urllib.parse.quote(bucket, safe="")
+        try:
+            http("POST", f"/api/0/buckets/{q}", {"id": bucket, "client": "billables-e2e",
+                                                  "type": kind, "hostname": built.host})
+        except urllib.error.HTTPError as exc:
+            exc.close()                  # release the response body, or Python 3.14 warns
+            if exc.code != 304:          # the real server's answer for a bucket that exists
+                raise
+        if events:
+            http("POST", f"/api/0/buckets/{q}/events", [
+                {"timestamp": e["timestamp"], "duration": e["duration"], "data": e["data"]}
+                for e in events])
+
+
+def _category_rules(workspace, *args):
+    env = dict(os.environ, TIMESHEET_ACTIVITY_URL=BASE)
+    r = subprocess.run([sys.executable, str(SCRIPTS / "category_rules.py"), *map(str, args),
+                        "--workspace", str(workspace), "--utc-offset", "0"],
+                       capture_output=True, text=True, env=env)
+    return r.returncode, r.stdout, r.stderr
+
+
+def step_setup_checks_pass_and_collecting():
+    """checks.md `activity-source` against the real server, then the stated COLLECTING
+    state on two recorded days (guided-setup T19, US-2/AC-2)."""
+    from scenarios import real_shape_buckets, week_of_work  # type: ignore[import-not-found]
+    buckets = http("GET", "/api/0/buckets/") or {}
+    check(any(k.startswith("aw-watcher-window_") for k in buckets)
+          and any(k.startswith("aw-watcher-afk_") for k in buckets),
+          "activity-source check: /api/0/buckets/ holds aw-watcher-window_ and aw-watcher-afk_ keys")
+    workspace = Path(tempfile.mkdtemp(prefix="billables-e2e-ws-"))
+    state["workspace"] = workspace
+    (workspace / "Timesheets").mkdir()
+    (workspace / ".mcp").mkdir()
+    state["week"] = week_of_work(5)
+    for built in state["week"][:2]:
+        _post_buckets(built)
+    for name in real_shape_buckets(state["week"][0]):
+        check(name in (http("GET", "/api/0/buckets/") or {}), f"the real server holds {name}")
+    code, out, err = _category_rules(workspace, "--data-days")
+    check(code == 0, f"category_rules.py --data-days exits 0 ({err.strip()})")
+    check("COLLECTING" in out and "2 of 5" in out,
+          "two recorded days end in the stated COLLECTING state (2 of 5)")
+    check("say:" in out and "come back" in out, "the run prints its own say: line")
+    check(not list((workspace / ".mcp").iterdir()),
+          "COLLECTING wrote no rule and no backup under .mcp")
+
+
+def step_category_stage_from_a_week():
+    """A week of injected real-shape events, then --data-days READY, --from-context, and the
+    written rules match each client's titles (US-3/AC-3)."""
+    from scenarios import CONTEXT_ACME_BETA  # type: ignore[import-not-found]
+    workspace = state["workspace"]
+    for built in state["week"][2:]:
+        _post_buckets(built)
+    code, out, err = _category_rules(workspace, "--data-days")
+    check(code == 0 and "READY" in out and "5 of 5" in out,
+          "five recorded days read READY (5 of 5)")
+    (workspace / "Timesheets" / ".context.md").write_text(CONTEXT_ACME_BETA, encoding="utf-8")
+    code, out, err = _category_rules(workspace, "--inspect")
+    check(code == 0 and "SAMPLE" in out, f"--inspect reads the injected titles ({err.strip()})")
+    check("HOST example.invalid" in out,
+          "the candidate hosts come from the injected titles (HOST example.invalid)")
+    code, out, err = _category_rules(workspace, "--from-context")
+    print(out)
+    check(code == 0, f"--from-context exits 0 ({err.strip()})")
+    verify = [line for line in out.splitlines() if line.startswith("VERIFY")]
+    check(any("ACME" in line for line in verify) and any("BETA" in line for line in verify),
+          "one VERIFY line each for ACME and BETA, asked of the real activity source")
+    rules = (http("GET", "/api/0/settings/classes") or [])
+    names = {" > ".join(r["name"]) for r in rules}
+    check({"ACME", "BETA"} <= names, "the real server now holds an ACME and a BETA category")
+    code, out, _ = _category_rules(workspace, "--status")
+    check(out.startswith("CURRENT"), "--status reads CURRENT straight after the write")
+
+
 def step_uninstall():
     """Unregister the task and compare the day's output with the watcher absent."""
     code, out = powershell(f"Unregister-ScheduledTask -TaskName {TASK} -Confirm:$false")
@@ -211,6 +302,8 @@ def main():
         step_inject_answers()
         step_assert_question_not_block()
         step_assert_lunch_stays_break()
+        step_setup_checks_pass_and_collecting()
+        step_category_stage_from_a_week()
         step_uninstall()
     finally:
         proc = state.get("proc")

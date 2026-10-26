@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Walk a first-time user through installing this plugin — offering to install what the machine is missing, installing the activity source and the browser extensions, interviewing them about their clients to tag single-client browser profiles, write a starter workspace context file and write and verify their category rules, getting the screenshot task past endpoint security, settling whether the Outlook calendar is read, and offering the two optional check-in watchers that ask what you were doing while you were away — verifying each one before moving on, in plain language for a non-technical user. User-invoked.
+description: Open with a menu — set up on a new machine, finish a partial setup, add a new client, fix something that stopped, or report a problem — then walk the user through installing this plugin — offering to install what the machine is missing, installing the activity source and the browser extensions, interviewing them about their clients to tag single-client browser profiles, write a starter workspace context file and write and verify their category rules, getting the screenshot task past endpoint security, settling whether the Outlook calendar is read, and offering the two optional check-in watchers that ask what you were doing while you were away — verifying each one before moving on, in plain language for a non-technical user. User-invoked.
 compatibility: Windows-first. Reads a running ActivityWatch server over HTTP (default http://localhost:5600). Step 5 registers a Windows scheduled task and needs PowerShell plus Python 3.10+; on macOS and Linux there is no screenshot capture to set up and that step is skipped. Step 6 reports the calendar off without classic Outlook. Step 7 offers the optional check-in watchers (Python 3.11+). Needs a harness that can execute local commands and make HTTP requests. Posts nothing to any timesheet provider.
 disable-model-invocation: true
 ---
@@ -39,6 +39,35 @@ Seven steps, and then a stated finish.
 
 Steps 4, 5 and 6 run scripts that ship with the `daily` skill, in a directory beside this one. Resolve **this** skill's folder from where this `SKILL.md` was read, then look for a sibling named `daily` — or, in the shared export, `billables-daily`, because that directory is flat and every skill in it is prefixed. Check which of the two exists rather than guessing; a wrong prefix fails as "file not found", which reads like a broken install rather than a wrong path.
 
+## What do you want to do?
+
+Ask this first, before any install step, in plain words. Offer exactly these five and send the user down the path they pick:
+
+1. **Set up on a new machine** → "Before you start", then the Steps.
+2. **Finish setup on a machine that already has some of it** → "A machine that already has some of it", below.
+3. **Add a new client** → the `onboard-client` skill, a sibling of this one (resolved as below).
+4. **Fix something that stopped working** → the `troubleshoot` skill, a sibling of this one.
+5. **Report a problem or ask for a change** → `daily/references/reporting-issues.md`, "From the setup menu". You draft it and hand it over. You never send, file or post it from here.
+
+A user who has already said what they want ("I've got a new client", "my screenshots stopped") has named their job: do not ask the menu. Take their first action on that path. A user whose answer fits two paths ("new laptop, same clients") gets choice 2, which finds what is missing.
+
+## What only a person does
+
+Setup does every other step itself, once, after one plain line on what it will do and why. These are the steps only a person can do, and the only ones to ask for:
+
+- **Click Add** on a browser-store page. Setup opens the page in the right profile. The store gives no way to do this for them.
+- **Accept an administrator prompt** for an install that already needs one today (the table in `references/install-commands.md`). No new install that needs administrator rights is added here; it is not setup's decision to make.
+- **Accept a consent page**, such as the one Firefox shows after the web watcher installs.
+- **Save a title format** in the extension's options page, in each one-client browser profile (step 3). The extension has no way to be set from outside. Setup gives the exact string.
+- **Put a credential in the configuration dialog**, never in the conversation (`/plugin configure billables`, or the `.env` on an exported install).
+- **Type a category by hand**, only where this ActivityWatch build refuses the write. Step 4 says so out loud first.
+
+Each of these is recorded as verified by its own check in `references/checks.md`, and no other step asks the user to type a command, a pattern or a path.
+
+## A machine that already has some of it
+
+Run each check in `references/checks.md` in order and read the answer. **Skip every check that passes.** Offer only what is missing, as one list with a plain line on each, and do it after a yes. Never write over the user's context file or their category rules: show the diff first, and write only after a yes. A check that fails on an existing install is the `troubleshoot` skill's job to explain; here, fix the missing piece and go on. Their rules were written by an older version? Leave them alone. The daily run's own check says when they are stale.
+
 ## Before you start
 
 Five things before step 1 — the first four in parallel, then the fifth from what they found:
@@ -65,14 +94,9 @@ Five things before step 1 — the first four in parallel, then the fifth from wh
 4. **Is there a shell to run step 5's script in?** A stock Windows box has only Windows PowerShell 5.1, so `pwsh` may not exist. It is optional: `powershell.exe -File ...` runs the scripts under 5.1 just as well. Under 5.1, quote home-relative paths as `"$HOME/..."`: a bare `~` is passed through literally to a native command rather than expanded, so the path resolves to a directory named `~` and the failure reads as "file not found".
 5. **What is missing, offered once.** Look the rest up yourself rather than asking: whether the activity source answers `GET <activity-url>/api/0/info`, whether the Bash tool runs at all (no Bash tool on Windows means no Git Bash), and which browsers are installed — for each Chromium browser, the profiles in `User Data\Local State` under `profile.info_cache` (each key is a profile's directory, its `name` what the user sees). The profiles feed steps 2 and 3, so keep them. Then put everything missing to the user as **one** list, each item with a plain line on why it matters and the command you would run:
 
-   | Missing | Windows | macOS | Linux |
-   |---|---|---|---|
-   | ActivityWatch | `winget install -e --id ActivityWatch.ActivityWatch` | `brew install --cask activitywatch`, where `brew` exists | the downloads page in step 1 |
-   | Python 3.10+ | `winget install -e --id Python.Python.3.13` | `brew install python@3.13` | the distribution's own package |
-   | Git Bash | `winget install -e --id Git.Git` | — | — |
-   | PowerShell 7 (optional) | `winget install -e --id Microsoft.PowerShell` | — | — |
+   The commands are in `references/install-commands.md`, one row per item.
 
-   Ask once — "Shall I install these for you?" — and run only what the user says yes to: a machine-wide install is theirs to choose. Say before you start that Windows may show an administrator prompt and that it is theirs to accept. Anything declined falls back to the step's own instruction, as if nothing had been offered.
+   Ask once — "Shall I install these for you?" — and run only what the user says yes to: a machine-wide install is theirs to choose. The administrator prompt is one of the steps in "What only a person does". Say before you start that Windows may show an administrator prompt and that it is theirs to accept. Anything declined falls back to the step's own instruction, as if nothing had been offered.
 
    **Verify each install by re-running its probe**, not by the installer's exit code. A new Python is not on this session's `PATH` until the shell restarts — probe it by `py` or by the path winget printed. A new Git Bash reaches nothing until a new session starts, because the hook that publishes the configuration runs at session start; say so, and have the user restart and invoke setup again rather than carrying on without it.
 
@@ -81,7 +105,7 @@ Five things before step 1 — the first four in parallel, then the fifth from wh
 Steps 3 and 4 settle who the user's clients are and how each one shows up on screen. Settle it as an **interview in rounds**: each decision opens the ones that depend on it, and a round asks every question whose prerequisites are already answered — the **frontier** — and nothing that waits on an answer not yet given.
 
 - **Number each question and give your recommended answer under it**, with one plain line on why. The user can reply "yes to all" or correct a number.
-- **Facts are yours to find, never the user's to supply.** Profile names come from `Local State`; client codes already in use from the `SEEN` lines; the addresses each client's work opens from the `HOST` lines; the user's own old categories from the `RULE` lines — all printed by `--inspect` (step 4.1). Ask the user only for decisions: which client a thing belongs to, and what to call it.
+- **Facts are yours to find, never the user's to supply.** Profile names come from `Local State`; client codes already in use from the `SEEN` lines; the addresses each client's work opens from the `HOST` lines; the user's own old categories from the `RULE` lines — all printed by `--inspect` (step 4.2). Ask the user only for decisions: which client a thing belongs to, and what to call it.
 - **Done is an empty frontier**: every client has a name, a code and its terms, every work profile is single-client or general, and nothing is left assumed. Then put the one-line-per-client summary (step 4.4), and write once the user confirms it.
 
 The rounds, in the order their prerequisites allow:
@@ -106,9 +130,7 @@ ActivityWatch is the app that records which window is in front and when. Everyth
 >
 > Tell me when you see the icon.
 
-**Verify** — `GET <activity-url>/api/0/buckets/` returns JSON holding a key that starts `aw-watcher-window_` and one that starts `aw-watcher-afk_`. Note the hostname suffix on those keys; the buckets are hostname-scoped and the rest of this run needs the window bucket's full id.
-
-**If it fails** — a refused connection means it is not running (the tray icon, not the installer, is the thing to check). HTML or a 404 instead of JSON means something else holds the port. If the user runs the server on another machine or port, that address is `TIMESHEET_ACTIVITY_URL`: have them set it through `/plugin configure billables` rather than passing it per-command forever, and use the new address for the rest of this run.
+**Verify** and **If it fails** — run `references/checks.md` (check `activity-source`) and do not move on until it passes.
 
 ### 2. The browser extensions are recording
 
@@ -119,7 +141,7 @@ Window titles are the only client signal that survives into the activity stream.
 | URL in title — required | https://chromewebstore.google.com/detail/url-in-title/ignpacbgnbnkaiooknalneoeladjnfgb | none this plugin has been tested with |
 | ActivityWatch web watcher — recommended | https://chromewebstore.google.com/detail/activitywatch-web-watcher/nglaklhklhcoonedhgnpgddginnjdadi | https://addons.mozilla.org/firefox/addon/aw-watcher-web/ |
 
-**Do** — for each browser and work profile "Before you start" found, offer to open the store pages in that profile for them: `Start-Process "<browser exe>" -ArgumentList '--profile-directory="<profile dir>"', '<store url>'`, with the directory from `Local State`. The profile has to be named: without it the page opens in whichever profile was used last, and the extension lands in the wrong one. The user still clicks **Add** — a store install cannot be done for them without browser policy. Then give the user this:
+**Do** — for each browser and work profile "Before you start" found, offer to open the store pages in that profile for them: `Start-Process "<browser exe>" -ArgumentList '--profile-directory="<profile dir>"', '<store url>'`, with the directory from `Local State`. The profile has to be named: without it the page opens in whichever profile was used last, and the extension lands in the wrong one. The user still clicks **Add** ("What only a person does") — a store install cannot be done for them without browser policy. Then give the user this:
 
 > **Add two extensions to each browser profile you work in.** They let your timesheet see which website each window shows.
 >
@@ -134,17 +156,13 @@ Where the user works in Firefox, say plainly that there is no Firefox copy of UR
 
 The verify below is aggregate, so the profile list is not what it is judged against. Step 3's check is the one that walks the profiles one at a time.
 
-**Verify** — have the user browse for a minute in a work profile, then read recent events: `GET <activity-url>/api/0/buckets/<window-bucket>/events?limit=1000`. Keep the events whose `data.app` is a browser, and check that at least one `data.title` carries a hostname — a `host.tld` pattern such as `example.com`. Do not expect all of them to: a profile without the extension, and any window opened before it was installed, legitimately have none. **Zero across every browser event is the failure**, and it localises to this step rather than to the tagging in step 3.
-
-Where the user added the web watcher, `GET <activity-url>/api/0/buckets/` also holds an `aw-watcher-web-<browser>_<host>` bucket for each browser they added it to, updated in the last few minutes. Edge and Vivaldi report as `chrome`; Brave, Opera and Firefox as themselves. A declined web watcher is recorded as off, not as a failure.
-
-**If it fails** — the usual cause is the extension living in one profile while the user browsed in another. Ask which profile they just used and check it directly. A web watcher with no bucket is usually the same fault, or, in Firefox, the extension's own consent page left unaccepted. A managed browser can also refuse the install outright: on Edge or Chrome under policy, each extension has to be allow-listed by ID — `ignpacbgnbnkaiooknalneoeladjnfgb` for URL in title, `nglaklhklhcoonedhgnpgddginnjdadi` for the web watcher — a precise request, which `references/endpoint-security.md` says how to evidence before making.
+**Verify** and **If it fails** — run `references/checks.md` (check `browser-extensions`) and do not move on until it passes.
 
 ### 3. A browser profile dedicated to one client carries that client's tag
 
 **Which browser decides how.** Say which one you are configuring. **Edge** already writes the profile's name into every window title (`… - ClientA - Alex - Microsoft Edge`), so a profile name is a category term with nothing installed: the `PROFILE` lines of step 4.1 list each one with the gate's verdict, and the tag below is an optional upgrade for Edge. **Chrome** writes no profile name — two profiles can show byte-identical titles — so URL in title and its tag are **required** there. **Firefox** has not been verified for either; say so and claim no support. Bracketed codes and rules already written keep working unchanged. Detail: `references/profile-names.md`.
 
-**Do** — run `--inspect` (step 4.1) first, so its lines are in hand, then the interview's rounds 1 and 2. Round 2 decides which of their profiles belongs to exactly one client. **A profile tag goes on those and nowhere else.** A general or default profile — the one they use for everything, their own admin, research, the tools they share across clients — carries none, and its time is attributed from what is on the page instead. A short, collision-resistant **client code** is settled for every client either way; give the user this once per single-client profile, with that profile's own code substituted:
+**Do** — run `--inspect` (step 4.2) first, so its lines are in hand, then the interview's rounds 1 and 2. Round 2 decides which of their profiles belongs to exactly one client. **A profile tag goes on those and nowhere else.** A general or default profile — the one they use for everything, their own admin, research, the tools they share across clients — carries none, and its time is attributed from what is on the page instead. A short, collision-resistant **client code** is settled for every client either way; give the user this once per single-client profile, with that profile's own code substituted:
 
 > **Add this client's code to this profile.** The code is a short label, like ACME. It tells your timesheet that everything in this profile is for that client.
 >
@@ -159,12 +177,7 @@ The narrowing is the point, and it is not tidiness. The code in a tag is the fir
 
 Write down which profile carries which code: step 4 composes a rule from it and writes it into the workspace context file as that client's **Profile tag**.
 
-**Verify** — have the user browse for a minute in each profile they tagged, then read recent events as in step 2 and check the browser titles for a bracketed code, `\[[A-Za-z0-9-]{2,12}\]`. Two checks, and the second is new:
-
-1. Go through the codes the user named one at a time: **each has to appear in at least one real title.** A code with zero matches is a profile whose format string was never saved — which is invisible in the options page, because it shows what was typed rather than what was stored.
-2. Have them browse for a minute in the **general** profile, if they have one, and check those titles carry **no** bracketed code. A leftover tag there is the failure this step now exists to prevent, and it is silent: everything still classifies, to the wrong client.
-
-**If it fails** — the format was saved in a different profile from the one browsed in; or it was typed and the page left without saving. Re-check per profile, not in aggregate: an aggregate pass hides the one profile that is wrong, and that client's whole day comes back uncategorized. A code appearing in the general profile's titles is the reverse of the same fault — the format string was pasted into the wrong profile's options page, and it is cleared there rather than fixed in step 4.
+**Verify** and **If it fails** — run `references/checks.md` (check `profile-tags`) and do not move on until it passes.
 
 ### 4. The clients are written down and their category rules verified
 
@@ -172,33 +185,14 @@ This step is yours, not the user's. Each client gets **one** category rule, made
 
 **Do** — in this order.
 
-1. **Read what is already there.** In the Bash tool, `python "<daily>/scripts/category_rules.py" --inspect` — again where step 3 tagged profiles, so the new tags show. It prints one `RULE` line per category the activity source holds — `[managed]` for the ones this plugin wrote, `[unmanaged]` for the user's own — with the share of recent window titles each matches and an example of what it caught. Above them, one `SEEN` line per profile tag the titles really carry, with the Edge profile it appeared in: those are the client codes as they really appear, so choose from them rather than from what the user remembers. Then one `HOST` line per address the browser titles carry, most-seen first, counted in distinct titles rather than time: these are what a page names its client by when no tag does. A shared host — `dev.azure.com`, `github.com` — is only ever listed with the organisation after it, because bare it is every client's at once.
-2. **Offer to adopt the unmanaged ones, once, as a single list.** Read each rule's name and the titles it caught, work out which client it is for and which of its words are really that client's, and put the whole set to the user **in plain words and in one pass** — "you already have six categories; I read them as Acme from the word ACME, Beta from BetaPortal, …" — never one question per rule. They accept the list, correct the parts that are wrong, or skip adoption entirely. Keep the words that name the client and drop the ones any client's work could produce: `Invoice|ACME|Acme Holdings` adopts as `ACME` and `Acme Holdings`, not `Invoice`.
-
-   **An adopted rule names what it takes over.** Put the existing category's name on the candidate as `"adopts": "Work>Acme"` — the name exactly as the `RULE` line printed it, `>`-joined if it is nested. Without that the compiler has no way to know the old rule and the new one are the same rule, and the user ends up with both. `[managed]` rules need no `adopts`: the rebuild replaces them whole, including every rule an older version of this plugin wrote.
-
-   What they accept is written into `Timesheets/.context.md` at 4.5, with every other term — the rules are rebuilt from each client's **Category terms** line, so a term that lives only in this conversation is dropped by the next rebuild.
-
-   What they skip is left exactly as it is and goes on working, below the rules you write. **A rule the inspect marked `OVER the … ceiling` is worth raising by name** while you have their attention: it matches a large share of everything they do, and since the first matching rule wins it is taking the label off whichever rule should have won.
-3. **Choose each client's terms with the user — up to eight, and usually two to four.** This is the interview's round 3. In this order:
-   - **the client code** — `ACME`. It is in the profile tag, in the name of a browser profile kept for the client, and usually in the workspace or folder the user opened for them, so one term catches all three. Where the code is also an ordinary word — `LEDGER`, `NIMBUS` — use its tag, `[LEDGER]`, instead: the bare word turns up in pages that have nothing to do with the client. A code made up in this interview for an untagged client is in none of those places yet: offer it as a term only where the `HOST` lines or the user's own folders already carry it, and keep it in the context file either way;
-   - **the names of the client's own products or apps** — the system you build for them, the name their app goes by (`AcmePortal`);
-   - **the client's full name**, where it differs from the code;
-   - **the addresses only this client's work opens**, from the `HOST` lines — its SharePoint site (`acmetrust.sharepoint.com`), its DevOps organisation (`dev.azure.com/acme-it`), its CRM environment (`acme-uat.example.com`), its own website. These carry the client for a user whose one profile holds every client, and they are worth offering to a tagged user too, for the pages they open outside that client's profile. Read each one back to the user in plain words — "the Acme Trust SharePoint site" — rather than as an address.
-
-   Nothing any other client's work could produce: no domain words (`Invoice`, `Timesheet`), no product any client could be using (`Dynamics`, `SharePoint`, `Xero`), no application names, and no address shared by every tenant (`go.xero.com`, `app.asana.com`) or opened by the user's own firm (round 1). A client's own tenant on a shared product is theirs; the product's name is not. A term is a literal word, matched without case anywhere in the app name or the title, so write it as the user would say it — never a pattern.
+1. **Is there enough to learn from?** Run `python "<daily>/scripts/category_rules.py" --data-days` in the Bash tool and read the `DATA` line. `COLLECTING` means fewer workdays are recorded than the threshold (five by default; the user's `Workdays before the category stage` line under `## Preferences` changes it). **Stop here: write no rule.** Relay the `say:` line as it stands, write the date to come back under `## Preferences`, and end this step as *collecting data* — the daily run still works without rules, with more questions, and offers this step again once the date has passed. `READY` goes on.
+2. **Read what is already there.** `python "<daily>/scripts/category_rules.py" --inspect` — again where step 3 tagged profiles, so the new tags show. It prints `RULE`, `SEEN`, `PROFILE` and `HOST` lines, described in `references/choosing-terms.md`.
+3. **Choose each client's terms with the user** — adopting their own categories and choosing terms are both in `references/choosing-terms.md`, which is the one home of those rules. This is the interview's round 3.
 4. **Say what you are about to do, in one line per client** — "Acme: ACME, AcmePortal, Acme Holdings, the Acme Trust SharePoint site. Beta: BETA, Fabric Orders. Your six other categories stay as they are." — and go on once they say yes. That confirmation is the end of the interview.
 5. **Write the workspace and its context file** — before the rules, because the script stamps the rules with a fingerprint of this file, and a file written after them reads as changed on the `daily` skill's next run.
    - **The workspace** is the folder round 1 chose. From a clone of the repo, `install/setup_workspace.ps1 -Workspace <path>` (POSIX: `install/setup_workspace.sh <path>`); otherwise create `Timesheets/`, `daily_exports/` and `.mcp/` in it yourself. A folder other than the one sessions start in also needs `TIMESHEET_WORKSPACE` set to it — through `/plugin configure billables`, or the `.env` on an exported install — once the folder exists; until the next session, pass `--workspace <path>` to the script below.
    - **`Timesheets/.context.md` is never written over.** If it does not exist, copy the `daily` skill's `references/context.md.example` to it, then fill in the **AW buckets** section from step 1's bucket ids and one **Active client projects** section per client: **Client name** as the provider spells it, **Profile tag** where step 3 set one (else delete that line), **Category terms**, and under **Signals** the profile and the addresses behind its host terms. Leave every other section as the template has it: those are the `daily` skill's first run to fill. If the file already exists — a user re-running setup — write the same facts into it as a change, showing the user the diff first, as the `daily` skill does.
-6. **Write the rules.** Write the candidates to a JSON file with your file-writing tool:
-
-   ```json
-   [{"client": "Acme", "terms": ["ACME", "AcmePortal", "Acme Holdings", "acmetrust.sharepoint.com"]},
-    {"client": "Beta", "terms": ["BETA", "Fabric Orders"], "adopts": "Work>Beta"}]
-   ```
-
-   and pass its path: `python "<daily>/scripts/category_rules.py" --candidates <file>`. One entry per client, in the order that should win a title two clients both match, and each client's terms exactly as its **Category terms** line has them. Run it in the **Bash** tool, like every other configured read in this skill. The script backs the existing rules up into the workspace before it writes a thing, so there is no diff to show.
+6. **Write the rules from the context file.** Run `python "<daily>/scripts/category_rules.py" --from-context` (add `--adopts "Client=Existing name"` for each rule the user chose to adopt) in the **Bash** tool, like every other configured read in this skill. The clients and their terms are read from the file you just wrote, in file order, which is the order that wins a title two clients both match. Nothing is transcribed into a second list. The script backs the existing rules up into the workspace before it writes a thing, so there is no diff to show.
 
 **The user's own internal work gets no category and no client.** Leave it uncategorized: internal time is carried at review by an exclusion and the internal-admin task, and inventing a client name for the user's own firm puts a name in the client field that their timesheet provider does not have.
 
@@ -214,22 +208,7 @@ This step is yours, not the user's. Each client gets **one** category rule, made
 
 Save per category rather than once at the end. Keep the category flat and named for the client: the timeline joins a category's name path with `>`, so a grouping parent changes the label every downstream consumer matches on.
 
-**Verify** — the same evidence either way, and never the UI having appeared to save.
-
-- **The context file** — `Timesheets/.context.md` exists in the workspace, and carries one client section per client with a **Category terms** line matching what the candidates passed. Read it back rather than trusting the write.
-- **On the written route**, the script's own output: one `VERIFY` line per client, naming how many sampled titles its terms matched and how many hours **the activity source itself** labels with the rule. The script asks the activity source rather than trusting its own matching: a rule it matched that the activity source labels nothing with fails the run with an `ERR`, as does a rule missing from what reads back. A `WROTE` line with no `VERIFY` lines under it is the same thing.
-- **On the manual route**, re-run `--inspect` and read the `RULE` lines. Judge them against **the codes the user demonstrated in this session**, not against every rule on the machine: each of those must match at least one real title. A rule that matches nothing is only a defect if its code is one the user just showed you working — on a machine that has been running a while, a zero usually means that client simply wasn't worked on inside the sampled window, and calling it broken sends the user to fix something that is fine. A leftover placeholder (`New class`, `FILL ME`) is a defect either way.
-
-**If it fails** — the gate refuses in words, and a refusal anywhere means *nothing* was written, so answer every line it printed and re-run. In order of how often each is the answer:
-
-- **`UNVERIFIED … matches none of the sampled titles`** — written, not refused, so the run exits 0 and this is easy to read past. For a code the user demonstrated in this session it is a failure: that word is not in this machine's titles. Usually the code and the tag disagree, or the profile carrying it was never browsed in, which is really a step 3 failure surfacing here; the `SEEN` lines printed under it are the codes really there. `suspect` means the client's other terms matched and this one did not; `dormant` means none of them did, which for a client not worked on lately is fine. For a user with one profile for every client, a code with no `SEEN` line is expected — nothing tags their titles — and their client's addresses are what has to match.
-- **`OVERLAP … both match`** — written, but two clients' terms catch the same titles, and the first client in the file takes them. Usually one term is shared, or is a word both clients' work produces: drop it and re-run.
-- **`over the … ceiling`** — a term is too broad. The first matching rule wins, so a broad term does not merely add noise, it takes the label off a correct rule. Drop it, or use a longer word only this client's work produces.
-- **`over the 8 a client's rule takes`**, **`one candidate per client`**, **`a candidate needs "terms"`** — all three are yours, not the user's. Fix the file and re-run.
-- **`ERR … labels none of them`** — the activity source does not match the rule the way the script did. That is a defect in this plugin, not in the user's terms: the backup the run printed is the rule set as it was, and it goes upstream by `<daily>/references/reporting-issues.md`.
-- **An `ERR` about the settings endpoint or the write** — the manual route above, loudly.
-
-If this install carries `demo/tag-rule-demo.html`, opening it shows the matching failures live and is faster than explaining them.
+**Verify** and **If it fails** — run `references/checks.md` (check `category-rules`) and do not move on until it passes.
 
 ### 5. The screenshot task is registered and actually capturing
 
@@ -243,17 +222,7 @@ If `TIMESHEET_SCREENSHOTS_DIR` is configured, pass the same path as `-Screenshot
 
 **Read that value in the Bash tool** — `python "<daily>/scripts/screenshot_capture.py" --where` — and put the result on `-ScreenshotsDir`, **quoted**: `-ScreenshotsDir "C:\My Shots"`, because an unquoted path with a space binds only up to the space and errors. This `.ps1` is necessarily run through PowerShell, and the configuration reaches Bash tool calls alone (the same reason the probe in "Before you start" is a Bash command), so read there it comes back empty, the task registers against `~\Pictures\WorkScreenshots`, and the capture writes where nothing reads — the divergence passing it explicitly is meant to close. Use that command rather than echoing the variable: it applies the full precedence and expands a `~`, and it is the same resolution the capture script itself writes by.
 
-**Verify** — three checks, and the second is the one that catches a stale install:
-
-1. `Get-ScheduledTaskInfo -TaskName WorkScreenshots` returns without error.
-2. `(Get-ScheduledTask -TaskName WorkScreenshots).Actions` — read the `Execute` and `Arguments` back and confirm they name **this** install's `screenshot_capture.py` and a current interpreter. A machine that once had a hand-installed copy keeps a task pointing at the old path; it registers, reports `Ready`, and captures into a folder nobody reads. On a plugin install the stored path names a *versioned* cache folder, and the session-start hook re-points it at the current version each time a session starts — so a plugin-install task still naming a superseded version usually means the hook is not running on this machine, which is the same gap as configuration not arriving, and `references/first-run.md` § "When the configuration does not arrive" in the `daily` skill is the route. The other cause is a task the hook could not write, which is the elevated-shell registration under "If it fails" below; the hook gives up on that one until the next release rather than retrying every session.
-3. Fire one capture by hand and confirm the files land: run `screenshot_capture.py` from the sibling skill's `scripts/`, **passing the same directory as its first argument**, then list that directory's folder for today and confirm `HH-MM-SS_m1.png` files appeared, one per monitor. The script would fall back to the configured value on its own, but only if the session published it — pass it explicitly so a check that comes back empty means no capture rather than two folders. Multi-monitor machines write `_m1`, `_m2`, `_m3`; a laptop on its own writes only `_m1`.
-
-**If it fails** — decide which of three it is before telling the user anything, because they lead to completely different asks:
-
-- **`Access is denied` on registration** — a previous task was registered from an elevated shell, so the task file is owned by `BUILTIN\Administrators`. Do *not* just have them re-run setup elevated: that succeeds and re-creates the task with the same owner, so the next ordinary re-register fails identically and they are back here. Two steps — `Unregister-ScheduledTask -TaskName WorkScreenshots -Confirm:$false` from an **elevated** PowerShell, then the setup script from a **normal** one, which is what leaves the task owned by the user.
-- **`No module named mss` / `No module named PIL`, or the task's `LastTaskResult` is `0x80070002`** — an interpreter problem, not a security one. The stored path is absolute, so a Python upgrade or reinstall breaks every trigger from that moment on. Re-run the setup script, or pin the interpreter with `-PythonExe <path>`.
-- **The task registers, reports `Ready`, and no image ever appears** — this is the one that is usually endpoint security. Read `references/endpoint-security.md` before saying so to the user: it has to be evidenced before it is escalated.
+**Verify** and **If it fails** — run `references/checks.md` (check `screenshot-task`) and do not move on until it passes.
 
 ### 6. The calendar is settled — on and readable, or off on purpose
 
@@ -267,19 +236,7 @@ python "<daily>/scripts/calendar_day.py" <today, YYYY-MM-DD>
 
 That one command is the whole check, whatever the toggle says. **Do not read the toggle to find out first** — a command written to see whether a configured value is set writes its own answer into the transcript, which is the rule from "Before you start" and the family the 0.5.0 leak came from. This one answers by doing what the `daily` skill will do, which is the only answer that means anything: on a machine with new Outlook alone the toggle is on and the calendar still cannot be read.
 
-**Verify** — the command's own answer, which is one of three. Every refusal you can get here exits 1 — only a malformed date exits 2 — so judge it by the `ERR` line and never by the exit code:
-
-1. **A JSON day, exit 0** — the calendar is on and working. Report **how many events it holds and the first one's subject**, and nothing else out of it: that is enough to show the adapter reached the right calendar, and the rest of the day's meetings are the user's business rather than the transcript's. An empty `events` list passes too — say which it is, though, because "the calendar was read and today has nothing on it" and "the calendar could not be read" look identical if you don't.
-2. **`ERR the calendar is off: TIMESHEET_OUTLOOK_CALENDAR is not set to true …`** — the ordinary state, and most installs. Offer it in one sentence: *the plugin can read your Outlook calendar, so a meeting you sat through without touching the keyboard is billed rather than lost as a break, and a meeting it cannot corroborate is put to you as a question instead of billed.* If they want it, the route is `/plugin configure billables` → **Read my Outlook calendar** — or, on the exported install, the `TIMESHEET_OUTLOOK_CALENDAR=true` line of the `.env` beside the sibling skill's `SKILL.md`, the same file "Before you start" routes a gap to. **Then run the same command again — and read the answer by the route they took**, because the two routes reach a running session differently. A `.env` is read by the script itself, so the re-check should now print the day, and a second `off` means the line is wrong: `true` is the one spelling of on. **The dialog will still say off, and that is expected rather than a failure** — declared configuration is published to a session when it *starts*, so a value set now reaches the next one. Say that, and say what closes it: start a new session and run this one command again before the first `/billables:daily`. Don't send them back to the dialog, and don't record step 6 as passed on the strength of the dialog having been filled in — a user who is not told this reads their first drafted day, sees no calendar in it, and concludes the feature does not work. If they don't want it, say the calendar stays off and move on: off is exactly today's behaviour and costs them nothing.
-3. **`ERR the calendar stays off: …`, or an adapter failure whose reason names classic Outlook** — the toggle is on and this machine cannot read a calendar. Say so and say why: the shipped adapter drives **classic Outlook**'s object model, which new Outlook (the store app) does not have at all, and which macOS and Linux have no equivalent of. Then **have them turn the toggle back off**, and do not leave this as a note for later — an on-but-unreadable calendar is not a quiet no-op. The `daily` skill stops on a calendar it was told to read and could not, so every run from here would fail on this same line until the toggle goes off.
-
-**If it fails** — the answers that are not about the calendar at all, and are the more likely ones:
-
-- **The re-check still says off in a session that started *after* the dialog was filled in, or straight away on the `.env` route.** That is no longer the expected answer above; it is the same gap as a `MISSING` in "Before you start" — the message names the shell when the configuration cannot have reached the command at all — and `references/first-run.md` in the `daily` skill owns the diagnosis. Check the spelling first: `true`, and nothing else, is on.
-- **An `ERR` naming the activity source.** Step 1 passing does not keep the server running, and the corroboration verdict is computed against the day's window events, so there is no calendar day to be had without it. That is step 1 to re-check, not the calendar.
-- **An `ERROR:` saying no timezone could be read.** The wrapper needs the zone to know which day it is reading, and takes it from the configuration or from the machine; this machine offered neither, or named a zone this interpreter cannot load — the message says which, and names `tzdata` where that is the cause. Route the user to the configuration dialog for the zone, or to the install the message names; the calendar is untested until one of them is done, so say that rather than reporting step 6 passed.
-- **`No such file`, or a `ModuleNotFoundError`.** The sibling path, not the calendar: `daily` on a plugin install and `billables-daily` in the shared export, per "Finding the files this skill needs".
-- **`ERR the calendar adapter … is not there: this copy of the skill does not ship it`.** The wrapper is present and the adapter beside it is not, which is a half-copied install rather than anything the user configured. Re-install rather than re-configure — and until it is fixed the toggle has to go off, for the reason in outcome 3.
+**Verify** and **If it fails** — run `references/checks.md` (check `calendar`) and do not move on until it passes.
 
 ### 7. The check-in watchers are offered — on and recording, or off on purpose
 
@@ -296,13 +253,7 @@ Optional, and entered either way: *off* is an outcome to state, not a step to sk
 
 On Windows, offer only the check-in watcher. The ask watcher needs a program Windows does not have, so it is not offered there. Install only what the user says yes to. On Windows, run `<daily>/scripts/setup_checkin_watcher.ps1` — add `-DryRun` first and read it back; it needs Python 3.11 or newer and no admin rights. On Mac and Linux, follow the reference; for the ask watcher it has the install, the two weekday prompts, the check and the removal. A **no** is written as `Check-in watcher: off` or `Ask watcher: off` under `## Preferences` in `Timesheets/.context.md`, and asked about never again.
 
-**Verify** — for a watcher the user said yes to, run `python "<daily>/scripts/checkin_answers.py" --probe checkin` (or `--probe ask`) and read `found`. `true` with a `newest_event` is recording. `true` with none means it is installed and has not yet been answered: say so, and do not call it a failure. For a watcher the user declined, nothing is run, and the finish says "off, by your choice".
-
-**If it fails** — `found` is `false` after an install:
-
-- Run `python "<daily>/scripts/checkin_answers.py" --diagnose`. If it names `two-afk-buckets`, the check-in watcher stops itself because it finds two activity records from two computers. Say that in plain words, name the old one it reports, and offer to export it first. Delete it only after the export is saved and the user says yes to that named record. Never delete without both.
-- The watcher needs Python 3.11 or newer. A Python 3.10 install is the next most likely cause: say so, and offer the install table in "Before you start".
-- A watcher that is installed but never prompts: on Windows check `Get-ScheduledTask -TaskName CheckinWatcher`. Whether the task starts after the next sign-in cannot be seen from here; say that, and ask the user to tell you after their next sign-in.
+**Verify** and **If it fails** — run `references/checks.md` (check `checkin-watchers`) and do not move on until it passes.
 
 ## When endpoint security is the answer
 
@@ -316,6 +267,6 @@ Say so plainly, and say what is now true: the activity source is recording, brow
 
 - The check-in watchers are on, or off by your choice. Say which, in one line each. A watcher that is on only asks; a work answer comes back to the user as a question at review and is never billed without their yes.
 - The `daily` skill has its own first run. It finds the sections of `Timesheets/.context.md` step 4 left as template — colleagues, external contacts, work kinds, how they bill, what to exclude — and walks the user through them. Tell the user where the file is, that it is theirs to edit, and that the category rules are rebuilt from its **Category terms** lines, so a new word for a client goes there. Then tell them to invoke that skill next, for a day they have already worked.
-- Two things go stale on their own and are worth naming now: a new client needs its **Category terms** adding to `.context.md` — its rule follows on the next run, and a single-client browser profile also wants its own tag — and a screenshot task that stops firing does so silently. `Get-ScheduledTaskInfo -TaskName WorkScreenshots` with a `LastTaskResult` of `0` is the health check.
+- Two things go stale on their own and are worth naming now: a new client needs its **Category terms** adding to `.context.md` — its rule follows on the next run, and a single-client browser profile also wants its own tag — and a screenshot task that stops firing does so silently. The health check is in `references/checks.md`.
 
 Nothing in this skill posts to a timesheet provider, and the `daily` skill will not either without passing the confirmation gate. Say that too — it is the question a new user has and does not always ask.
