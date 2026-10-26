@@ -32,11 +32,14 @@ activity-to-timesheet/
 │   ├── adr/                  # the decisions that are hard to reverse, with their reasoning
 │   ├── agents/               # tracker and label conventions the engineering skills read
 │   └── skills/daily/decision-log.md  # the evidence behind the daily skill's rules
+│   └── skills/setup/human-only-audit.md  # every setup step, and which only a person can do
 ├── demo/
 │   └── tag-rule-demo.html    # interactive demo of the tag/category-rule failure modes
 ├── .claude-plugin/           # marketplace + plugin manifests, incl. the configuration it asks for
 ├── hooks/                    # SessionStart: hands that configuration to the bundled scripts
-├── skills/setup/             # /billables:setup — the manual steps, each one verified
+├── skills/setup/             # /billables:setup — the front door: a menu, then the steps, each one verified
+├── skills/onboard-client/    # /billables:onboard-client — add a client
+├── skills/troubleshoot/      # /billables:troubleshoot — something stopped working
 ├── skills/reconcile/         # /billables:reconcile — days worked but never billed
 ├── skills/daily/             # /billables:daily — the timesheet run
 │   ├── SKILL.md              # the skill's instructions
@@ -174,6 +177,9 @@ the column.
 | A version bump is the only thing that reaches an installed user, so the manifest version and the changelog's newest heading must agree | `.claude-plugin/plugin.json` `version` | the repo-level `tests/test_distribution.py::test_every_version_marker_agrees` | `AGENTS.md` §Releasing, this file's own §Releasing below |
 | Standing the screenshot task up: what `setup_screenshot_pipeline.ps1` registers — the schedule it fires on, the directory it captures into, the script it runs *in place* — and the two shells that clear an `Access is denied` for good, because re-running elevated recreates the same `BUILTIN\Administrators` owner | the `setup` skill's `SKILL.md` step 5 | the repo-level `tests/test_setup_skill.py` — the `-StartTime` and `-EndTime` the script's own `param()` block binds, held against the *paragraph that runs the script* rather than against the step, because the **Do** above it already names the same two in an aside and a whole-step check passes with the owning paragraph deleted; and the elevated-task fix counted across every `skills/**/*.md` and refused a second copy. Both are scoped to `skills/` and cannot see `README.md` | `README.md` § 10 was the third copy this row was written for, and #38 deleted it with the rest of the walkthrough; `references/first-run.md` § "Screenshot capture", now a pointer here plus the health check it owns outright — a task that was working and stopped; the `reconcile` skill's capture-less-days finding, which names the health check alone. The split is #39's, and the line it draws is **standing one up against diagnosing one that has stopped** — the same line those two files already claim in their own headers |
 | Getting a Harvest account ID and a personal access token, and what makes them reach a running session | `references/first-run.md` §"First-run: configuration", which is the copy carrying *why* — the precedence the seam applies, where a sensitive value actually sits on this platform, and why a new session is what delivers it | the repo-level `tests/test_plugin_config.py`, which counts the shipped files naming `id.getharvest.com` and refuses a second. It holds the count rather than the wording: the `setup` skill routes a missing credential to the configure dialog and must never collect one itself, which is the copy worth preventing | `README.md`'s install table, which is the reading version of where the values are stored; `SKILL.md` Prerequisite 5, which checks the credentials work and routes a failure here. The install table keeps the `id.getharvest.com` address a reader needs before installing anything, so the guard stays scoped to `skills/` rather than widening to the whole repo |
+| Category terms have one home: the **Category terms** line in the context file. Rules are compiled from it with `--from-context`; no skill, reference or script holds, defines or transcribes them | `docs/adr/0010-setup-is-the-one-front-door.md` | `tests/test_one_home_for_terms.py` — scans the exported set and proves itself by planted violations | `skills/setup/references/choosing-terms.md`, `skills/daily/scripts/context_terms.py` |
+| No shipped skill asks for a credential in chat or prints one | `skills/setup/SKILL.md` "What this covers" | `tests/test_credentials_never_in_chat.py` — planted ask and planted print both fail it | `skills/setup/references/checks.md` |
+| The steps only a person can do are one list, and every setup step is classified | `skills/setup/SKILL.md` "What only a person does" | `tests/test_setup_human_only_audit.py` | `docs/skills/setup/human-only-audit.md` |
 
 ### Held by a reader
 

@@ -8,6 +8,10 @@ and the precedent for the distinction is
 [ADR-0002](./0002-defer-splitting-the-provider-into-its-own-plugin.md), which was superseded when
 its decision reversed. **Amended again 2026-10-01 (#67)**, on the same grounds: setup now offers to
 perform the installs it used to only describe, and scaffolds the workspace it used to defer.
+**Amended a third time 2026-10-27**: setup is now the one front door
+([ADR-0010](./0010-setup-is-the-one-front-door.md)). It routes the jobs that are not an install
+to two sibling skills, so the walkthrough this ADR made the only owner of the install no longer
+owns every setup-adjacent job. The install itself is still setup's alone.
 **Context:** distribution. Related: [`ADR-0004`](./0004-generate-the-shared-agent-skills-export.md)
 (the other install artifact), issues #12 and #14.
 
