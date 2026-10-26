@@ -58,6 +58,7 @@ Setup does every other step itself, once, after one plain line on what it will d
 - **Click Add** on a browser-store page. Setup opens the page in the right profile. The store gives no way to do this for them.
 - **Accept an administrator prompt** for an install that already needs one today (the table in `references/install-commands.md`). No new install that needs administrator rights is added here; it is not setup's decision to make.
 - **Accept a consent page**, such as the one Firefox shows after the web watcher installs.
+- **Save a title format** in the extension's options page, in each one-client browser profile (step 3). The extension has no way to be set from outside. Setup gives the exact string.
 - **Put a credential in the configuration dialog**, never in the conversation (`/plugin configure billables`, or the `.env` on an exported install).
 - **Type a category by hand**, only where this ActivityWatch build refuses the write. Step 4 says so out loud first.
 

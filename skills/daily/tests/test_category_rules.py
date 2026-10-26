@@ -1118,7 +1118,7 @@ def test_data_days_come_back_date_is_the_workday_that_reaches_the_threshold(
         live_aw, workspace):
     first, second = past_days(2)
     result = data_days(live_aw, worked(first), worked(second))
-    needed, cursor = 3, dt.date.today()
+    needed, cursor = 3, dt.datetime.now(dt.timezone.utc).date()  # the run is --utc-offset 0
     while needed:
         cursor += dt.timedelta(days=1)
         if cursor.weekday() < 5:
