@@ -39,6 +39,8 @@ is why it lives with your facts rather than in a shipped script.
   <!-- activity_timeline --gap-fold -->
 - **Smallest span the timeline prints**: `3.0 min` — shorter ones are hidden from the text
   view but still counted in the rollup  <!-- activity_timeline --min-span -->
+- **Category stage reminder**: `on` — set `off` to stop the daily run offering the category stage
+  <!-- daily Step 2 -->
 - **Category-rule breadth ceiling**: `0.35` — a category term matching more than this share of your
   recent window titles is refused as over-broad. Raise it if you work for one client most
   of the time  <!-- category_rules --max-share -->
