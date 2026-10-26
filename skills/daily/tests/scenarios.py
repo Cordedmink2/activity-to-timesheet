@@ -347,3 +347,49 @@ SCENARIOS: tuple[Scenario, ...] = (
 )
 
 BY_NAME = {s.name: s for s in SCENARIOS}
+
+
+# --------------------------------------------------------------------------------------
+# Real-shape fixtures for the category stage and the setup checks (guided-setup T21)
+# --------------------------------------------------------------------------------------
+# Shapes copied from the watchers at the pinned ActivityWatch v0.14.1 commits; the source
+# lines are named in `test_real_shapes.py`. Hosts are `example-*`, clients ACME / BETA.
+
+REAL_SHAPE_HOST = "example-host"
+
+CONTEXT_ACME_BETA = """# Context
+
+## Active client projects
+
+### Acme Ltd
+
+**Client name**: `ACME`
+**Category terms**: `ACME`, `AcmePortal`
+
+### Beta Co
+
+**Client name**: `BETA`
+**Category terms**: `BETA`, `Fabric Orders`
+"""
+
+
+def week_of_work(count: int = 5) -> list[Day]:
+    """`count` distinct completed weekdays, newest first, each a morning of ACME work and an
+    afternoon of BETA work in a window bucket, with the AFK bucket's `not-afk` between."""
+    days, cursor = [], dt.date.today() - dt.timedelta(days=1)
+    while len(days) < count:
+        if cursor.weekday() < 5:
+            built = day(date=cursor, offset=0, host=REAL_SHAPE_HOST)
+            built.active("09:00", "12:00").active("13:00", "17:00")
+            built.window("09:00", "12:00", "Code.exe", "AcmePortal - ACME-1 - editor")
+            built.window("13:00", "17:00", "msedge.exe",
+                         "Fabric Orders - BETA board - example.invalid/orders")
+            days.append(built)
+        cursor -= dt.timedelta(days=1)
+    return days
+
+
+def real_shape_buckets(built: Day) -> dict[str, list[dict]]:
+    """The window and AFK buckets of a day, as the two real watchers write them."""
+    return {name: events for name, events in built.buckets().items()
+            if name.startswith(("aw-watcher-window_", "aw-watcher-afk_"))}
