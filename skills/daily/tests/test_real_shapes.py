@@ -52,3 +52,13 @@ def test_a_week_is_five_distinct_past_weekdays_with_acme_and_beta_titles_and_exa
 def test_the_context_file_has_one_section_per_client_and_a_category_terms_line_each():
     assert CONTEXT_ACME_BETA.count("**Category terms**") == 2
     assert "ACME" in CONTEXT_ACME_BETA and "BETA" in CONTEXT_ACME_BETA
+
+
+def test_a_browser_title_has_the_url_in_title_extensions_shape_and_the_scripts_read_its_host():
+    """The extension writes `{title}-{hostname}{path}` (the format setup step 3 tells the user
+    to save), so the host is joined to the page title by a bare hyphen. The category script
+    must read `example.invalid` out of the fixture's own browser title."""
+    import category_rules
+    sample = [(e["data"]["app"], e["data"]["title"])
+              for d in week_of_work(2) for e in d.window_events()]
+    assert category_rules.host_counts(sample)["example.invalid"] >= 1

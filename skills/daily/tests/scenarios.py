@@ -383,7 +383,7 @@ def week_of_work(count: int = 5) -> list[Day]:
             built.active("09:00", "12:00").active("13:00", "17:00")
             built.window("09:00", "12:00", "Code.exe", "AcmePortal - ACME-1 - editor")
             built.window("13:00", "17:00", "msedge.exe",
-                         "Fabric Orders - BETA board - example.invalid/orders")
+                         "Fabric Orders-example.invalid/orders - [BETA]")
             days.append(built)
         cursor -= dt.timedelta(days=1)
     return days
