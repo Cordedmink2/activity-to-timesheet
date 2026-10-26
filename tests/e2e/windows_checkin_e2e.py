@@ -32,6 +32,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -205,8 +206,13 @@ def _post_buckets(built):
         kind = ("afktask" if bucket.startswith("aw-watcher-ask-away") else
                 "afkstatus" if "afk" in bucket else "currentwindow")
         q = urllib.parse.quote(bucket, safe="")
-        http("POST", f"/api/0/buckets/{q}", {"id": bucket, "client": "billables-e2e",
-                                              "type": kind, "hostname": built.host})
+        try:
+            http("POST", f"/api/0/buckets/{q}", {"id": bucket, "client": "billables-e2e",
+                                                  "type": kind, "hostname": built.host})
+        except urllib.error.HTTPError as exc:
+            exc.close()                  # release the response body, or Python 3.14 warns
+            if exc.code != 304:          # the real server's answer for a bucket that exists
+                raise
         if events:
             http("POST", f"/api/0/buckets/{q}/events", [
                 {"timestamp": e["timestamp"], "duration": e["duration"], "data": e["data"]}
